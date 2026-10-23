@@ -85,6 +85,12 @@ func Run(manifestPath, outputRoot string, parallelJobs, workersPerJob int) (Repo
 	return RunWithDisk(manifestPath, outputRoot, parallelJobs, workersPerJob, 0)
 }
 func RunWithDisk(manifestPath, outputRoot string, parallelJobs, workersPerJob, diskPartitions int) (Report, error) {
+	return RunWithCompression(manifestPath, outputRoot, parallelJobs, workersPerJob, diskPartitions, false)
+}
+
+// RunWithCompression enables direct-to-gzip evidence for independent batch jobs.
+// Older callers keep the existing plaintext default.
+func RunWithCompression(manifestPath, outputRoot string, parallelJobs, workersPerJob, diskPartitions int, evidenceGzip bool) (Report, error) {
 	report := Report{Schema: Schema, StartedUTC: time.Now().UTC().Format(time.RFC3339), ParallelJobs: parallelJobs, WorkersPerJob: workersPerJob, DiskPartitions: diskPartitions}
 	if diskPartitions != 0 && (diskPartitions < 2 || diskPartitions > 64) {
 		return report, fmt.Errorf("disk partitions must be 2..64")
@@ -126,7 +132,7 @@ func RunWithDisk(manifestPath, outputRoot string, parallelJobs, workersPerJob, d
 				}
 				var summary engine.Summary
 				var e error
-				options := engine.RunOptions{Workers: workersPerJob, DiskPartitions: diskPartitions}
+				options := engine.RunOptions{Workers: workersPerJob, DiskPartitions: diskPartitions, EvidenceGzip: evidenceGzip}
 				if diskPartitions > 0 {
 					summary, e = engine.RunDiskWithOptions(config, out, options)
 				} else {

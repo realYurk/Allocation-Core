@@ -38,6 +38,7 @@ type Request struct {
 	DiskPartitions  int    `json:"disk_partitions"`
 	DriverDiskIndex bool   `json:"driver_disk_index"`
 	DriverCache     bool   `json:"driver_cache"`
+	EvidenceGzip    bool   `json:"evidence_gzip"`
 }
 type Job struct {
 	ID          string            `json:"id"`
@@ -301,7 +302,7 @@ func (s *Server) jobsHandler(w http.ResponseWriter, r *http.Request) {
 			jsonOut(w, 400, map[string]string{"error": e.Error()})
 			return
 		}
-		opts := engine.RunOptions{Workers: req.Workers, DiskPartitions: req.DiskPartitions, DriverDiskIndex: req.DriverDiskIndex}
+		opts := engine.RunOptions{Workers: req.Workers, DiskPartitions: req.DiskPartitions, DriverDiskIndex: req.DriverDiskIndex, EvidenceGzip: req.EvidenceGzip}
 		if req.DriverCache {
 			opts.DriverCacheDir = filepath.Join(s.store, "cache")
 		}
@@ -357,7 +358,7 @@ func (s *Server) jobHandler(w http.ResponseWriter, r *http.Request) {
 		jsonOut(w, 200, j)
 		return
 	}
-	allowed := map[string]bool{"results.csv": true, "ledger.csv": true, "reconciliation.csv": true, "source_to_pool.csv": true, "run_summary.json": true}
+	allowed := map[string]bool{"results.csv": true, "ledger.csv": true, "ledger.csv.gz": true, "reconciliation.csv": true, "source_to_pool.csv": true, "source_to_pool.csv.gz": true, "lineage_links.csv": true, "lineage_links.csv.gz": true, "evidence_stream_manifest.json": true, "run_summary.json": true}
 	if !allowed[parts[1]] {
 		w.WriteHeader(404)
 		return

@@ -2,12 +2,14 @@ package engine
 
 import (
 	"bufio"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"io"
 	"os"
 	"path/filepath"
@@ -54,6 +56,7 @@ type RunOptions struct {
 	CheckpointDir      string // durable completed stages, disk execution only
 	Resume             bool   // allow reusing validated completed checkpoints
 	TestStopAfterStage int    // tests only: abort after N completed durable stages
+	EvidenceGzip       bool   // V18: stream lossless, integrity-recorded gzip for evidence CSV
 }
 
 // PoolResult is computed entirely off-thread. Output files are written only by
@@ -270,15 +273,41 @@ type driverRef struct {
 	targetChecks map[string]func(string) bool
 }
 
+// csvSink may transparently write an on-the-fly gzip file, preserving the
+// exact original CSV byte stream (including UTF-8 BOM). It never stages a full
+// plaintext ledger. Both formats use the same coordinator order and rows.
 type csvSink struct {
-	buf   *bufio.Writer
-	f     *os.File
-	w     *csv.Writer
-	final string
-	temp  string
+	buf     *bufio.Writer
+	f       *os.File
+	w       *csv.Writer
+	gz      *gzip.Writer
+	digest  hash.Hash
+	rawSize int64
+	final   string
+	temp    string
+}
+
+type digestWriter struct {
+	dst  io.Writer
+	sink *csvSink
+}
+
+func (d digestWriter) Write(p []byte) (int, error) {
+	n, err := d.dst.Write(p)
+	if n > 0 {
+		_, _ = d.sink.digest.Write(p[:n])
+		d.sink.rawSize += int64(n)
+	}
+	return n, err
 }
 
 func newSink(path string, header []string) (*csvSink, error) {
+	return newSinkWithCompression(path, header, false)
+}
+func newSinkWithCompression(path string, header []string, compress bool) (*csvSink, error) {
+	if compress {
+		path += ".gz"
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return nil, err
 	}
@@ -287,15 +316,25 @@ func newSink(path string, header []string) (*csvSink, error) {
 	if err != nil {
 		return nil, err
 	}
-	buffer := bufio.NewWriterSize(f, 256*1024)
-	// A UTF-8 BOM allows Windows Excel to open multilingual CSV without guessing ACP.
-	if _, err := buffer.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
-		f.Close()
-		return nil, err
+	s := &csvSink{f: f, final: path, temp: tmp, digest: sha256.New()}
+	var target io.Writer = f
+	if compress {
+		z, e := gzip.NewWriterLevel(f, gzip.BestSpeed)
+		if e != nil {
+			f.Close()
+			os.Remove(tmp)
+			return nil, e
+		}
+		s.gz = z
+		target = z
 	}
-	s := &csvSink{f: f, buf: buffer, w: csv.NewWriter(buffer), final: path, temp: tmp}
-	if err := s.w.Write(header); err != nil {
-		f.Close()
+	s.buf = bufio.NewWriterSize(digestWriter{dst: target, sink: s}, 256*1024)
+	if _, err = s.buf.Write([]byte{0xEF, 0xBB, 0xBF}); err == nil {
+		s.w = csv.NewWriter(s.buf)
+		err = s.w.Write(header)
+	}
+	if err != nil {
+		s.abort()
 		return nil, err
 	}
 	return s, nil
@@ -304,23 +343,38 @@ func (s *csvSink) write(fields []string) error { return s.w.Write(fields) }
 func (s *csvSink) finish() error {
 	s.w.Flush()
 	if err := s.w.Error(); err != nil {
-		s.f.Close()
+		s.abort()
 		return err
 	}
 	if err := s.buf.Flush(); err != nil {
-		s.f.Close()
+		s.abort()
 		return err
 	}
+	if s.gz != nil {
+		if err := s.gz.Close(); err != nil {
+			s.abort()
+			return err
+		}
+	}
 	if err := s.f.Sync(); err != nil {
-		s.f.Close()
+		s.abort()
 		return err
 	}
 	if err := s.f.Close(); err != nil {
+		os.Remove(s.temp)
 		return err
 	}
 	return os.Rename(s.temp, s.final)
 }
-func (s *csvSink) abort() { s.f.Close(); os.Remove(s.temp) }
+func (s *csvSink) abort() {
+	if s.gz != nil {
+		_ = s.gz.Close()
+	}
+	if s.f != nil {
+		_ = s.f.Close()
+	}
+	_ = os.Remove(s.temp)
+}
 
 func sourceFilter(row Row, f map[string]func(string) bool) bool {
 	for d, fn := range f {
@@ -563,7 +617,7 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 		return summary, err
 	}
 	h := sha256.Sum256(data)
-	summary = Summary{DataSHA256: map[string]string{}, Schema: Schema, Engine: "go-core/0.16.0", Name: spec.Name, RuleSHA256: hex.EncodeToString(h[:]), StartedUTC: time.Now().UTC().Format(time.RFC3339), Status: "RUNNING"}
+	summary = Summary{DataSHA256: map[string]string{}, Schema: Schema, Engine: "go-core/0.18.0", Name: spec.Name, RuleSHA256: hex.EncodeToString(h[:]), StartedUTC: time.Now().UTC().Format(time.RFC3339), Status: "RUNNING"}
 	base := filepath.Dir(configPath)
 	if outputDir == "" {
 		outputDir = filepath.Join(base, "output")
@@ -594,7 +648,7 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 			out.abort()
 		}
 	}()
-	ledger, err := newSink(filepath.Join(outputDir, "ledger.csv"), []string{"stage", "rule", "pool", "target", "target_row_id", "pool_amount", "share_amount", "driver_weight", "driver_denominator", "allocated_amount"})
+	ledger, err := newSinkWithCompression(filepath.Join(outputDir, "ledger.csv"), []string{"stage", "rule", "pool", "target", "target_row_id", "pool_amount", "share_amount", "driver_weight", "driver_denominator", "allocated_amount"}, options.EvidenceGzip)
 	if err != nil {
 		return summary, err
 	}
@@ -603,7 +657,7 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 			ledger.abort()
 		}
 	}()
-	membership, err := newSink(filepath.Join(outputDir, "source_to_pool.csv"), []string{"stage", "pool", "upstream_row_id", "input_amount"})
+	membership, err := newSinkWithCompression(filepath.Join(outputDir, "source_to_pool.csv"), []string{"stage", "pool", "upstream_row_id", "input_amount"}, options.EvidenceGzip)
 	if err != nil {
 		return summary, err
 	}
@@ -621,7 +675,7 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 			reconcile.abort()
 		}
 	}()
-	lineage, err := newSink(filepath.Join(outputDir, "lineage_links.csv"), []string{"stage", "event", "parent_row_id", "child_row_id", "parent_amount"})
+	lineage, err := newSinkWithCompression(filepath.Join(outputDir, "lineage_links.csv"), []string{"stage", "event", "parent_row_id", "child_row_id", "parent_amount"}, options.EvidenceGzip)
 	if err != nil {
 		return summary, err
 	}
@@ -912,6 +966,11 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 	}
 	if err := os.WriteFile(filepath.Join(outputDir, "run_summary.json"), js, 0644); err != nil {
 		return summary, err
+	}
+	if options.EvidenceGzip {
+		if err := WriteEvidenceStreamManifest(outputDir, out, ledger, membership, reconcile, lineage); err != nil {
+			return summary, err
+		}
 	}
 	if err := os.Rename(outputDir, outputFinalDir); err != nil {
 		return summary, err

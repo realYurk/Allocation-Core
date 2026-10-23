@@ -106,3 +106,41 @@ func TestAPIRejectsTraversalAndSymlinkEscape(t *testing.T) {
 		t.Fatal("traversal via path")
 	}
 }
+
+func TestV18HTTPStreamingCompressedEvidence(t *testing.T) {
+	s, _ := initFixture(t)
+	w := req(s, "POST", "/v1/jobs", `{"rule":"case/rule.json","workers":2,"disk_partitions":4,"evidence_gzip":true}`, "secret")
+	if w.Code != 202 {
+		t.Fatalf("submit %d %s", w.Code, w.Body)
+	}
+	var job Job
+	if err := json.Unmarshal(w.Body.Bytes(), &job); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(6 * time.Second)
+	for time.Now().Before(deadline) {
+		w = req(s, "GET", "/v1/jobs/"+job.ID, "", "secret")
+		if err := json.Unmarshal(w.Body.Bytes(), &job); err != nil {
+			t.Fatal(err)
+		}
+		if job.Status == "PASS" {
+			break
+		}
+		if job.Status == "FAILED" {
+			t.Fatal(job.Error)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if job.Status != "PASS" {
+		t.Fatal("incomplete job")
+	}
+	for _, name := range []string{"results.csv", "ledger.csv.gz", "source_to_pool.csv.gz", "lineage_links.csv.gz", "evidence_stream_manifest.json"} {
+		w = req(s, "GET", "/v1/jobs/"+job.ID+"/"+name, "", "secret")
+		if w.Code != 200 || len(w.Body.Bytes()) == 0 {
+			t.Fatalf("bad %s: %d", name, w.Code)
+		}
+	}
+	if w = req(s, "GET", "/v1/jobs/"+job.ID+"/ledger.csv", "", "secret"); w.Code == 200 {
+		t.Fatal("phantom raw ledger served")
+	}
+}

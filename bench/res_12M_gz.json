@@ -1,0 +1,47 @@
+{
+  "label": "12M-gzip",
+  "periods": 12,
+  "accounts": 100,
+  "skus": 10000,
+  "multi_factor": false,
+  "workers": 4,
+  "disk_partitions": 0,
+  "driver_disk_index": false,
+  "evidence_gzip": true,
+  "returncode": 0,
+  "wall_seconds": 41.686,
+  "peak_rss_bytes": 264704000,
+  "peak_rss_mb": 252.4,
+  "status": "PASS",
+  "input_amount": "1200000.00",
+  "output_amount": "1200000.00",
+  "terminal_rows": 12000000,
+  "output_rows": 12002400,
+  "ledger_rows": 12002400,
+  "pool_checks": 3600,
+  "stages": [
+    {
+      "stage": "stage1",
+      "input": "1200000.00",
+      "output": "1200000.00",
+      "pools": 1200,
+      "output_rows": 2400
+    },
+    {
+      "stage": "stage2",
+      "input": "1200000.00",
+      "output": "1200000.00",
+      "pools": 2400,
+      "output_rows": 12000000
+    }
+  ],
+  "output_bytes": {
+    "evidence_stream_manifest.json": 2179,
+    "ledger.csv.gz": 229491980,
+    "lineage_links.csv.gz": 84,
+    "reconciliation.csv": 440454,
+    "results.csv": 1200000079,
+    "run_summary.json": 1254,
+    "source_to_pool.csv.gz": 59749
+  }
+}

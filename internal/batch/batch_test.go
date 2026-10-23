@@ -68,3 +68,27 @@ func TestManifestRejectsTraversalIDs(t *testing.T) {
 		t.Fatal("unsafe ID accepted")
 	}
 }
+
+func TestV18BatchStreamEvidence(t *testing.T) {
+	root := filepath.Join("..", "..", "examples")
+	fixture, errAbs := filepath.Abs(filepath.Join(root, "dual_driver", "rule.json"))
+	if errAbs != nil {
+		t.Fatal(errAbs)
+	}
+	path := filepath.Join(t.TempDir(), "batch.json")
+	raw, _ := json.Marshal(Manifest{Schema: Schema, Jobs: []JobSpec{{ID: "job", Rule: fixture}}})
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "out")
+	r, err := RunWithCompression(path, out, 1, 2, 4, true)
+	if err != nil || r.Succeeded != 1 {
+		t.Fatalf("result %+v error %v", r, err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "job", "ledger.csv.gz")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "job", "ledger.csv")); !os.IsNotExist(err) {
+		t.Fatal("unexpected uncompressed evidence")
+	}
+}

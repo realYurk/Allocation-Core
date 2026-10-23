@@ -144,7 +144,7 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 		return summary, e
 	}
 	ruleHash := sha256.Sum256(data)
-	summary = Summary{DataSHA256: map[string]string{}, Schema: Schema, Engine: "go-core/0.16.0-disk", Name: spec.Name, RuleSHA256: hex.EncodeToString(ruleHash[:]), StartedUTC: time.Now().UTC().Format(time.RFC3339), Status: "RUNNING"}
+	summary = Summary{DataSHA256: map[string]string{}, Schema: Schema, Engine: "go-core/0.18.0-disk", Name: spec.Name, RuleSHA256: hex.EncodeToString(ruleHash[:]), StartedUTC: time.Now().UTC().Format(time.RFC3339), Status: "RUNNING"}
 	base := filepath.Dir(configPath)
 	if final == "" {
 		final = filepath.Join(base, "output")
@@ -180,12 +180,12 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 		return summary, e
 	}
 	defer results.abort()
-	ledger, e := newSink(filepath.Join(working, "ledger.csv"), []string{"stage", "rule", "pool", "target", "target_row_id", "pool_amount", "share_amount", "driver_weight", "driver_denominator", "allocated_amount"})
+	ledger, e := newSinkWithCompression(filepath.Join(working, "ledger.csv"), []string{"stage", "rule", "pool", "target", "target_row_id", "pool_amount", "share_amount", "driver_weight", "driver_denominator", "allocated_amount"}, options.EvidenceGzip)
 	if e != nil {
 		return summary, e
 	}
 	defer ledger.abort()
-	membership, e := newSink(filepath.Join(working, "source_to_pool.csv"), []string{"stage", "pool", "upstream_row_id", "input_amount"})
+	membership, e := newSinkWithCompression(filepath.Join(working, "source_to_pool.csv"), []string{"stage", "pool", "upstream_row_id", "input_amount"}, options.EvidenceGzip)
 	if e != nil {
 		return summary, e
 	}
@@ -195,7 +195,7 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 		return summary, e
 	}
 	defer reconcile.abort()
-	lineage, e := newSink(filepath.Join(working, "lineage_links.csv"), []string{"stage", "event", "parent_row_id", "child_row_id", "parent_amount"})
+	lineage, e := newSinkWithCompression(filepath.Join(working, "lineage_links.csv"), []string{"stage", "event", "parent_row_id", "child_row_id", "parent_amount"}, options.EvidenceGzip)
 	if e != nil {
 		return summary, e
 	}
@@ -635,6 +635,11 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 	}
 	if e = os.WriteFile(filepath.Join(working, "run_summary.json"), js, 0644); e != nil {
 		return summary, e
+	}
+	if options.EvidenceGzip {
+		if e = WriteEvidenceStreamManifest(working, results, ledger, membership, reconcile, lineage); e != nil {
+			return summary, e
+		}
 	}
 	if e = os.Rename(working, final); e != nil {
 		return summary, e

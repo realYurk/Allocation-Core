@@ -77,6 +77,24 @@ func scanEvidence(path string, expected []string, fn func([]string) error) error
 // TraceRow diagnoses one result at a time. It never changes calculation files.
 // maxNodes protects against unbounded fan-in in a complex allocation chain.
 func TraceRow(dir, id string, maxNodes int) (TraceReport, error) {
+	packed, err := openPackedTraceIndex(dir)
+	if err != nil {
+		return TraceReport{}, err
+	}
+	if packed != nil {
+		return traceRowWithScanner(dir, id, maxNodes, packed.scan)
+	}
+	idx, err := openTraceIndex(dir)
+	if err != nil {
+		return TraceReport{}, err
+	}
+	scanner := func(file string, keys map[string]bool, fields []string, keyOf func([]string) string, fn func([]string) error) error {
+		return scanIndexedEvidence(idx, dir, file, keys, fields, keyOf, fn)
+	}
+	return traceRowWithScanner(dir, id, maxNodes, scanner)
+}
+
+func traceRowWithScanner(dir, id string, maxNodes int, scan func(string, map[string]bool, []string, func([]string) string, func([]string) error) error) (TraceReport, error) {
 	report := TraceReport{TargetRowID: id, Note: "Money attribution is represented at pools; lineage merge edges show causal inputs, not individual proportional attribution."}
 	if id == "" {
 		return report, fail("row ID must not be empty")
@@ -86,10 +104,6 @@ func TraceRow(dir, id string, maxNodes int) (TraceReport, error) {
 	}
 	if maxNodes > 5000 {
 		return report, fail("max nodes must be <= 5000")
-	}
-	idx, indexErr := openTraceIndex(dir)
-	if indexErr != nil {
-		return report, indexErr
 	}
 	frontier := map[string]bool{id: true}
 	seen := map[string]bool{id: true}
@@ -118,7 +132,7 @@ func TraceRow(dir, id string, maxNodes int) (TraceReport, error) {
 				next[parent] = true
 			}
 		}
-		err := scanIndexedEvidence(idx, dir, "lineage_links.csv", frontier, []string{"stage", "event", "parent_row_id", "child_row_id", "parent_amount"}, func(r []string) string { return r[3] }, func(r []string) error {
+		err := scan("lineage_links.csv", frontier, []string{"stage", "event", "parent_row_id", "child_row_id", "parent_amount"}, func(r []string) string { return r[3] }, func(r []string) error {
 			found[r[3]] = true
 			addEdge(TraceEdge{Kind: r[1], Stage: r[0], From: r[2], To: r[3], Amount: r[4]})
 			addParent(r[2])
@@ -128,7 +142,7 @@ func TraceRow(dir, id string, maxNodes int) (TraceReport, error) {
 			return report, err
 		}
 		pools := map[string]bool{}
-		err = scanIndexedEvidence(idx, dir, "ledger.csv", frontier, []string{"stage", "rule", "pool", "target_row_id", "allocated_amount", "driver_denominator"}, func(r []string) string { return r[3] }, func(r []string) error {
+		err = scan("ledger.csv", frontier, []string{"stage", "rule", "pool", "target_row_id", "allocated_amount", "driver_denominator"}, func(r []string) string { return r[3] }, func(r []string) error {
 			found[r[3]] = true
 			poolID := "POOL:" + r[0] + ":" + r[2]
 			pools[poolID] = true
@@ -139,7 +153,7 @@ func TraceRow(dir, id string, maxNodes int) (TraceReport, error) {
 			return report, err
 		}
 		if len(pools) > 0 {
-			err = scanIndexedEvidence(idx, dir, "source_to_pool.csv", poolKeysForIndex(pools), []string{"stage", "pool", "upstream_row_id", "input_amount"}, func(r []string) string { return r[0] + "\x1f" + r[1] }, func(r []string) error {
+			err = scan("source_to_pool.csv", poolKeysForIndex(pools), []string{"stage", "pool", "upstream_row_id", "input_amount"}, func(r []string) string { return r[0] + "\x1f" + r[1] }, func(r []string) error {
 				poolID := "POOL:" + r[0] + ":" + r[1]
 				addEdge(TraceEdge{Kind: "SOURCE_TO_POOL", Stage: r[0], From: r[2], To: poolID, Amount: r[3]})
 				addParent(r[2])

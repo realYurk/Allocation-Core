@@ -1,4 +1,5 @@
-Allocation Core V17
-Backend: universal multidimensional allocation DAG engine
-Changes: lossless audit archive (audit-pack/audit-verify/audit-extract), persistent trace index (trace-index/trace-index-verify), plus all prior V16 causal links, namespaced source IDs, strict CSV/JSON validation, and trace CLI.
-Not included: approvals, full transactional database, claim of uniform high performance under every topology.
+Allocation Core V19
+Schema: allocation-ir/2.0 (unchanged)
+Runtime: Go standard library, compiled Windows/macOS/Linux binaries
+New: trace-pack-index / trace-pack-verify; gzip chunk-index trace without full extraction
+Legacy financial calculation: unchanged from V18

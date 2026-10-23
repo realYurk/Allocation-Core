@@ -1,13 +1,12 @@
-# Allocation Core V17｜高性能通用多维分摊内核
+# Allocation Core V19
 
-**本版主线：无损审计归档 + 快速血缘索引。计算公式与规则协议不变。**
+请先读 `00_START_HERE_CN.md`。
 
-先看 `00_START_HERE_CN.md`。
+V19 是 V18 之上的**可选压缩血缘查询加速层**。保留全部多因子、多步骤、DAG、整数金额守恒、磁盘索引、检查点、HTTP API 和离线示例。
 
-核心能力：任意维度、多因子、多步骤、DAG 分叉合并、守恒、并发、磁盘分区、检查点、HTTP API、中文 CSV。
+- `22_Windows_Compressed_Trace_Demo.bat`：运行并体验压缩血缘反查。
+- `23_Windows_Verify_Trace_Index.bat`：验签与完整性检查。
+- `docs/V19_TECH_AND_PERFORMANCE_CN.md`：性能实测、存储代价和能力边界。
+- `trace-pack-index`、`trace-pack-verify`：新增 CLI 命令。
 
-新增命令：`trace-index`、`trace-index-verify`、`audit-pack`、`audit-verify`、`audit-extract`。
-
-Windows 双击 `18_Windows_Trace_Index_Demo.bat` 和 `19_Windows_Audit_Pack_Demo.bat`。后端强约束、前端仅辅助：`tools/Allocation_Studio_V15_Offline.html`。
-
-详细报告 `docs/V17_PERFORMANCE_AND_RISKS_CN.md`；操作指南 `docs/V17_BEGINNER_GUIDE_CN.md`。
+旧文档留在 docs 目录作为版本历史；以本版首页和 V19 技术文档为准。

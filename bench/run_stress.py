@@ -53,6 +53,8 @@ def main():
                     help="0 = memory executor, >=2 = disk executor")
     ap.add_argument("--driver-disk-index", action="store_true")
     ap.add_argument("--driver-cache-dir", default="")
+    ap.add_argument("--evidence-gzip", action="store_true",
+                    help="V18: stream gzip evidence instead of plaintext ledger")
     ap.add_argument("--label", default="")
     ap.add_argument("--out", default="result.json")
     ap.add_argument("--skip-gen", action="store_true")
@@ -84,6 +86,8 @@ def main():
                 cmd += ["--driver-cache-dir", args.driver_cache_dir]
     if args.workers:
         cmd += ["--workers", str(args.workers)]
+    if args.evidence_gzip:
+        cmd += ["--evidence-gzip"]
 
     rc, out, err, wall, peak = run_cmd(cmd)
 
@@ -96,6 +100,7 @@ def main():
         "workers": args.workers,
         "disk_partitions": args.disk_partitions,
         "driver_disk_index": args.driver_disk_index,
+        "evidence_gzip": args.evidence_gzip,
         "returncode": rc,
         "wall_seconds": round(wall, 3),
         "peak_rss_bytes": peak,

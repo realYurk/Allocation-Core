@@ -45,6 +45,11 @@ func runOptions(args []string) (engine.RunOptions, error) {
 			return o, fmt.Errorf("duplicate option %s", flag)
 		}
 		used[flag] = true
+		if flag == "--evidence-gzip" {
+			o.EvidenceGzip = true
+			i++
+			continue
+		}
 		if flag == "--driver-disk-index" {
 			o.DriverDiskIndex = true
 			i++
@@ -143,8 +148,42 @@ func main() {
 		help()
 	}
 	// Evidence tools operate on an already completed run and do not parse rules.
-	if args[0] == "trace-index" || args[0] == "trace-index-verify" || args[0] == "audit-pack" || args[0] == "audit-verify" || args[0] == "audit-extract" {
+	if args[0] == "trace-pack-index" || args[0] == "trace-pack-verify" || args[0] == "trace-index" || args[0] == "trace-index-verify" || args[0] == "audit-pack" || args[0] == "audit-verify" || args[0] == "audit-extract" || args[0] == "evidence-verify" || args[0] == "evidence-expand" {
 		switch args[0] {
+		case "evidence-verify":
+			if len(args) != 2 {
+				help()
+			}
+			result, e := engine.VerifyEvidenceStream(args[1])
+			if e != nil {
+				stop(e)
+			}
+			printJSON(result)
+		case "evidence-expand":
+			if len(args) != 3 {
+				help()
+			}
+			if e := engine.ExpandEvidenceStream(args[1], args[2]); e != nil {
+				stop(e)
+			}
+			fmt.Println("LOSSLESS EVIDENCE RESTORED:", args[2])
+		case "trace-pack-index":
+			if len(args) != 2 {
+				help()
+			}
+			receipt, e := engine.BuildPackedTraceIndex(args[1])
+			if e != nil {
+				stop(e)
+			}
+			printJSON(receipt)
+		case "trace-pack-verify":
+			if len(args) != 2 {
+				help()
+			}
+			if e := engine.VerifyPackedTraceIndex(args[1]); e != nil {
+				stop(e)
+			}
+			fmt.Println("PACKED TRACE INDEX VERIFIED")
 		case "trace-index":
 			if len(args) != 2 {
 				help()
@@ -211,7 +250,7 @@ func main() {
 			stop(e)
 		}
 		server := &http.Server{Addr: *listen, Handler: app, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
-		fmt.Println("Allocation Core V17 HTTP API listening on", *listen)
+		fmt.Println("Allocation Core V19 HTTP API listening on", *listen)
 		fmt.Println("GET /healthz | POST /v1/validate | POST /v1/jobs | GET /v1/jobs/{id}")
 		stop(server.ListenAndServe())
 	}
@@ -219,11 +258,24 @@ func main() {
 		if len(args) < 3 {
 			help()
 		}
-		jobs, workers, disk, e := batchOptions(args[3:])
+		batchArgs := args[3:]
+		evidenceGzip := false
+		filtered := make([]string, 0, len(batchArgs))
+		for _, v := range batchArgs {
+			if v == "--evidence-gzip" {
+				if evidenceGzip {
+					stop(fmt.Errorf("duplicate --evidence-gzip"))
+				}
+				evidenceGzip = true
+			} else {
+				filtered = append(filtered, v)
+			}
+		}
+		jobs, workers, disk, e := batchOptions(filtered)
 		if e != nil {
 			stop(e)
 		}
-		report, e := batch.RunWithDisk(args[1], args[2], jobs, workers, disk)
+		report, e := batch.RunWithCompression(args[1], args[2], jobs, workers, disk, evidenceGzip)
 		printJSON(report)
 		if e != nil {
 			stop(e)
@@ -485,8 +537,13 @@ func main() {
 	}
 }
 func help() {
-	fmt.Fprintln(os.Stderr, `Allocation Core V17
+	fmt.Fprintln(os.Stderr, `Allocation Core V19
 Evidence and indexed tracing:
+  alloc evidence-verify OUTPUT_DIR
+  alloc evidence-expand OUTPUT_DIR RESTORED_DIR
+  alloc trace-pack-index GZIP_RUN_DIR
+  alloc trace-pack-verify GZIP_RUN_DIR
+  alloc trace RULE.json GZIP_RUN_DIR ROW_ID (auto-uses packed index)
   alloc trace-index OUTPUT_DIR
   alloc trace-index-verify OUTPUT_DIR
   alloc audit-pack OUTPUT_DIR ARCHIVE.zip
@@ -502,8 +559,8 @@ Original commands:
   alloc trace RULE.json OUTPUT_DIR ROW_ID
   alloc trace-first RULE.json OUTPUT_DIR
   alloc graph RULE.json
-  alloc run RULE.json OUTPUT_DIR [--workers 4] [--disk-partitions 8] [--checkpoint-dir CKPT_DIR] [--resume] [--driver-disk-index] [--driver-cache-dir CACHE_DIR]
-  alloc batch MANIFEST.json OUTPUT_DIR [--jobs 3] [--workers 2] [--disk-partitions 8]
+  alloc run RULE.json OUTPUT_DIR [--workers 4] [--disk-partitions 8] [--checkpoint-dir CKPT_DIR] [--resume] [--driver-disk-index] [--driver-cache-dir CACHE_DIR] [--evidence-gzip]
+  alloc batch MANIFEST.json OUTPUT_DIR [--jobs 3] [--workers 2] [--disk-partitions 8] [--evidence-gzip]
   alloc generate RULE.json NEW_COMPANY_DIR
 Persistent workspace commands:
   alloc workspace publish RULE.json WORKSPACE

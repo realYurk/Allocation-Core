@@ -1,25 +1,19 @@
-# Prebuilt binaries (release artifacts, build from source instead)
+# Compiled binaries (release artifacts, not source)
 alloc_windows_amd64.exe
 alloc_windows_arm64.exe
 alloc_linux_amd64
+alloc_linux_arm64
+alloc_darwin_amd64
 alloc_darwin_arm64
 
-# Runtime output
+# Runtime output directories
 output_demo/
 runs/
 new_company_demo/
 service_data/
 v14_service_data/
-v17_runs/
+*.tmp
 
-# Generated result CSVs at repo root only (keep examples/*.csv)
-/*.csv
-
-# OS / editor
+# OS / editor noise
 .DS_Store
 Thumbs.db
-*.swp
-
-# Go build cache
-*.test
-*.out
