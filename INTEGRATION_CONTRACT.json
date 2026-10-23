@@ -1,0 +1,15 @@
+{
+  "integration_kit": "allocation-core/integration-v21",
+  "calculation_core": "V20, unmodified",
+  "rule_contract": "allocation-ir/2.0",
+  "execution_modes": ["cli-full-run", "local-http-full-run"],
+  "clients": {"java": "java8-http-client-only-jar", "python": "stdlib-http-client"},
+  "data_contracts": {
+    "inputs": ["amounts.csv", "driver CSV", "rule.json"],
+    "outputs": ["run_summary.json", "results.csv", "reconciliation.csv", "compressed full audit evidence"]
+  },
+  "database_strategy": "full recalculation, staging bulk load, validation, atomic active run pointer switch",
+  "redis_required": false,
+  "incremental_recalculation": false,
+  "approval_module": false
+}

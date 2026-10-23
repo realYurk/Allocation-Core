@@ -1,10 +1,10 @@
-# Compiled binaries (release artifacts, not source)
-alloc_windows_amd64.exe
-alloc_windows_arm64.exe
-alloc_linux_amd64
-alloc_linux_arm64
-alloc_darwin_amd64
-alloc_darwin_arm64
+# Compiled binaries (release artifacts; SHA256 recorded in CORE_SHA256.json)
+core/alloc_windows_amd64.exe
+core/alloc_windows_arm64.exe
+core/alloc_linux_amd64
+core/alloc_linux_arm64
+core/alloc_darwin_amd64
+core/alloc_darwin_arm64
 
 # Runtime output directories
 output_demo/
@@ -12,6 +12,7 @@ runs/
 new_company_demo/
 service_data/
 v14_service_data/
+demo_workspace/
 *.tmp
 
 # OS / editor noise
