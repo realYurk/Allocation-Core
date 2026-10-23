@@ -1,0 +1,45 @@
+{
+  "label": "6M-multifactor",
+  "periods": 12,
+  "accounts": 100,
+  "skus": 5000,
+  "multi_factor": true,
+  "workers": 4,
+  "disk_partitions": 0,
+  "driver_disk_index": false,
+  "returncode": 0,
+  "wall_seconds": 32.742,
+  "peak_rss_bytes": 258330624,
+  "peak_rss_mb": 246.4,
+  "status": "PASS",
+  "input_amount": "1200000.00",
+  "output_amount": "1200000.00",
+  "terminal_rows": 12000000,
+  "output_rows": 12002400,
+  "ledger_rows": 12002400,
+  "pool_checks": 3600,
+  "stages": [
+    {
+      "stage": "stage1",
+      "input": "1200000.00",
+      "output": "1200000.00",
+      "pools": 1200,
+      "output_rows": 2400
+    },
+    {
+      "stage": "stage2",
+      "input": "1200000.00",
+      "output": "1200000.00",
+      "pools": 2400,
+      "output_rows": 12000000
+    }
+  ],
+  "output_bytes": {
+    "ledger.csv": 3174636115,
+    "lineage_links.csv": 56,
+    "reconciliation.csv": 440454,
+    "results.csv": 1200000079,
+    "run_summary.json": 1406,
+    "source_to_pool.csv": 471829
+  }
+}

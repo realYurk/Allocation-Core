@@ -1,0 +1,45 @@
+{
+  "label": "smoke-memory",
+  "periods": 12,
+  "accounts": 20,
+  "skus": 1000,
+  "multi_factor": false,
+  "workers": 4,
+  "disk_partitions": 0,
+  "driver_disk_index": false,
+  "returncode": 0,
+  "wall_seconds": 0.925,
+  "peak_rss_bytes": 41029632,
+  "peak_rss_mb": 39.1,
+  "status": "PASS",
+  "input_amount": "240000.00",
+  "output_amount": "240000.00",
+  "terminal_rows": 240000,
+  "output_rows": 240480,
+  "ledger_rows": 240480,
+  "pool_checks": 720,
+  "stages": [
+    {
+      "stage": "stage1",
+      "input": "240000.00",
+      "output": "240000.00",
+      "pools": 240,
+      "output_rows": 480
+    },
+    {
+      "stage": "stage2",
+      "input": "240000.00",
+      "output": "240000.00",
+      "pools": 480,
+      "output_rows": 240000
+    }
+  ],
+  "output_bytes": {
+    "ledger.csv": 63247315,
+    "lineage_links.csv": 56,
+    "reconciliation.csv": 88134,
+    "results.csv": 24000079,
+    "run_summary.json": 1231,
+    "source_to_pool.csv": 94147
+  }
+}

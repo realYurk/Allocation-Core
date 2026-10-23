@@ -1,4 +1,4 @@
-Allocation Core V16
+Allocation Core V17
 Backend: universal multidimensional allocation DAG engine
-Changes: lossless causal links across consolidation and merges, namespaced source IDs, strict CSV/JSON validation, trace CLI.
+Changes: lossless audit archive (audit-pack/audit-verify/audit-extract), persistent trace index (trace-index/trace-index-verify), plus all prior V16 causal links, namespaced source IDs, strict CSV/JSON validation, and trace CLI.
 Not included: approvals, full transactional database, claim of uniform high performance under every topology.

@@ -87,6 +87,10 @@ func TraceRow(dir, id string, maxNodes int) (TraceReport, error) {
 	if maxNodes > 5000 {
 		return report, fail("max nodes must be <= 5000")
 	}
+	idx, indexErr := openTraceIndex(dir)
+	if indexErr != nil {
+		return report, indexErr
+	}
 	frontier := map[string]bool{id: true}
 	seen := map[string]bool{id: true}
 	roots := map[string]bool{}
@@ -114,10 +118,7 @@ func TraceRow(dir, id string, maxNodes int) (TraceReport, error) {
 				next[parent] = true
 			}
 		}
-		err := scanEvidence(filepath.Join(dir, "lineage_links.csv"), []string{"stage", "event", "parent_row_id", "child_row_id", "parent_amount"}, func(r []string) error {
-			if !frontier[r[3]] {
-				return nil
-			}
+		err := scanIndexedEvidence(idx, dir, "lineage_links.csv", frontier, []string{"stage", "event", "parent_row_id", "child_row_id", "parent_amount"}, func(r []string) string { return r[3] }, func(r []string) error {
 			found[r[3]] = true
 			addEdge(TraceEdge{Kind: r[1], Stage: r[0], From: r[2], To: r[3], Amount: r[4]})
 			addParent(r[2])
@@ -127,10 +128,7 @@ func TraceRow(dir, id string, maxNodes int) (TraceReport, error) {
 			return report, err
 		}
 		pools := map[string]bool{}
-		err = scanEvidence(filepath.Join(dir, "ledger.csv"), []string{"stage", "rule", "pool", "target_row_id", "allocated_amount", "driver_denominator"}, func(r []string) error {
-			if !frontier[r[3]] {
-				return nil
-			}
+		err = scanIndexedEvidence(idx, dir, "ledger.csv", frontier, []string{"stage", "rule", "pool", "target_row_id", "allocated_amount", "driver_denominator"}, func(r []string) string { return r[3] }, func(r []string) error {
 			found[r[3]] = true
 			poolID := "POOL:" + r[0] + ":" + r[2]
 			pools[poolID] = true
@@ -141,11 +139,8 @@ func TraceRow(dir, id string, maxNodes int) (TraceReport, error) {
 			return report, err
 		}
 		if len(pools) > 0 {
-			err = scanEvidence(filepath.Join(dir, "source_to_pool.csv"), []string{"stage", "pool", "upstream_row_id", "input_amount"}, func(r []string) error {
+			err = scanIndexedEvidence(idx, dir, "source_to_pool.csv", poolKeysForIndex(pools), []string{"stage", "pool", "upstream_row_id", "input_amount"}, func(r []string) string { return r[0] + "\x1f" + r[1] }, func(r []string) error {
 				poolID := "POOL:" + r[0] + ":" + r[1]
-				if !pools[poolID] {
-					return nil
-				}
 				addEdge(TraceEdge{Kind: "SOURCE_TO_POOL", Stage: r[0], From: r[2], To: poolID, Amount: r[3]})
 				addParent(r[2])
 				return nil
@@ -214,4 +209,17 @@ func FirstResultID(dir string) (string, error) {
 		return "", fail("results.csv missing first row ID")
 	}
 	return data[idx], nil
+}
+
+func poolKeysForIndex(pools map[string]bool) map[string]bool {
+	out := map[string]bool{}
+	for pool := range pools {
+		for i := 5; i < len(pool); i++ {
+			if pool[i] == ':' {
+				out[pool[5:i]+"\x1f"+pool[i+1:]] = true
+				break
+			}
+		}
+	}
+	return out
 }

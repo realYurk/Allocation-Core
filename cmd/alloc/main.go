@@ -142,6 +142,55 @@ func main() {
 	if len(args) < 1 {
 		help()
 	}
+	// Evidence tools operate on an already completed run and do not parse rules.
+	if args[0] == "trace-index" || args[0] == "trace-index-verify" || args[0] == "audit-pack" || args[0] == "audit-verify" || args[0] == "audit-extract" {
+		switch args[0] {
+		case "trace-index":
+			if len(args) != 2 {
+				help()
+			}
+			receipt, e := engine.BuildTraceIndex(args[1])
+			if e != nil {
+				stop(e)
+			}
+			printJSON(receipt)
+		case "trace-index-verify":
+			if len(args) != 2 {
+				help()
+			}
+			if e := engine.VerifyTraceIndex(args[1]); e != nil {
+				stop(e)
+			}
+			fmt.Println("TRACE INDEX VERIFIED")
+		case "audit-pack":
+			if len(args) != 3 {
+				help()
+			}
+			report, e := engine.PackEvidence(args[1], args[2])
+			if e != nil {
+				stop(e)
+			}
+			printJSON(report)
+		case "audit-verify":
+			if len(args) != 2 {
+				help()
+			}
+			report, e := engine.VerifyEvidencePack(args[1])
+			if e != nil {
+				stop(e)
+			}
+			printJSON(report)
+		case "audit-extract":
+			if len(args) != 3 {
+				help()
+			}
+			if e := engine.ExtractEvidencePack(args[1], args[2]); e != nil {
+				stop(e)
+			}
+			fmt.Println("EXTRACTED AND VERIFIED:", args[2])
+		}
+		return
+	}
 	if args[0] == "serve" {
 		fs := flag.NewFlagSet("serve", flag.ExitOnError)
 		root := fs.String("root", ".", "directory containing allowed rules and datasets")
@@ -162,7 +211,7 @@ func main() {
 			stop(e)
 		}
 		server := &http.Server{Addr: *listen, Handler: app, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
-		fmt.Println("Allocation Core V16 HTTP API listening on", *listen)
+		fmt.Println("Allocation Core V17 HTTP API listening on", *listen)
 		fmt.Println("GET /healthz | POST /v1/validate | POST /v1/jobs | GET /v1/jobs/{id}")
 		stop(server.ListenAndServe())
 	}
@@ -436,7 +485,13 @@ func main() {
 	}
 }
 func help() {
-	fmt.Fprintln(os.Stderr, `Allocation Core V16
+	fmt.Fprintln(os.Stderr, `Allocation Core V17
+Evidence and indexed tracing:
+  alloc trace-index OUTPUT_DIR
+  alloc trace-index-verify OUTPUT_DIR
+  alloc audit-pack OUTPUT_DIR ARCHIVE.zip
+  alloc audit-verify ARCHIVE.zip
+  alloc audit-extract ARCHIVE.zip NEW_OUTPUT_DIR
 HTTP service:
   alloc serve --root ./examples --store ./service_data --listen 127.0.0.1:8787 --jobs 2 [--token SECRET]
 Original commands:
