@@ -1,0 +1,4 @@
+Allocation Core V16
+Backend: universal multidimensional allocation DAG engine
+Changes: lossless causal links across consolidation and merges, namespaced source IDs, strict CSV/JSON validation, trace CLI.
+Not included: approvals, full transactional database, claim of uniform high performance under every topology.

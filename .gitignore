@@ -1,0 +1,24 @@
+# Prebuilt binaries (release artifacts, build from source instead)
+alloc_windows_amd64.exe
+alloc_windows_arm64.exe
+alloc_linux_amd64
+alloc_darwin_arm64
+
+# Runtime output
+output_demo/
+runs/
+new_company_demo/
+service_data/
+v14_service_data/
+
+# Generated result CSVs at repo root only (keep examples/*.csv)
+/*.csv
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Go build cache
+*.test
+*.out

@@ -1,0 +1,4 @@
+?   	allocation-core/cmd/alloc	[no test files]
+ok  	allocation-core/internal/batch	0.022s
+ok  	allocation-core/internal/engine	0.110s
+ok  	allocation-core/internal/workspace	0.168s

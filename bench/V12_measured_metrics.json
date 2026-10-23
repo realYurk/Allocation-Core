@@ -1,0 +1,28 @@
+{
+  "version": "V12",
+  "date": "2026-10-23",
+  "environment": "Linux amd64, Go 1.23.2, current container",
+  "scenario": "100 accounts x 12 periods x 1000 sku, 2-stage synthetic DAG",
+  "workers": 4,
+  "disk_partitions": 16,
+  "result_rows": 1200000,
+  "ledger_rows": 1202400,
+  "pool_checks": 3600,
+  "input_and_output_total": "1200000.00",
+  "fresh_with_checkpoint": {
+    "elapsed_seconds": 8.69,
+    "peak_RSS_KiB": 44968
+  },
+  "replay_from_completed_stages": {
+    "elapsed_seconds": 4.45,
+    "peak_RSS_KiB": 8812,
+    "reused_stages": 2
+  },
+  "output_file_sha256_equal": {
+    "results.csv": "c34e06fa8889b21fb4fb1681f0510c84afd9ec58cd63dbfee375508275911f69",
+    "ledger.csv": "1b730c419aa39629458d97b6b4ff962957818ff26091444747ec8d87573714d4",
+    "source_to_pool.csv": "3265438d62bafa67d300ca0f6a1a8d6cad0891db95918b5534a814f6b64d0d11",
+    "reconciliation.csv": "d910cb2fc9c0a7c1f305cfd01aed3a78205c49d4b21272497d3f2b4abbfe91cd"
+  },
+  "windows_note": "Cross-compiled Windows amd64/arm64; not executed on actual corporate Windows PC."
+}

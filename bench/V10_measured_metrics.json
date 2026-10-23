@@ -1,0 +1,67 @@
+{
+  "environment": "Linux execution container, Go 1.23.2; independent synthetic datasets",
+  "single_stage": {
+    "scenario": "100 accounts x 12 months x 1000 SKUs",
+    "pools": 1200,
+    "final_rows": 1200000,
+    "workers_1": {
+      "seconds": 6.3,
+      "peak_rss_kb": 28940
+    },
+    "workers_4": {
+      "seconds": 5.27,
+      "peak_rss_kb": 42100
+    }
+  },
+  "two_stage": {
+    "scenario": "24 accounts x 12 months x 500 SKUs, 2 stages",
+    "pools": 864,
+    "final_rows": 144000,
+    "workers_1": {
+      "seconds": 0.71,
+      "peak_rss_kb": 17424
+    },
+    "workers_4": {
+      "seconds": 0.6,
+      "peak_rss_kb": 22140
+    }
+  },
+  "file_digests": {
+    "single_stage": {
+      "results.csv": {
+        "sha256": "4c49f7710f1dcfdb36d73bd8471e0661ae0d745e222d8c2f4de43d6f9d36b5b2",
+        "workers_1_matches_workers_4": true
+      },
+      "ledger.csv": {
+        "sha256": "3d5299b1f45a9029908ee060cca7f25ce3e36a255651197bf8d3842edfdac0af",
+        "workers_1_matches_workers_4": true
+      },
+      "reconciliation.csv": {
+        "sha256": "cf1232bae83cdcd6a5498da8fbcaaee868ed7e80c0e142ff96c1fd54ab7a5b39",
+        "workers_1_matches_workers_4": true
+      },
+      "source_to_pool.csv": {
+        "sha256": "f449ff3fee2d777e6224f272b2a2c7631239c73275481c7754282d94a2aed83c",
+        "workers_1_matches_workers_4": true
+      }
+    },
+    "two_stage": {
+      "results.csv": {
+        "sha256": "bc44ca904f16db9e30fe51109ecf62d16ef0d71121c6ed634bac05e6b651da12",
+        "workers_1_matches_workers_4": true
+      },
+      "ledger.csv": {
+        "sha256": "6cdc5dd875b79692f0a12943c223fb341765c4b4851f0c742e210c0be69ca417",
+        "workers_1_matches_workers_4": true
+      },
+      "reconciliation.csv": {
+        "sha256": "e20fd59f6724a96afcdfec68fa11d43daa6109c0322b2ef9aea047a1411a8c15",
+        "workers_1_matches_workers_4": true
+      },
+      "source_to_pool.csv": {
+        "sha256": "49d28eb235e407f02fd344bfb7f05ffa994fdad648f58638d861dfed4a3294ff",
+        "workers_1_matches_workers_4": true
+      }
+    }
+  }
+}

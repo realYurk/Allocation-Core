@@ -1,0 +1,8 @@
+{
+  "schema": "allocation-batch/1.0",
+  "jobs": [
+    {"id": "manufacturing_two_stage", "rule": "manufacturing/rule.json"},
+    {"id": "cosmetics_scope", "rule": "cosmetics/rule.json"},
+    {"id": "split_and_merge", "rule": "split_merge/rule.json"}
+  ]
+}

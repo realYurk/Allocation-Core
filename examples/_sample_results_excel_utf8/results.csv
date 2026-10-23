@@ -1,0 +1,5 @@
+﻿terminal_stage,row_id,period,plant,brand,family,sku,account,currency,amount
+第二步_系列分到商品,b63e557ccdf12881aa6e585a,2026-01,工厂甲,品牌甲,系列甲,商品A,能源费,CNY,100.00
+第二步_系列分到商品,c41a44a394caa9bde391499e,2026-01,工厂甲,品牌甲,系列甲,商品B,能源费,CNY,300.00
+第二步_系列分到商品,25e52c71e27198d97dbda11a,2026-01,工厂甲,品牌甲,系列乙,商品C,能源费,CNY,400.00
+第二步_系列分到商品,02207af12cbfe51dfe9f2cbf,2026-01,工厂甲,品牌甲,系列乙,商品D,能源费,CNY,400.00

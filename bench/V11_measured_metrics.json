@@ -1,0 +1,28 @@
+{
+  "version": "V11",
+  "date": "2026-10-23",
+  "environment": "Linux amd64, Go 1.23.2 toolchain, current container",
+  "scenario": "Synthetic 2-stage: 100 accounts x 12 months x 1000 SKU",
+  "workers": 4,
+  "disk_partitions": 16,
+  "results_rows": 1200000,
+  "ledger_rows": 1202400,
+  "pool_checks": 3600,
+  "source_and_result_amount": "1200000.00",
+  "memory_mode": {
+    "seconds": 4.83,
+    "peak_RSS_KiB": 44276
+  },
+  "disk_mode": {
+    "seconds": 5.29,
+    "peak_RSS_KiB": 40512
+  },
+  "CSV_sorted_SHA256_matches": {
+    "results.csv": "2a4bfd3cb2131fa7a346c8eeb3e9252e29e38e94ea00cb5f974181e8c43fc35b",
+    "ledger.csv": "851e48d39f364f8d8661e46e6fe43ffa0a88250137f5f4d320269359243f14c7",
+    "reconciliation.csv": "10c2e4319d0292e514961ca1623c215c43b3589b32e811f8e1e49beb0442a8b1",
+    "source_to_pool.csv": "05015fecd990bd00349bd50288069bb67a9ade17fe791cce2f15aa69461e71c8"
+  },
+  "accuracy_note": "SHA256 computed after LC_ALL=C sort of full CSV lines, not raw file byte equality.",
+  "windows_note": "Windows binaries cross-compiled but not run on actual Windows machine."
+}

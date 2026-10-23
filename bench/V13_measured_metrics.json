@@ -1,0 +1,46 @@
+{
+  "test_type": "synthetic, single Linux container, /usr/bin/time -v, 4 workers, 16 disk partitions",
+  "go_version": "1.23.2",
+  "standard_100_accounts_12_periods_1000_sku": {
+    "driver_rows": 12000,
+    "final_rows": 1200000,
+    "pool_checks": 3600,
+    "memory_index": {
+      "wall_clock": "0:04.19",
+      "max_rss_kib": 46084
+    },
+    "disk_index": {
+      "wall_clock": "0:06.86",
+      "max_rss_kib": 28172
+    },
+    "four_csv_sha256_equal": true
+  },
+  "large_driver_10_accounts_12_periods_1000_sku": {
+    "driver_rows": 300000,
+    "final_rows": 120000,
+    "pool_checks": 360,
+    "memory_index": {
+      "wall_clock": "0:02.93",
+      "max_rss_kib": 586492
+    },
+    "disk_index": {
+      "wall_clock": "0:09.21",
+      "max_rss_kib": 33112
+    },
+    "four_csv_sha256_equal": true
+  },
+  "multipass_480k_drivers": {
+    "driver_rows": 480000,
+    "final_rows": 120000,
+    "disk_index": {
+      "wall_clock": "0:16.08",
+      "max_rss_kib": 33356
+    },
+    "status": "PASS"
+  },
+  "caveats": [
+    "Synthetic test is not a Windows SLA",
+    "Disk index trades IO and speed for reduced RAM",
+    "HTTP is a local integration prototype, with no durable job queue"
+  ]
+}
