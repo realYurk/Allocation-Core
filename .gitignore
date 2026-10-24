@@ -1,4 +1,4 @@
-# Compiled binaries (rebuild from source; SHA-verified via CORE_SHA256.json / RELEASE_SHA256.json)
+# Compiled binaries (rebuild from source; SHA-verified via release manifests)
 core/alloc_windows_amd64.exe
 core/alloc_windows_arm64.exe
 core/alloc_linux_amd64
@@ -11,6 +11,12 @@ alloc_linux_amd64
 alloc_linux_arm64
 alloc_darwin_amd64
 alloc_darwin_arm64
+studio_windows_amd64.exe
+studio_windows_arm64.exe
+studio_linux_amd64
+studio_linux_arm64
+studio_darwin_amd64
+studio_darwin_arm64
 
 # Runtime output
 output_demo/
@@ -29,10 +35,12 @@ bench/scale_100m/
 acceptance_runs/
 core/acceptance_runs/
 
+# Local workspace
+.workbuddy/
+
 # OS / editor
 .DS_Store
 Thumbs.db
 *.log
 __pycache__/
 *.pyc
-.workbuddy/

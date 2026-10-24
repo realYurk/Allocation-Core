@@ -1,0 +1,98 @@
+{
+  "schema": "allocation-ir/2.0",
+  "name": "三因子费用分摊｜材料50% + 收入30% + 订单20%",
+  "precision": 2,
+  "dimensions": [
+    "period",
+    "department",
+    "sku",
+    "account",
+    "currency"
+  ],
+  "immutable_dimensions": [
+    "period",
+    "currency"
+  ],
+  "hierarchies": {},
+  "datasets": {
+    "amounts": {
+      "expenses": "amounts.csv"
+    },
+    "drivers": {
+      "material": "material.csv",
+      "revenue": "revenue.csv",
+      "orders": "orders.csv"
+    }
+  },
+  "stages": [
+    {
+      "id": "三因子分摊",
+      "inputs": [
+        {
+          "from": "expenses",
+          "share": "1"
+        }
+      ],
+      "source": {
+        "grouping": {
+          "period": "AS_IS",
+          "department": "AS_IS",
+          "sku": "TOTAL",
+          "account": "AS_IS",
+          "currency": "AS_IS"
+        },
+        "filters": {}
+      },
+      "target": {
+        "period": {
+          "mode": "SOURCE"
+        },
+        "department": {
+          "mode": "SOURCE"
+        },
+        "sku": {
+          "mode": "INCLUDE",
+          "include": [
+            "商品A",
+            "商品B"
+          ]
+        },
+        "account": {
+          "mode": "SOURCE"
+        },
+        "currency": {
+          "mode": "SOURCE"
+        }
+      },
+      "conservation_keys": [
+        "period",
+        "account",
+        "currency",
+        "department"
+      ],
+      "allocations": [
+        {
+          "id": "material",
+          "share": "0.50",
+          "driver_dataset": "material",
+          "weight_field": "material",
+          "negative_driver_policy": "REJECT"
+        },
+        {
+          "id": "revenue",
+          "share": "0.30",
+          "driver_dataset": "revenue",
+          "weight_field": "revenue",
+          "negative_driver_policy": "REJECT"
+        },
+        {
+          "id": "orders",
+          "share": "0.20",
+          "driver_dataset": "orders",
+          "weight_field": "orders",
+          "negative_driver_policy": "REJECT"
+        }
+      ]
+    }
+  ]
+}

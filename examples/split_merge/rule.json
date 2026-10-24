@@ -1,0 +1,188 @@
+{
+  "schema": "allocation-ir/2.0",
+  "name": "路径分叉与汇合：材料75%+收入25%（合成数据）",
+  "precision": 2,
+  "dimensions": [
+    "period",
+    "department",
+    "sku",
+    "account",
+    "currency"
+  ],
+  "immutable_dimensions": [
+    "period",
+    "currency"
+  ],
+  "hierarchies": {},
+  "datasets": {
+    "amounts": {
+      "expenses": "amounts.csv"
+    },
+    "drivers": {
+      "material": "material.csv",
+      "revenue": "revenue.csv"
+    }
+  },
+  "stages": [
+    {
+      "id": "按材料分配",
+      "inputs": [
+        {
+          "from": "expenses",
+          "share": "0.75"
+        }
+      ],
+      "source": {
+        "grouping": {
+          "period": "AS_IS",
+          "department": "AS_IS",
+          "sku": "TOTAL",
+          "account": "AS_IS",
+          "currency": "AS_IS"
+        },
+        "filters": {}
+      },
+      "target": {
+        "period": {
+          "mode": "SOURCE"
+        },
+        "department": {
+          "mode": "SOURCE"
+        },
+        "sku": {
+          "mode": "INCLUDE",
+          "include": [
+            "商品A",
+            "商品B"
+          ]
+        },
+        "account": {
+          "mode": "SOURCE"
+        },
+        "currency": {
+          "mode": "SOURCE"
+        }
+      },
+      "conservation_keys": [
+        "period",
+        "account",
+        "currency",
+        "department"
+      ],
+      "allocations": [
+        {
+          "id": "material",
+          "share": "1",
+          "driver_dataset": "material",
+          "weight_field": "material",
+          "negative_driver_policy": "REJECT"
+        }
+      ]
+    },
+    {
+      "id": "按收入分配",
+      "inputs": [
+        {
+          "from": "expenses",
+          "share": "0.25"
+        }
+      ],
+      "source": {
+        "grouping": {
+          "period": "AS_IS",
+          "department": "AS_IS",
+          "sku": "TOTAL",
+          "account": "AS_IS",
+          "currency": "AS_IS"
+        },
+        "filters": {}
+      },
+      "target": {
+        "period": {
+          "mode": "SOURCE"
+        },
+        "department": {
+          "mode": "SOURCE"
+        },
+        "sku": {
+          "mode": "INCLUDE",
+          "include": [
+            "商品A",
+            "商品B"
+          ]
+        },
+        "account": {
+          "mode": "SOURCE"
+        },
+        "currency": {
+          "mode": "SOURCE"
+        }
+      },
+      "conservation_keys": [
+        "period",
+        "account",
+        "currency",
+        "department"
+      ],
+      "allocations": [
+        {
+          "id": "revenue",
+          "share": "1",
+          "driver_dataset": "revenue",
+          "weight_field": "revenue",
+          "negative_driver_policy": "REJECT"
+        }
+      ]
+    },
+    {
+      "id": "合并分摊结果",
+      "inputs": [
+        {
+          "from": "按材料分配",
+          "share": "1"
+        },
+        {
+          "from": "按收入分配",
+          "share": "1"
+        }
+      ],
+      "source": {
+        "grouping": {
+          "period": "AS_IS",
+          "department": "AS_IS",
+          "sku": "AS_IS",
+          "account": "AS_IS",
+          "currency": "AS_IS"
+        },
+        "filters": {}
+      },
+      "target": {
+        "period": {
+          "mode": "SOURCE"
+        },
+        "department": {
+          "mode": "SOURCE"
+        },
+        "sku": {
+          "mode": "SOURCE"
+        },
+        "account": {
+          "mode": "SOURCE"
+        },
+        "currency": {
+          "mode": "SOURCE"
+        }
+      },
+      "conservation_keys": [
+        "period",
+        "department",
+        "sku",
+        "account",
+        "currency"
+      ],
+      "allocations": [],
+      "enabled": false,
+      "operation": "MERGE"
+    }
+  ]
+}
