@@ -38,6 +38,7 @@
   "alloc_darwin_amd64": "23aadb1752b2cfbd53185a780dfa61774c1a6a428e4a50efaf8830aa80f5b779",
   "alloc_darwin_arm64": "6792cf696fa42da80e12ea65f35581ccf0d81e8a504891b813aa771e04c528e1",
   "alloc_linux_amd64": "8b451acdb29e46a32a7f086515981a82fc0f71d26c04f90c30170a5414d9fdd3",
+  "alloc_linux_arm64": "a2ef8f074c4199d6d5bf570ec8245ac042d5cbdf1c8fcf284a3a603a0cdd19b0",
   "alloc_windows_amd64.exe": "fcd1cbf855d2484c5ecdf80f2b52325b9e6a0ad4d631a7ff5a5b70c06f192f9e",
   "alloc_windows_arm64.exe": "86c2e46ae5165b9a04ff1686d702d7b4a78b01c2fca63d50b0bdd3f048ffc628",
   "bench/V10_go_test_results.txt": "763170293920d8cd11df667716d68faac30e08c272df334c505a0c5f509aeb5a",

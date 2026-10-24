@@ -13,8 +13,7 @@ import java.util.Arrays;
 /** Lightweight Java 8 HTTP adapter. NEVER computes allocations itself. */
 public final class AllocationClient {
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_-]{1,128}");
-    public static final String SDK_VERSION = "21.1.0";
-    /** Exactly the ten downloadable filenames advertised by the frozen V20 service. */
+    /** Exactly the ten downloadable filenames advertised by the Allocation Core HTTP service. */
     private static final Set<String> ALLOWED_FILES = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
         "results.csv", "ledger.csv", "ledger.csv.gz", "reconciliation.csv", "source_to_pool.csv",
         "source_to_pool.csv.gz", "lineage_links.csv", "lineage_links.csv.gz",

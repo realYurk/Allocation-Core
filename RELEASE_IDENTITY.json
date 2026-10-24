@@ -1,6 +1,6 @@
 {
   "product": "Allocation Core",
-  "build_id": "20261024-8b451acdb29e",
+  "build_id": "20261024-crossplatform-acceptance-8b451acdb2",
   "build_sha256_linux_amd64": "8b451acdb29e46a32a7f086515981a82fc0f71d26c04f90c30170a5414d9fdd3",
   "runtime_product_version": "not embedded",
   "formula_behavior": "unchanged by tested differential comparisons",
@@ -11,5 +11,9 @@
     "/v1/jobs",
     "vault and audit data format identifiers"
   ],
-  "note": "Source and binaries no longer claim to match baseline hashes; runtime identifiers changed and a separate capacity admission module was added."
+  "note": "Source and binaries no longer claim to match baseline hashes; runtime identifiers changed and a separate capacity admission module was added.",
+  "distribution": "native binaries for windows-x64/arm64, linux-x64/arm64, macos-x64/arm64",
+  "verified_execution": "linux/amd64 only; all other native binaries inspected but not run here",
+  "core_changes": "No existing core source or binary changed; one newly cross-compiled Linux ARM64 executable added.",
+  "integration_changes": "Remove SDK runtime product version constants, fix PostgreSQL source input fingerprint, add acceptance/launch adapters."
 }

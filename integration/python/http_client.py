@@ -7,7 +7,6 @@ import re
 import tempfile
 from pathlib import Path
 
-SDK_VERSION = "21.1.0"
 ALLOWED_FILES = frozenset((
     "results.csv", "ledger.csv", "ledger.csv.gz", "reconciliation.csv", "source_to_pool.csv",
     "source_to_pool.csv.gz", "lineage_links.csv", "lineage_links.csv.gz",

@@ -1,0 +1,28 @@
+{
+  "tested_environment": "Linux x86_64 container, synthetic financial data",
+  "full_suite_status": "PASS",
+  "full_suite_seconds": 1.871,
+  "rule_examples": 4,
+  "scenario_count": 14,
+  "scenario_versions": 2,
+  "scenario_full_recalculations": 28,
+  "scenario_max_concurrent": 3,
+  "scenario_wall_seconds": 0.14,
+  "sqlite_full_publishes": 2,
+  "sqlite_failed_transaction_rolled_back": "PASS",
+  "checkpoint_reused_stages": 2,
+  "http_jobs": 3,
+  "http_max_concurrent": 2,
+  "http_history_after_restart": "PASS",
+  "million_rows": 1200000,
+  "million_seconds": 5.56,
+  "million_pools": 1200,
+  "million_bytes": 150509760,
+  "million_allocation_amount": "6000000.00",
+  "limits": [
+    "No real PostgreSQL or SQL Server executed here",
+    "No Windows/macOS/ARM64 native execution in this turn",
+    "No power-loss or mid-stage kill injection",
+    "No realistic FC rule equivalence claim"
+  ]
+}

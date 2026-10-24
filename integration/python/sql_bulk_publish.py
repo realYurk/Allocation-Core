@@ -38,6 +38,23 @@ def sha256(path):
     return h.hexdigest()
 
 
+def input_fingerprint(summary):
+    """Digest of the canonical map of SHA-256 values for ORIGINAL input CSVs.
+
+    It is NOT a hash of results.csv and not a bitwise concatenation of inputs.
+    Every input still has its individual digest in run_summary.data_sha256.
+    """
+    import re
+    entries = summary.get('data_sha256')
+    if not isinstance(entries, dict) or not entries:
+        raise ValueError('run summary has no original input SHA-256 map')
+    for name, digest in entries.items():
+        if not isinstance(name, str) or not isinstance(digest, str) or not re.fullmatch(r'[0-9a-f]{64}', digest):
+            raise ValueError('invalid original input SHA-256 map')
+    raw=json.dumps(entries, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
+    return hashlib.sha256(raw).hexdigest()
+
+
 def check_outputs(out):
     summary = json.loads((out / 'run_summary.json').read_text('utf-8-sig'))
     if summary.get('status') != 'PASS':
@@ -84,7 +101,7 @@ def publish_pg(dsn, out, run_id, scenario, business_version, summary):
               (run_id,scenario,business_version,source_sha256,rule_sha256,
                expected_amount,expected_rows,status)
               VALUES (%s,%s,%s,%s,%s,%s,%s,%s)''',
-              (run_id, scenario, business_version, sha256(out/'results.csv'),
+              (run_id, scenario, business_version, input_fingerprint(summary),
                summary['rule_sha256'], exact_amount(summary['input_amount']),
                int(summary['terminal_rows']), 'VALIDATED'))
             with cur.copy('''COPY allocation_result

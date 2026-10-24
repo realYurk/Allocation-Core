@@ -20,7 +20,18 @@ service_data/
 v14_service_data/
 core/service_data*/
 
+# Benchmark / acceptance artifacts (regenerable; can be many GB)
+bench/runs/
+bench/precision/
+bench/scale_1m/
+bench/scale_10m/
+bench/scale_100m/
+acceptance_runs/
+core/acceptance_runs/
+
 # OS / editor
 .DS_Store
 Thumbs.db
 *.log
+__pycache__/
+*.pyc
