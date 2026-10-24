@@ -5,10 +5,20 @@ import java.net.*;
 import java.nio.file.*;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
+import java.util.Set;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Arrays;
 
 /** Lightweight Java 8 HTTP adapter. NEVER computes allocations itself. */
 public final class AllocationClient {
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_-]{1,128}");
+    public static final String SDK_VERSION = "21.1.0";
+    /** Exactly the ten downloadable filenames advertised by the frozen V20 service. */
+    private static final Set<String> ALLOWED_FILES = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
+        "results.csv", "ledger.csv", "ledger.csv.gz", "reconciliation.csv", "source_to_pool.csv",
+        "source_to_pool.csv.gz", "lineage_links.csv", "lineage_links.csv.gz",
+        "evidence_stream_manifest.json", "run_summary.json")));
     private final String baseUrl;
     private final String token;
 
@@ -69,15 +79,34 @@ public final class AllocationClient {
     /** Download binary CSV without loading millions of rows into Java heap. */
     public void download(String jobId, String filename, Path target) throws IOException {
         if (!ID.matcher(jobId).matches()) throw new IllegalArgumentException("Invalid jobId");
-        if (!(filename.equals("results.csv") || filename.equals("reconciliation.csv") || filename.equals("ledger.csv") || filename.equals("source_to_pool.csv")))
+        if (!ALLOWED_FILES.contains(filename))
             throw new IllegalArgumentException("Unsupported endpoint filename");
-        HttpURLConnection c=connect("/v1/jobs/"+jobId+"/"+filename,"GET","text/csv");
-        Path parent = target.toAbsolutePath().getParent();
+        if (target == null) throw new IllegalArgumentException("target is required");
+        HttpURLConnection c=connect("/v1/jobs/"+jobId+"/"+filename,"GET","application/octet-stream");
+        Path destination = target.toAbsolutePath();
+        Path parent = destination.getParent();
         Files.createDirectories(parent);
+        Path temporary = null;
         try {
             requireSuccess(c);
-            try (InputStream in=c.getInputStream()) {Files.copy(in,target,StandardCopyOption.REPLACE_EXISTING);}
-        } finally {c.disconnect();}
+            // On HTTP failure or interrupted transfer, never replace a previously valid file.
+            temporary = Files.createTempFile(parent, ".allocation-download-", ".part");
+            long expectedBytes = c.getContentLengthLong();
+            long actualBytes;
+            try (InputStream in=c.getInputStream()) {
+                actualBytes = Files.copy(in, temporary, StandardCopyOption.REPLACE_EXISTING);
+            }
+            if (expectedBytes >= 0 && actualBytes != expectedBytes)
+                throw new IOException("Truncated download: expected=" + expectedBytes + " actual=" + actualBytes);
+            try {
+                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            if (temporary != null) Files.deleteIfExists(temporary);
+            c.disconnect();
+        }
     }
     public String health() throws IOException {
         HttpURLConnection c=connect("/healthz","GET","application/json");

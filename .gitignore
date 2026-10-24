@@ -1,20 +1,26 @@
-# Compiled binaries (release artifacts; SHA256 recorded in CORE_SHA256.json)
+# Compiled binaries (rebuilt from source; SHA-verified via CORE_SHA256.json)
 core/alloc_windows_amd64.exe
 core/alloc_windows_arm64.exe
 core/alloc_linux_amd64
 core/alloc_linux_arm64
 core/alloc_darwin_amd64
 core/alloc_darwin_arm64
+alloc_windows_amd64.exe
+alloc_windows_arm64.exe
+alloc_linux_amd64
+alloc_linux_arm64
+alloc_darwin_amd64
+alloc_darwin_arm64
 
-# Runtime output directories
+# Runtime output
 output_demo/
 runs/
 new_company_demo/
 service_data/
 v14_service_data/
-demo_workspace/
-*.tmp
+core/service_data*/
 
-# OS / editor noise
+# OS / editor
 .DS_Store
 Thumbs.db
+*.log

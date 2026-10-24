@@ -140,3 +140,8 @@ python integration/python/sqlite_full_run.py --workspace demo_workspace --amount
 - 企业每个科目场景的业务归属、分摊口径与对账责任。
 
 这些不应混进数值计算核心；应由现有项目或独立接入层负责。
+
+
+## V21.1 发布修订
+
+请继续阅读 [V21.1 审计整改与能力边界](05_V21_1_Audit_Fixes_CN.md)。Java/Python SDK 现对齐全部十种文件下载，失败不会覆盖已下载文件。`capacity_preflight.py` 只进行部署层粗估且不能替代系统硬配额。冻结的 V20 `/healthz` 和运行摘要中的历史标识未被改写；发行身份以 `RELEASE_IDENTITY.json` 为准。

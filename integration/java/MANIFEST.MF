@@ -1,3 +1,5 @@
 Manifest-Version: 1.0
 Main-Class: org.allocation.integration.AllocationDemo
+Implementation-Title: Allocation Core HTTP Java SDK
+Implementation-Version: 21.1.0
 

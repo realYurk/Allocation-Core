@@ -1,3 +1,7 @@
+# Allocation Core Integration V21.1 (V20 Frozen Core)
+
+**Independent audit hardening update:** [开发者审计修复说明](docs/05_V21_1_Audit_Fixes_CN.md) · [非开发人员快速说明](docs/06_V21_1_Beginner_CN.md).
+
 # Allocation Core 集成发行版 V21 —— 先看这里
 
 > **这是 V20 计算核心的接入套件，不是新的分摊算法版本。**

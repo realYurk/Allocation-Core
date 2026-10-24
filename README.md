@@ -1,53 +1,42 @@
-# Allocation Core
+# Allocation Core Integration Kit (V21.1)
 
-A rule-driven, multi-dimensional cost allocation engine, distributed here as an
-integration kit: the frozen Go compute core plus SQL templates and lightweight
-Java/Python HTTP clients.
+Rule-driven, multi-dimensional cost allocation engine with a frozen, SHA-verified Go core and thin Java / Python integration clients.
 
-Start with `README_START_HERE.md` (Chinese orientation). This is the concise
-English overview.
+- **Financial engine**: full recalculation, multi-stage DAG, multi-factor drivers, largest-remainder rounding, conservation and lineage — unchanged since V19, frozen at V20 (156 files, SHA-verified).
+- **Integration layer**: HTTP service, Java 8 JAR, Python HTTP client, SQL templates, a Vault result archive, capacity preflight, and input replay snapshots.
 
-## What it is
+## Start here
 
-- Multi-factor, multi-stage allocation over a directed-acyclic-graph topology,
-  with integer-amount conservation and largest-remainder tie-breaking.
-- Full evidence trail: ledger, lineage, source-to-pool membership, per-pool
-  reconciliation.
-- A lifecycle Vault that stores completed runs with SHA-256 deduplication and
-  gzip compression, plus a bulk DB export projection for `COPY`/`BULK INSERT`.
-- Lightweight Java 8 and Python HTTP clients. They are clients only — they never
-  reimplement the allocation math.
+| Role | First document |
+|---|---|
+| No coding background | `docs/01_Beginner_CN.md` |
+| Java / Spring Boot | `docs/02_Developer_Integration_CN.md` |
+| Python | `docs/02_Developer_Integration_CN.md` |
+| Database / ETL | `docs/03_SQL_Database_Integration_CN.md` |
+| Technical lead / deploy | `docs/04_Boundaries_Security_Acceptance_CN.md` |
 
-## Layout
+Full bilingual overview: [`README_START_HERE.md`](README_START_HERE.md).
 
-```
-core/            frozen Go engine (V20), examples, bats, docs, CORE_SHA256.json
-sql/             PostgreSQL / MySQL / SQL Server schema templates (design only)
-integration/     Java client JAR + Python HTTP client + SQLite end-to-end demo
-docs/            role-based guides (beginner / developer / DB / boundaries)
-tests/           integration regression and vault black-box tests
-```
-
-The frozen core is pinned by `CORE_SHA256.json` (156 files, SHA-256 verified).
-Prebuilt binaries are excluded from this repository and recorded there for
-verification after download.
-
-## Quick start
+## Repository layout
 
 ```
-# run the two-stage demo (Windows)
-core/01_Windows_Run_Two_Stage.bat
-
-# end-to-end SQL -> engine -> SQLite (Python 3 stdlib, no pip)
-python integration/python/sqlite_full_run.py --workspace ./demo_workspace --reset-demo
+core/           frozen Go engine (alloc_* binaries are gitignored, rebuild from source)
+integration/    Java 8 JAR, Python HTTP client, SQLite end-to-end demo, preflight/replay tools
+sql/            MySQL / PostgreSQL / SQL Server schema templates
+docs/           role-based guides + independent audit reports
+tests/          regression + independent attack tests
 ```
 
-## Honest boundaries
+## Version identity
 
-- The SQL templates are design references; they are not benchmarked against a
-  real PostgreSQL / MySQL / SQL Server instance.
-- The Vault archives completed results and evidence, not the raw inputs — it is
-  not a from-scratch replay snapshot.
-- The engine is single-process. Parallelism is in-process, bounded by cores.
+The canonical distribution version is **V21.1.0** (see `RELEASE_IDENTITY.json`). The frozen core still self-reports historical internal strings (`help=V20`, `run_summary=0.18.0`, `/healthz=0.14`); those are not the distribution version and are intentionally left untouched to preserve the 156-file SHA freeze.
 
-Sample data is fabricated and carries no business meaning.
+## Build
+
+The core is a Go program with no third-party dependencies. Build a binary with:
+
+```bash
+cd core && go build -o alloc ./cmd/alloc
+```
+
+Prebuilt binaries are excluded from git; download a release and verify it against `CORE_SHA256.json` / `RELEASE_SHA256.json`.

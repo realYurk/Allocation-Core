@@ -1,0 +1,13 @@
+{
+  "distribution_name": "Allocation Core Integration Kit",
+  "distribution_version": "21.1.0",
+  "distribution_type": "integration-only hardening; frozen core is unchanged",
+  "frozen_core_payload_version": "V20",
+  "frozen_core_sha256_file": "CORE_SHA256.json",
+  "financial_engine_self_reported": "go-core/0.18.0",
+  "http_health_self_reported": "allocation-core/0.14",
+  "api_contract": "allocation-ir/2.0 and /v1/jobs",
+  "java_client_sdk_version": "21.1.0",
+  "python_client_sdk_version": "21.1.0",
+  "important": "The Go core reports historical internal strings. They are not the integration kit version and have intentionally not been rewritten, preserving the 156-file SHA freeze."
+}
