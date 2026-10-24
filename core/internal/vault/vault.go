@@ -380,7 +380,7 @@ func Register(root, scenario, version, class, input string) (Record, error) {
 	return r, nil
 }
 
-// engineVerify is supplied by an adapter file so this package can validate V18's manifests.
+// engineVerify is supplied by an adapter file so this package can validate compressed-evidence manifests.
 func verifyBlob(path string, ref FileRef, output io.Writer) error {
 	if !validRef(ref) {
 		return errors.New("invalid ref")

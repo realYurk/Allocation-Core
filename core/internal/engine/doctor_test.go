@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestV15DoctorValidCases(t *testing.T) {
+func TestDoctorValidCases(t *testing.T) {
 	_, f, _, _ := runtime.Caller(0)
 	root := filepath.Join(filepath.Dir(f), "..", "..", "examples")
 	for _, name := range []string{"dual_driver", "triple_driver", "manufacturing", "split_merge"} {
@@ -30,7 +30,7 @@ func TestV15DoctorValidCases(t *testing.T) {
 		}
 	}
 }
-func TestV15DoctorMissingDriverColumn(t *testing.T) {
+func TestDoctorMissingDriverColumn(t *testing.T) {
 	_, f, _, _ := runtime.Caller(0)
 	p := filepath.Join(filepath.Dir(f), "..", "..", "examples", "dual_driver", "rule.json")
 	raw, err := os.ReadFile(p)

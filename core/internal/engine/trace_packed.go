@@ -1,6 +1,6 @@
 package engine
 
-// V19 opt-in compressed trace accelerator. It never modifies the original
+// Opt-in compressed trace accelerator. It never modifies the original
 // gzip CSVs or financial results. A bounded-memory builder creates independent
 // gzip chunks and small hashed-key index shards, permitting a trace without
 // expanding multi-GB audit files. Chunks are independently checksummed by
@@ -55,7 +55,7 @@ type packedTraceIndex struct {
 func packedTracePath(dir, name string) string { return filepath.Join(dir, packedTraceDir, name) }
 func packedShard(key string) int              { sum := sha256.Sum256([]byte(key)); return int(sum[0]) % traceShards }
 
-// BuildPackedTraceIndex only accepts a complete, verified V18 stream manifest.
+// BuildPackedTraceIndex only accepts a complete, verified compressed-evidence stream manifest.
 // Stale/damaged sources are refused. Publishing is atomic at directory level.
 func BuildPackedTraceIndex(dir string) (PackedTraceReceipt, error) {
 	receipt := PackedTraceReceipt{Format: packedTraceFormat, CreatedUTC: time.Now().UTC().Format(time.RFC3339), Files: map[string]PackedTraceFile{}}

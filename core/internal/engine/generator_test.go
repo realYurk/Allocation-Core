@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestV14GeneratorUsesASCIIFilenames(t *testing.T) {
+func TestGeneratorUsesASCIIFilenames(t *testing.T) {
 	// Reuse the public manufacturing fixture for a real multi-stage rule.
 	rule := filepath.Join("..", "..", "examples", "manufacturing", "rule.json")
 	dest := filepath.Join(t.TempDir(), "new_company")

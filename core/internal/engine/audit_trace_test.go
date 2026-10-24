@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-func TestV17IndexedTraceMatchesFullScanAndRejectsStaleFiles(t *testing.T) {
-	root := V16TestRoot(t)
+func TestIndexedTraceMatchesFullScanAndRejectsStaleFiles(t *testing.T) {
+	root := fixtureRoot(t)
 	rule := filepath.Join(root, "dual_driver", "rule.json")
 	dir := filepath.Join(t.TempDir(), "results")
 	if _, err := RunWithOptions(rule, dir, RunOptions{Workers: 2}); err != nil {
@@ -80,8 +80,8 @@ func TestV17IndexedTraceMatchesFullScanAndRejectsStaleFiles(t *testing.T) {
 	}
 }
 
-func TestV17AuditArchiveLosslessAndIntegrityChecks(t *testing.T) {
-	rule := filepath.Join(V16TestRoot(t), "manufacturing", "rule.json")
+func TestAuditArchiveLosslessAndIntegrityChecks(t *testing.T) {
+	rule := filepath.Join(fixtureRoot(t), "manufacturing", "rule.json")
 	base := t.TempDir()
 	source := filepath.Join(base, "run")
 	if _, err := RunWithOptions(rule, source, RunOptions{Workers: 2}); err != nil {

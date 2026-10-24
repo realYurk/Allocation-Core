@@ -107,7 +107,7 @@ func TestAPIRejectsTraversalAndSymlinkEscape(t *testing.T) {
 	}
 }
 
-func TestV18HTTPStreamingCompressedEvidence(t *testing.T) {
+func TestHTTPStreamingCompressedEvidence(t *testing.T) {
 	s, _ := initFixture(t)
 	w := req(s, "POST", "/v1/jobs", `{"rule":"case/rule.json","workers":2,"disk_partitions":4,"evidence_gzip":true}`, "secret")
 	if w.Code != 202 {
@@ -142,5 +142,22 @@ func TestV18HTTPStreamingCompressedEvidence(t *testing.T) {
 	}
 	if w = req(s, "GET", "/v1/jobs/"+job.ID+"/ledger.csv", "", "secret"); w.Code == 200 {
 		t.Fatal("phantom raw ledger served")
+	}
+}
+
+func TestHTTPProductionCapacityAdmission(t *testing.T) {
+	s, root := initFixture(t)
+	policy := filepath.Join(root, "cap.json")
+	blob := `{"pools":3600,"targets_per_pool":500000,"factor_paths":1,"result_bytes_per_row":144,"evidence_bytes_per_row":300,"overhead_percent":150,"max_rows":50000000,"max_peak_bytes":107374182400,"reserve_free_bytes":0}`
+	if e := os.WriteFile(policy, []byte(blob), 0600); e != nil {
+		t.Fatal(e)
+	}
+	s.cfg.BudgetFile = policy
+	w := req(s, "POST", "/v1/jobs", `{"rule":"case/rule.json"}`, "secret")
+	if w.Code != 507 || !strings.Contains(w.Body.String(), "capacity budget blocked job") {
+		t.Fatalf("expected blocked: %d %s", w.Code, w.Body)
+	}
+	if len(s.jobs) != 0 {
+		t.Fatal("blocked submit created a job")
 	}
 }

@@ -1,5 +1,0 @@
-Allocation Core V20
-Schema: allocation-ir/2.0 (unchanged)
-Runtime: Go standard library; Windows/macOS/Linux binaries
-New: vault add/list/stats/verify/restore/prune/release-source/gc/export-db
-Financial math and DAG engine unchanged since V19

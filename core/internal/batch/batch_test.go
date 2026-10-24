@@ -69,7 +69,7 @@ func TestManifestRejectsTraversalIDs(t *testing.T) {
 	}
 }
 
-func TestV18BatchStreamEvidence(t *testing.T) {
+func TestBatchStreamEvidence(t *testing.T) {
 	root := filepath.Join("..", "..", "examples")
 	fixture, errAbs := filepath.Abs(filepath.Join(root, "dual_driver", "rule.json"))
 	if errAbs != nil {

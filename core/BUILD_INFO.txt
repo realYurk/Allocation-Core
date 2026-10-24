@@ -1,0 +1,3 @@
+Allocation Core
+Build identity and content hashes: ../RELEASE_IDENTITY.json and ../CORE_SHA256.json
+No hardcoded product release number in the executable.

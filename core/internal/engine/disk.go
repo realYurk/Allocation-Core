@@ -6,6 +6,7 @@ package engine
 // constant-memory: skewed pools and cached driver indexes still use RAM.
 
 import (
+	"allocation-core/internal/capacity"
 	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
@@ -144,10 +145,13 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 		return summary, e
 	}
 	ruleHash := sha256.Sum256(data)
-	summary = Summary{DataSHA256: map[string]string{}, Schema: Schema, Engine: "go-core/0.18.0-disk", Name: spec.Name, RuleSHA256: hex.EncodeToString(ruleHash[:]), StartedUTC: time.Now().UTC().Format(time.RFC3339), Status: "RUNNING"}
+	summary = Summary{DataSHA256: map[string]string{}, Schema: Schema, Engine: "allocation-core", Name: spec.Name, RuleSHA256: hex.EncodeToString(ruleHash[:]), StartedUTC: time.Now().UTC().Format(time.RFC3339), Status: "RUNNING"}
 	base := filepath.Dir(configPath)
 	if final == "" {
 		final = filepath.Join(base, "output")
+	}
+	if e := capacity.CheckEnv(final); e != nil {
+		return summary, e
 	}
 	if _, e = os.Stat(final); e == nil {
 		return summary, fail("output directory already exists: %s", final)
@@ -167,7 +171,7 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 			summary.DataSHA256[path] = hash
 		}
 	}
-	working, e := os.MkdirTemp(filepath.Dir(final), ".allocation-v12-incomplete-")
+	working, e := os.MkdirTemp(filepath.Dir(final), ".allocation-incomplete-")
 	if e != nil {
 		return summary, e
 	}

@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestV15TwoAndThreeDrivers(t *testing.T) {
+func TestTwoAndThreeDrivers(t *testing.T) {
 	_, file, _, _ := runtime.Caller(0)
 	root := filepath.Join(filepath.Dir(file), "..", "..", "examples")
 	for _, tc := range []struct {
@@ -62,7 +62,7 @@ func TestV15TwoAndThreeDrivers(t *testing.T) {
 	}
 }
 
-func TestV15UnalignedBeforeAfterIsNotFaked(t *testing.T) {
+func TestUnalignedBeforeAfterIsNotFaked(t *testing.T) {
 	_, file, _, _ := runtime.Caller(0)
 	root := filepath.Join(filepath.Dir(file), "..", "..", "examples", "dual_driver")
 	dest := filepath.Join(t.TempDir(), "out")

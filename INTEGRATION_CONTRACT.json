@@ -1,6 +1,4 @@
 {
-  "integration_kit": "allocation-core/integration-v21.1.0",
-  "calculation_core": "V20, unmodified",
   "rule_contract": "allocation-ir/2.0",
   "execution_modes": [
     "cli-full-run",
@@ -46,5 +44,15 @@
     "integration/tools/release_info.py"
   ],
   "capacity_budget_is_hard_runtime_quota": false,
-  "vault_includes_inputs": false
+  "vault_includes_inputs": false,
+  "product": "allocation-core",
+  "calculation_core": "authoritative Go financial engine; identity strings changed, calculations differential tested",
+  "capacity_entrypoint_guard": "ALLOC_CAPACITY_POLICY environment variable, engine-level; HTTP --budget-file additionally prevents queueing",
+  "bulk_sql_publish": "optional PostgreSQL COPY and SQL Server batched ODBC; live DB testing required",
+  "invariants": [
+    "full recalculation only",
+    "exact integer allocation",
+    "conservation must PASS",
+    "preserve audit evidence"
+  ]
 }

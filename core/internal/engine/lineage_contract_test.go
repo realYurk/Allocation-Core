@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestV16RuleParsingRejectsTrailingJSON(t *testing.T) {
+func TestRuleParsingRejectsTrailingJSON(t *testing.T) {
 	base := `{"schema":"allocation-ir/2.0"}`
 	if _, err := ParseSpec([]byte(base + " true")); err == nil {
 		t.Fatal("trailing JSON accepted")
@@ -19,7 +19,7 @@ func TestV16RuleParsingRejectsTrailingJSON(t *testing.T) {
 		t.Fatal("junk trailing JSON accepted")
 	}
 }
-func TestV16CSVHeaderDuplicatesRejected(t *testing.T) {
+func TestCSVHeaderDuplicatesRejected(t *testing.T) {
 	if _, err := HeaderPositions([]string{"period", "amount", "amount"}); err == nil {
 		t.Fatal("duplicate headers accepted")
 	}
@@ -30,13 +30,13 @@ func TestV16CSVHeaderDuplicatesRejected(t *testing.T) {
 		t.Fatal("blank header accepted")
 	}
 }
-func V16TestRoot(t *testing.T) string {
+func fixtureRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
 	return filepath.Join(filepath.Dir(file), "..", "..", "examples")
 }
-func TestV16LineageCoalescingAndTrace(t *testing.T) {
-	ruleFile := filepath.Join(V16TestRoot(t), "dual_driver", "rule.json")
+func TestLineageCoalescingAndTrace(t *testing.T) {
+	ruleFile := filepath.Join(fixtureRoot(t), "dual_driver", "rule.json")
 	raw, err := os.ReadFile(ruleFile)
 	if err != nil {
 		t.Fatal(err)
@@ -137,7 +137,7 @@ func TestV16LineageCoalescingAndTrace(t *testing.T) {
 		t.Fatal("memory and disk calculation differ")
 	}
 }
-func TestV16DifferentDatasetSourceIDsAreUnique(t *testing.T) {
+func TestDifferentDatasetSourceIDsAreUnique(t *testing.T) {
 	if sourceRowID("expenseA", "1", 1) == sourceRowID("expenseB", "1", 1) {
 		t.Fatal("source id collision")
 	}

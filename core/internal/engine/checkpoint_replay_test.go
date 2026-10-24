@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestV12CSVExcelBOMAndUnicode(t *testing.T) {
+func TestCSVExcelBOMAndUnicode(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "results.csv")
 	sink, err := newSink(file, []string{"stage", "sku", "amount"})
@@ -46,7 +46,7 @@ func TestV12CSVExcelBOMAndUnicode(t *testing.T) {
 	}
 }
 
-func TestV12ResumeStageOutputAndEvidenceMatchesFresh(t *testing.T) {
+func TestResumeStageOutputAndEvidenceMatchesFresh(t *testing.T) {
 	for _, fixture := range []string{"manufacturing", "split_merge"} {
 		t.Run(fixture, func(t *testing.T) {
 			rule := filepath.Join("..", "..", "examples", fixture, "rule.json")
@@ -101,7 +101,7 @@ func TestV12ResumeStageOutputAndEvidenceMatchesFresh(t *testing.T) {
 	}
 }
 
-func TestV12CheckpointRejectsDataChangeAndTamper(t *testing.T) {
+func TestCheckpointRejectsDataChangeAndTamper(t *testing.T) {
 	tmp := t.TempDir()
 	src := filepath.Join("..", "..", "examples", "manufacturing")
 	for _, name := range []string{"rule.json", "amounts.csv", "labor.csv", "sales.csv"} {

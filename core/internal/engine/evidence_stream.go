@@ -1,6 +1,6 @@
 package engine
 
-// V18 optional direct-to-gzip audit evidence. The money engine, source rows,
+// Optional direct-to-gzip audit evidence. The money engine, source rows,
 // pool order, CSV encoding and reconciliation logic are unchanged.
 // Results and reconciliation remain ordinary Excel-readable CSV. Evidence
 // streams are lossless gzip CSV, never first written as large plaintext files.

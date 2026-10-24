@@ -1,0 +1,26 @@
+{
+  "old_core_file_count": 156,
+  "new_core_file_count": 167,
+  "changed_or_missing_legacy_paths": 30,
+  "new_paths": 28,
+  "removed_legacy_paths": 17,
+  "gzip_differential": {
+    "results.csv": true,
+    "reconciliation.csv": true,
+    "ledger.csv.gz": true,
+    "source_to_pool.csv.gz": true,
+    "lineage_links.csv.gz": true,
+    "run_summary.json": false,
+    "evidence_stream_manifest.json": false
+  },
+  "intentional_metadata_differences": [
+    "run_summary.json engine string",
+    "evidence_stream_manifest.json references changed summary digest"
+  ],
+  "calculation_modified": false,
+  "go_full_tests": "PASS",
+  "go_race": "PASS",
+  "go_vet": "PASS",
+  "sqlite_full_run_rollback": "PASS",
+  "real_postgres_sqlserver": "NOT TESTED - no database services"
+}

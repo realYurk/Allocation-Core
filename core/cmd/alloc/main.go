@@ -2,6 +2,7 @@ package main
 
 import (
 	"allocation-core/internal/batch"
+	"allocation-core/internal/capacity"
 	"allocation-core/internal/engine"
 	"allocation-core/internal/service"
 	"allocation-core/internal/vault"
@@ -147,6 +148,20 @@ func main() {
 	args := os.Args[1:]
 	if len(args) < 1 {
 		help()
+	}
+	if args[0] == "capacity" {
+		if len(args) != 3 {
+			stop(fmt.Errorf("usage: alloc capacity BUDGET.json OUTPUT_DIR"))
+		}
+		r, e := capacity.Check(args[1], args[2])
+		if e != nil {
+			stop(e)
+		}
+		printJSON(r)
+		if r.Status != "PASS" {
+			stop(fmt.Errorf("capacity preflight BLOCK"))
+		}
+		return
 	}
 	// Lifecycle vault commands are additive and never modify the financial engine.
 	if args[0] == "vault" {
@@ -368,19 +383,20 @@ func main() {
 		maxJobs := fs.Int("jobs", 2, "maximum concurrent jobs")
 		q := fs.Int("queue", 16, "maximum waiting jobs")
 		token := fs.String("token", "", "optional Bearer token for local API")
+		budgetFile := fs.String("budget-file", "", "trusted capacity budget; checked before accepting jobs")
 		if e := fs.Parse(args[1:]); e != nil {
 			stop(e)
 		}
 		host, _, e := net.SplitHostPort(*listen)
 		if e != nil || (host != "127.0.0.1" && host != "localhost" && host != "::1") {
-			stop(fmt.Errorf("V14 only permits loopback --listen; use authenticated reverse proxy for remote access"))
+			stop(fmt.Errorf("This service only permits loopback --listen; use authenticated reverse proxy for remote access"))
 		}
-		app, e := service.New(service.Config{Root: *root, Store: *store, Token: *token, Concurrent: *maxJobs, Queue: *q})
+		app, e := service.New(service.Config{Root: *root, Store: *store, Token: *token, Concurrent: *maxJobs, Queue: *q, BudgetFile: *budgetFile})
 		if e != nil {
 			stop(e)
 		}
 		server := &http.Server{Addr: *listen, Handler: app, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
-		fmt.Println("Allocation Core V20 HTTP API listening on", *listen)
+		fmt.Println("Allocation Core HTTP API listening on", *listen)
 		fmt.Println("GET /healthz | POST /v1/validate | POST /v1/jobs | GET /v1/jobs/{id}")
 		stop(server.ListenAndServe())
 	}
@@ -667,7 +683,10 @@ func main() {
 	}
 }
 func help() {
-	fmt.Fprintln(os.Stderr, `Allocation Core V20
+	fmt.Fprintln(os.Stderr, `Allocation Core
+Capacity admission:
+  alloc capacity BUDGET.json OUTPUT_DIR
+  Set ALLOC_CAPACITY_POLICY to a trusted budget path to enforce on ALL engine paths.
 Vault lifecycle:
   alloc vault add VAULT SCENARIO VERSION draft|official RUN_DIR
   alloc vault list VAULT
@@ -690,7 +709,7 @@ Evidence and indexed tracing:
   alloc audit-verify ARCHIVE.zip
   alloc audit-extract ARCHIVE.zip NEW_OUTPUT_DIR
 HTTP service:
-  alloc serve --root ./examples --store ./service_data --listen 127.0.0.1:8787 --jobs 2 [--token SECRET]
+  alloc serve --root ./examples --store ./service_data --listen 127.0.0.1:8787 --jobs 2 [--token SECRET] [--budget-file BUDGET.json]
 Original commands:
   alloc validate RULE.json
   alloc explain RULE.json

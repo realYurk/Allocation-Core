@@ -1,4 +1,4 @@
-# Compiled binaries (rebuilt from source; SHA-verified via CORE_SHA256.json)
+# Compiled binaries (rebuild from source; SHA-verified via CORE_SHA256.json / RELEASE_SHA256.json)
 core/alloc_windows_amd64.exe
 core/alloc_windows_arm64.exe
 core/alloc_linux_amd64

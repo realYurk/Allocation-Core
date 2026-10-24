@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestV14DriverContentAddressedCache(t *testing.T) {
+func TestDriverContentAddressedCache(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "driver.csv")
 	if e := os.WriteFile(p, []byte("period,sku,units\n01,商品A,3\n01,商品B,1\n"), 0600); e != nil {
@@ -63,7 +63,7 @@ func TestV14DriverContentAddressedCache(t *testing.T) {
 	fourth.ix.disk.close()
 }
 
-func TestV14DriverCacheParallelBuild(t *testing.T) {
+func TestDriverCacheParallelBuild(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "d.csv")
 	if e := os.WriteFile(p, []byte("period,sku,units\n01,A,1\n01,B,2\n"), 0600); e != nil {

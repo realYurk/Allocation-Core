@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"allocation-core/internal/capacity"
 	"bufio"
 	"compress/gzip"
 	"crypto/sha256"
@@ -56,7 +57,7 @@ type RunOptions struct {
 	CheckpointDir      string // durable completed stages, disk execution only
 	Resume             bool   // allow reusing validated completed checkpoints
 	TestStopAfterStage int    // tests only: abort after N completed durable stages
-	EvidenceGzip       bool   // V18: stream lossless, integrity-recorded gzip for evidence CSV
+	EvidenceGzip       bool   // Stream lossless, integrity-recorded gzip for evidence CSV
 }
 
 // PoolResult is computed entirely off-thread. Output files are written only by
@@ -617,10 +618,13 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 		return summary, err
 	}
 	h := sha256.Sum256(data)
-	summary = Summary{DataSHA256: map[string]string{}, Schema: Schema, Engine: "go-core/0.18.0", Name: spec.Name, RuleSHA256: hex.EncodeToString(h[:]), StartedUTC: time.Now().UTC().Format(time.RFC3339), Status: "RUNNING"}
+	summary = Summary{DataSHA256: map[string]string{}, Schema: Schema, Engine: "allocation-core", Name: spec.Name, RuleSHA256: hex.EncodeToString(h[:]), StartedUTC: time.Now().UTC().Format(time.RFC3339), Status: "RUNNING"}
 	base := filepath.Dir(configPath)
 	if outputDir == "" {
 		outputDir = filepath.Join(base, "output")
+	}
+	if e := capacity.CheckEnv(outputDir); e != nil {
+		return summary, e
 	}
 	if _, e := os.Stat(outputDir); e == nil {
 		return summary, fail("output directory already exists, choose a new folder: %s", outputDir)

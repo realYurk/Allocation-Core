@@ -5,6 +5,7 @@ package service
 // unique output directories and use the same authoritative engine as CLI.
 
 import (
+	"allocation-core/internal/capacity"
 	"allocation-core/internal/engine"
 	"bufio"
 	"crypto/rand"
@@ -30,7 +31,8 @@ type Config struct {
 	Token            string
 	Concurrent       int
 	Queue            int
-	MaxActiveWorkers int // upper bound of workers per service job, 1..16
+	BudgetFile       string // admission budget for this service
+	MaxActiveWorkers int    // upper bound of workers per service job, 1..16
 }
 type Request struct {
 	Rule            string `json:"rule"`
@@ -68,6 +70,11 @@ type Server struct {
 
 func utc() string { return time.Now().UTC().Format(time.RFC3339Nano) }
 func New(cfg Config) (*Server, error) {
+	if cfg.BudgetFile != "" {
+		if _, e := capacity.Load(cfg.BudgetFile); e != nil {
+			return nil, e
+		}
+	}
 	if cfg.Concurrent == 0 {
 		cfg.Concurrent = 2
 	}
@@ -124,7 +131,7 @@ func New(cfg Config) (*Server, error) {
 			w.WriteHeader(405)
 			return
 		}
-		jsonOut(w, 200, map[string]string{"status": "ok", "engine": "allocation-core/0.14"})
+		jsonOut(w, 200, map[string]string{"status": "ok", "engine": "allocation-core"})
 	})
 	s.mux.HandleFunc("/v1/jobs", s.jobsHandler)
 	s.mux.HandleFunc("/v1/jobs/", s.jobHandler)
@@ -285,6 +292,17 @@ func (s *Server) jobsHandler(w http.ResponseWriter, r *http.Request) {
 			jsonOut(w, 400, map[string]string{"error": e.Error()})
 			return
 		}
+		if s.cfg.BudgetFile != "" {
+			report, e := capacity.Check(s.cfg.BudgetFile, filepath.Join(s.store, "jobs"))
+			if e != nil {
+				jsonOut(w, 503, map[string]string{"error": "capacity check failed: " + e.Error()})
+				return
+			}
+			if report.Status != "PASS" {
+				jsonOut(w, 507, map[string]any{"error": "capacity budget blocked job", "capacity": report})
+				return
+			}
+		}
 		if req.Workers > s.cfg.MaxActiveWorkers || req.Workers*s.cfg.Concurrent > 32 {
 			jsonOut(w, 400, map[string]string{"error": "workers exceed configured service resource budget"})
 			return
@@ -386,7 +404,19 @@ func (s *Server) worker() {
 			continue
 		}
 		s.mx.Unlock()
-		result, e := engine.RunDiskWithOptions(t.rule, filepath.Join(s.store, "jobs", t.id), t.opts)
+		// Re-check at dispatch: the disk budget may have changed while queued.
+		var result engine.Summary
+		var e error
+		if s.cfg.BudgetFile != "" {
+			var report capacity.Report
+			report, e = capacity.Check(s.cfg.BudgetFile, filepath.Join(s.store, "jobs"))
+			if e == nil && report.Status != "PASS" {
+				e = fmt.Errorf("capacity budget rejected dispatch: %v", report.Reasons)
+			}
+		}
+		if e == nil {
+			result, e = engine.RunDiskWithOptions(t.rule, filepath.Join(s.store, "jobs", t.id), t.opts)
+		}
 		s.mx.Lock()
 		j = s.jobs[t.id]
 		j.Finished = utc()

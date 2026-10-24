@@ -1,0 +1,11 @@
+{
+  "pools": 3600,
+  "targets_per_pool": 500000,
+  "factor_paths": 1,
+  "result_bytes_per_row": 144,
+  "evidence_bytes_per_row": 300,
+  "overhead_percent": 150,
+  "max_rows": 50000000,
+  "max_peak_bytes": 107374182400,
+  "reserve_free_bytes": 0
+}

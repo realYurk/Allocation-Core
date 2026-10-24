@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func compareV18Files(t *testing.T, first, second string) {
+func compareStreamFiles(t *testing.T, first, second string) {
 	t.Helper()
 	for _, name := range evidenceStreamNames {
 		a, err := os.ReadFile(filepath.Join(first, name))
@@ -27,7 +27,7 @@ func compareV18Files(t *testing.T, first, second string) {
 	}
 }
 
-func TestV18StreamingEvidenceIsLosslessAcrossWorkersAndExamples(t *testing.T) {
+func TestStreamingEvidenceIsLosslessAcrossWorkersAndExamples(t *testing.T) {
 	for _, test := range []string{"manufacturing", "dual_driver", "triple_driver", "split_merge"} {
 		t.Run(test, func(t *testing.T) {
 			rule := filepath.Join("..", "..", "examples", test, "rule.json")
@@ -47,7 +47,7 @@ func TestV18StreamingEvidenceIsLosslessAcrossWorkersAndExamples(t *testing.T) {
 			if err := ExpandEvidenceStream(compressed, restored); err != nil {
 				t.Fatal(err)
 			}
-			compareV18Files(t, raw, restored)
+			compareStreamFiles(t, raw, restored)
 			if _, err := os.Stat(filepath.Join(compressed, "ledger.csv")); !os.IsNotExist(err) {
 				t.Fatal("plaintext ledger created in streaming mode")
 			}
@@ -78,7 +78,7 @@ func TestV18StreamingEvidenceIsLosslessAcrossWorkersAndExamples(t *testing.T) {
 	}
 }
 
-func TestV18DiskCheckpointResumeAndRestore(t *testing.T) {
+func TestDiskCheckpointResumeAndRestore(t *testing.T) {
 	rule := filepath.Join("..", "..", "examples", "split_merge", "rule.json")
 	root := t.TempDir()
 	cp := filepath.Join(root, "checkpoint")
@@ -109,10 +109,10 @@ func TestV18DiskCheckpointResumeAndRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Both disk flows preserve the same output files across checkpoints.
-	compareV18Files(t, raw, expanded)
+	compareStreamFiles(t, raw, expanded)
 }
 
-func TestV18DetectsTruncatedEvidenceAndTamperedManifest(t *testing.T) {
+func TestDetectsTruncatedEvidenceAndTamperedManifest(t *testing.T) {
 	rule := filepath.Join("..", "..", "examples", "dual_driver", "rule.json")
 	root := t.TempDir()
 	dir := filepath.Join(root, "output")

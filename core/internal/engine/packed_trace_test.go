@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestV19CompressedTraceMatchesFullPlainAcrossTopologies(t *testing.T) {
+func TestCompressedTraceMatchesFullPlainAcrossTopologies(t *testing.T) {
 	for _, example := range []string{"split_merge", "dual_driver", "triple_driver", "manufacturing"} {
 		t.Run(example, func(t *testing.T) {
 			rule := filepath.Join("..", "..", "examples", example, "rule.json")
@@ -54,7 +54,7 @@ func TestV19CompressedTraceMatchesFullPlainAcrossTopologies(t *testing.T) {
 		})
 	}
 }
-func TestV19CompressedTraceRejectsCorruptedShardChunkAndSource(t *testing.T) {
+func TestCompressedTraceRejectsCorruptedShardChunkAndSource(t *testing.T) {
 	rule := filepath.Join("..", "..", "examples", "split_merge", "rule.json")
 	dir := filepath.Join(t.TempDir(), "result")
 	if _, err := RunWithOptions(rule, dir, RunOptions{EvidenceGzip: true}); err != nil {
