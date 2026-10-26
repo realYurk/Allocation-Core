@@ -1,0 +1,47 @@
+{
+  "source_kind": "user-uploaded archive only",
+  "source_filename": "Allocation-Core-main.zip",
+  "source_zip_sha256": "37acfaddbf4355f5b827755f5ada3692385884b220c1ed1464000c4153b0b912",
+  "source_real_file_count": 208,
+  "upstream_source_files_removed": 0,
+  "original_core_go_files_preserved_byte_for_byte": 47,
+  "original_studio_go_files_preserved_byte_for_byte": 4,
+  "original_files_intentionally_edited": [
+    "Start_Windows.cmd",
+    "README.md",
+    "CORE_UNCHANGED_SHA256.json",
+    "RELEASE_SHA256.txt"
+  ],
+  "added_paths": [
+    "README_DOWNLOAD_FIRST_CN.md",
+    "BUILD_PROVENANCE.json",
+    "Check_Windows_Installation.cmd",
+    "docs/CORE_HASHES_FROM_UPLOADED_SOURCE.json",
+    ".github/workflows/build-complete.yml",
+    "tools/make_release.py",
+    "tools/verify_distribution.py",
+    "tests/test_distribution.py"
+  ],
+  "go_version": "go1.23.2",
+  "architectures_built": [
+    "windows/amd64",
+    "windows/arm64",
+    "linux/amd64",
+    "linux/arm64",
+    "darwin/amd64",
+    "darwin/arm64"
+  ],
+  "tests": {
+    "studio_go_test": "PASS",
+    "core_go_test": "PASS",
+    "studio_go_vet": "PASS",
+    "core_go_vet": "PASS",
+    "studio_go_race": "PASS",
+    "core_go_race": "NOT_COMPLETED_TIMEOUT",
+    "linux_core_two_stage_smoke": "PASS (1200.00 in, 1200.00 out; 3 conservation pools)",
+    "linux_studio_health_and_designer": "PASS (HTTP 200)",
+    "windows_native_exe_start": "NOT_RUN_LINUX_BUILD_HOST",
+    "github_actions_native_windows_smoke": "PROVIDED_CONFIG_NOT_EXECUTED"
+  },
+  "claim_boundary": "This package is derived strictly from the uploaded archive; its equivalence to remote GitHub main and version label V22 is not verified."
+}

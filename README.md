@@ -1,3 +1,5 @@
+> **Windows 新电脑启动 / Windows setup:** 先看 [README_DOWNLOAD_FIRST_CN.md](README_DOWNLOAD_FIRST_CN.md)。GitHub Source ZIP 不含 EXE；下载完整发行包。
+
 # Allocation Core
 
 规则驱动的多维成本分摊引擎。以精确整数金额运算为核心，把一组成本池，按可配置的驱动因子（销量、工时、用料等）与多阶段拓扑，分摊到目标对象，并在每一步保证金额守恒。
