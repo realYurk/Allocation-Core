@@ -52,8 +52,8 @@
         "sku": {
           "mode": "INCLUDE",
           "include": [
-            "商品A",
-            "商品B"
+            "Item-A",
+            "Item-B"
           ]
         },
         "account": {

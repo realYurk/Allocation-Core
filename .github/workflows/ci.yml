@@ -1,0 +1,52 @@
+name: Clean Core CI
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build and generate only synthetic data
+        run: |
+          go build -o AllocationCore .
+          ./AllocationCore demo .
+      - name: Go tests, static checks and examples
+        run: |
+          go test ./...
+          go vet ./...
+          ./AllocationCore run examples/manufacturing/rule.json output/ci-simple --workers 4
+          ./AllocationCore multi -project testdata/multi_sample -out output/ci-multi -engine ./AllocationCore
+      - name: Public source audit
+        run: |
+          ! git ls-files | grep -Ei '\.(csv|xlsx|xls|exe|db|sqlite|parquet)$'
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build one executable
+        shell: pwsh
+        run: |
+          go build -trimpath -ldflags="-s -w" -o AllocationCore.exe .
+          .\AllocationCore.exe demo .
+          .\AllocationCore.exe run examples/manufacturing/rule.json output\ci-simple --workers 2
+          $bin = (Resolve-Path .\AllocationCore.exe).Path
+          .\AllocationCore.exe multi -project testdata\multi_sample -out output\ci-multi -engine $bin
+      - name: Archive one-folder product
+        shell: pwsh
+        run: |
+          $include = @('AllocationCore.exe','go.mod','main.go','README.md','.gitignore','internal','examples','testdata','docs','input')
+          New-Item -ItemType Directory -Force dist\Allocation-Core-Clean | Out-Null
+          foreach ($item in $include) { Copy-Item -Recurse -Force $item dist\Allocation-Core-Clean\ }
+          Get-ChildItem dist\Allocation-Core-Clean -Recurse -File | Where-Object { $_.Extension -in @('.csv','.xlsx','.xls','.db','.sqlite') } | Remove-Item -Force
+          Compress-Archive -Path dist\Allocation-Core-Clean -DestinationPath dist\Allocation-Core-Clean-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Allocation-Core-Clean-Windows
+          path: dist/Allocation-Core-Clean-Windows.zip

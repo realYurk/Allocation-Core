@@ -1,0 +1,98 @@
+{
+  "schema": "allocation-ir/2.0",
+  "name": "化妆品区域品牌内分摊，排除试用品（合成数据）",
+  "precision": 2,
+  "dimensions": [
+    "period",
+    "region",
+    "brand",
+    "sku",
+    "account",
+    "currency"
+  ],
+  "immutable_dimensions": [
+    "period",
+    "currency"
+  ],
+  "hierarchies": {
+    "sku": {
+      "可售商品": [
+        "Item-A",
+        "Item-B",
+        "试用品"
+      ]
+    }
+  },
+  "datasets": {
+    "amounts": {
+      "expenses": "amounts.csv"
+    },
+    "drivers": {
+      "sales": "sales.csv"
+    }
+  },
+  "stages": [
+    {
+      "id": "按销量分摊",
+      "inputs": [
+        {
+          "from": "expenses",
+          "share": "1"
+        }
+      ],
+      "source": {
+        "grouping": {
+          "period": "AS_IS",
+          "region": "AS_IS",
+          "brand": "AS_IS",
+          "sku": "TOTAL",
+          "account": "AS_IS",
+          "currency": "AS_IS"
+        },
+        "filters": {}
+      },
+      "target": {
+        "period": {
+          "mode": "SOURCE"
+        },
+        "region": {
+          "mode": "SOURCE"
+        },
+        "brand": {
+          "mode": "SOURCE"
+        },
+        "sku": {
+          "mode": "INCLUDE_EXCLUDE",
+          "include": [
+            "可售商品"
+          ],
+          "exclude": [
+            "试用品"
+          ]
+        },
+        "account": {
+          "mode": "SOURCE"
+        },
+        "currency": {
+          "mode": "SOURCE"
+        }
+      },
+      "conservation_keys": [
+        "region",
+        "brand",
+        "period",
+        "account",
+        "currency"
+      ],
+      "allocations": [
+        {
+          "id": "units",
+          "share": "1",
+          "driver_dataset": "sales",
+          "weight_field": "units",
+          "negative_driver_policy": "REJECT"
+        }
+      ]
+    }
+  ]
+}

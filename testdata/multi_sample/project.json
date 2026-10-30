@@ -1,0 +1,14 @@
+{
+  "amounts": "amounts.csv",
+  "assignments": "assignments.csv",
+  "overrides": "overrides.csv",
+  "templates": "templates",
+  "drivers": "drivers",
+  "workers": 2,
+  "jobs": 2,
+  "disk_partitions": 8,
+  "driver_disk_index": true,
+  "evidence_gzip": true,
+  "keep_group_outputs": true,
+  "timeout_seconds": 120
+}
