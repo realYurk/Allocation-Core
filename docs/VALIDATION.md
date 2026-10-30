@@ -95,3 +95,31 @@ AllocationCore reconcile --actual output/example/results.csv --reference input/r
 ```
 
 **Performance boundary / 性能边界：** The 32-partition comparison bounds aggregation to the largest partition but still uses disk proportional to the inputs; extremely skewed data can create an oversized partition. Initial cache hash verification still re-reads the source data. Neither feature guarantees a fixed speedup. / 对账采用分区聚合，但临时磁盘占用随输入增长，极端倾斜也可能造成分区内存峰值过高；Driver 缓存仍需重新校验源文件哈希，不能承诺固定提速。
+
+## Clean V5 reproducible profiling and source adapters / V5 性能与适配器验收
+
+From a clean checkout / 从全新检出开始：
+
+```bash
+go build -o AllocationCore .
+./AllocationCore demo .
+go test ./...
+go vet ./...
+go test -race ./internal/engine ./adapter ./internal/profiling
+./AllocationCore data csv --config examples/import_mapping.json output/normalized.csv
+./AllocationCore profile examples/manufacturing/rule.json output/manufacturing-profile --workers 4 --disk-partitions 8 --evidence-gzip
+```
+
+All profiling artifacts, normalized CSV and generated fixtures must remain local. / 全部 Profile、生成 CSV 和真实适配配置均不得提交 GitHub。
+
+Golden regression / 黄金结果回归：same input and V4 rule must produce byte-identical `results.csv`, `reconciliation.csv`, `ledger`, `source_to_pool`, `lineage_links`, and `evidence_stream_manifest` in both memory and disk modes. Local CPU benchmarks are not proof of production throughput. / 同数据旧版与新版需在内存及磁盘模式下逐文件一致，微基准不能代表真实生产吞吐。
+
+### Measured synthetic V5 observations / 本轮合成实测结果
+
+**Environment / 环境:** Linux x64 / AMD EPYC VM; NOT a Windows production workload. / 不是 Windows 生产环境成绩。
+
+- **50,000 source rows, two-stage disk executor (`--disk-partitions 8`, gzip evidence, CPU profiling active):** ~904 ms measured wall time; sampled peak `HeapAlloc` ~11.27 MB; total Go heap allocated ~252.17 MB; persisted output ~301 KB; `/proc/self/io` write-byte delta ~20.96 MB. The 20.96 MB includes temporary spool and profile writes, **not** just the published results. / 5 万行两阶段磁盘计算开启 CPU Profile，耗时约 904ms、采样堆峰值约 11.27MB、累计 Go 堆分配约 252MB。最终文件 301KB，但进程写盘约 20.96MB，包含临时文件与 Profile；不能当成单次业务结果体积。
+- **CPU profile:** `encoding/json` spool decoding and temporary Go object allocation were prominent; `encoding/json.(*decodeState).object` accumulated approximately 330ms of 930ms sampled CPU. This motivates **future spool serialization work**, not an untested format change in V5. / 证据显示 JSON 中间数据解码和 GC 是值得继续优化的热点，这轮不冒险改掉检查点文件格式。
+- **20k rows / 100 unique coordinates**, synthetic grouping microbenchmark: legacy ~9.09ms / 4.02MB allocated vs adaptive packed grouping ~4.30ms / 0.60MB allocated; **20k mostly unique coordinates**: packed path not chosen and adaptive ~16.4ms vs legacy ~16.0ms in single runs. / 高重复度坐标局部优化效果明显，稀疏唯一场景无总体提速保证。
+- **1,000 accounts, 1,000 different rules:** V4 and V5 full `results.csv` and account reconciliation SHA-256 identical. One unprofiled run V4 ~5.90s vs V5 ~6.22s on the same host, **no end-to-end speedup demonstrated**. / 千科目结果完全一致，但本轮单次耗时没有取得整体提升，不能夸大。
+- **Byte-for-byte regression** against V4 for synthetic manufacturing with memory/disk mode and compressed evidence: complete final outputs, ledger, lineage, membership and manifest agree. / 两种执行模式的金额、审计和血缘文件与 V4 完全一致。

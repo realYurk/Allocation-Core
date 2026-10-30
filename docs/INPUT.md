@@ -112,3 +112,62 @@ For Studio / 工作台操作：
 5. Find `summary.json` and `differences.csv` under the job's newly created `acceptance-*` directory. / 在新建的本地验收目录查看完整 CSV 与摘要。
 
 **Important:** `MATCH` proves *only that these two snapshots agree at every business coordinate within tolerance*. Financial conservation alone is not equivalent to reference agreement. No reference file = not verified. The engine does not provide a native MySQL or Cube connector yet; extract into this explicit contract. / `MATCH` 只证明两份快照在所选精度和容差下逐坐标一致，**不自动证明原系统规则正确**。没有独立参考结果不得写“验收一致”。目前数据库和 Cube 仍需外部适配为明确的输入契约。
+
+## V5: one mapping for CSV, SQL and Cube / 同一份数据映射接入不同来源
+
+**中文：** 数据源不同，规则中使用的标准维度、金额精度和分摊因子字段不应该不同。V5 先提供可立即使用的 CSV 映射命令；MySQL 与多维 Cube 的 Go 流式适配接口也已实现，但当前不内置数据库驱动、连接账号或厂商 SDK。
+
+**English:** The source provider is separate from the allocation contract. V5 offers a working CSV normalization command and Go interfaces for a caller-injected SQL driver or Cube cell cursor. No MySQL credentials, network connection, or proprietary Cube client is built into this release.
+
+### 1. Map columns / 建立列映射
+
+`examples/import_mapping.json` is a **synthetic, vendor-neutral** example. Set `source.path` to your exported file, then map every canonical dimension and the exact decimal value field. Run:
+
+```bash
+AllocationCore.exe demo .
+AllocationCore.exe data csv --config examples/import_mapping.json output/normalized.csv
+AllocationCore.exe inspect examples/manufacturing/rule.json
+```
+
+`output/normalized.csv` will contain exactly the declared dimension columns and one named amount field; existing sparse coordinates and duplicate rows are preserved. / 输出严格保留稀疏坐标与重复数据，不对空维度擅自填 `TOTAL`，也不把独立记录合并。
+
+**For Driver / 用于分摊因子：** specify `value_name` as the exact target Driver column such as `units`, and `precision` as `6`. Amounts commonly use `value_name=amount`, `precision=2`. No silent rounding; over-precision, invalid decimals and `int64` overflow fail closed. / 分摊因子一般用 6 位精度；金额按业务精度声明，超精度拒绝而不是偷偷四舍五入。
+
+**CLI limitation / 命令行边界：** `data csv` only supports source.type=`csv`. Native MySQL requires a separately registered `database/sql` driver and a **read-only database account**. Cube requires a separately implemented vendor cell cursor, with dimensions and exact decimal values. Both reuse `ingest.ImportCSV(ctx, source, mapping, output)`. / MySQL 和 Cube 当前是可编译可测试的标准接入接口，不是“填连接字符串就能直连”。
+
+### 2. Quick acceptance / 小白验收步骤
+
+1. Export or prepare a **small slice** of source amounts and drivers. Never share credentials or proprietary rules in the public Git repo. / 准备一小份金额与因子，不上传真实规则和数据库密码。
+2. Normalize each source with its explicit mapping. `data csv` returns a row count and status; errors do not publish a partial output. / 运行映射命令，检查行数和报错，不会发布半成品。
+3. Reference those normalized files from a private rule JSON; run `inspect` first. / 在私有规则中引用标准文件，先运行数据体检。
+4. Execute `run` or `multi`; require conservation **and** independent full-coordinate comparison with a trusted reference, not just equal totals. / 执行分摊后同时核对守恒和完整坐标差异。
+
+### 3. Failure examples / 常见拒绝原因
+
+| Error / 错误 | Meaning / 处理 |
+|---|---|
+| `missing source column` | Fix column mapping; do not guess a column. / 修改映射，禁止猜字段 |
+| `missing dimension` | Explicitly map a real member. Legitimate `No Product` is not an error; empty string is. / 保留明确的未分配成员，空值拒绝 |
+| `invalid amount` | The declared decimal precision is exceeded or the value is invalid. / 精度不匹配或金额非法 |
+| `output already exists` | Choose a new versioned output file; inputs are immutable. / 改用新输出文件，避免覆盖历史结果 |
+| SQL connection error | Check private read-only account, driver and network in the private integration application. / 私有接入程序校验权限、驱动和网络 |
+
+### 4. Developer read-only connector examples / 开发者只读接入示例
+
+For a private MySQL integration program (using your own registered `database/sql` driver), construct a source **without accepting arbitrary SQL text**:
+
+```go
+src := adapter.SQLSource{
+    DB: db, // caller provides a least-privilege read-only *sql.DB
+    Table: "finance.expenses",
+    ColumnsList: []string{"period", "site", "item", "amount"},
+    Equal: map[string]string{"period": "2026-01"},
+}
+report, err := adapter.ImportCSV(ctx, src, mapping, privateOutputPath)
+```
+
+**中文：** `DB` 必须由你私有工程初始化，驱动和口令不得写到公共仓库。库表名与列名采用严格标识符白名单，筛选值全部通过参数传入，且会请求只读事务。仍应在数据库端使用真正的只读账号，不依赖程序自身的 SELECT 限制作为唯一安全边界。
+
+For a private Cube API client, implement `adapter.CellCursor` and return `adapter.Cell{Members:..., Value:"123.45"}` with **explicit source grain**. Then pass `adapter.CubeSource{Cursor: cursor, Dimensions: dimensions, ValueColumn: "amount"}` to `adapter.ImportCSV`. / 对 Cube 只需实现单元格迭代器，返回明确的维度成员和金额字符串，绝不能把未分配成员擅自替换为默认商品。
+
+**Current integration boundary / 当前限制：** This repository uses a short local Go module path (`allocationcore`). The public `adapter` package is usable inside this module or a local Go workspace; publishing a separately versioned external Go SDK requires canonical module-path/version governance. / 当前适配包已公开在代码根目录，可供同一工程或 Go Workspace 使用；未来要把它作为外部独立依赖，还需要正式治理公开模块路径和版本兼容。

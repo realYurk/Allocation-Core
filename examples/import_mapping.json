@@ -1,0 +1,21 @@
+{
+  "source": {
+    "type": "csv",
+    "path": "manufacturing/amounts.csv"
+  },
+  "mapping": {
+    "dimensions": ["period", "plant", "brand", "family", "sku", "account", "currency"],
+    "columns": {
+      "period": "period",
+      "plant": "plant",
+      "brand": "brand",
+      "family": "family",
+      "sku": "sku",
+      "account": "account",
+      "currency": "currency"
+    },
+    "value_source": "amount",
+    "value_name": "amount",
+    "precision": 2
+  }
+}

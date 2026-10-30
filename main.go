@@ -1,14 +1,18 @@
 package main
 
 import (
+	"allocationcore/adapter"
 	"allocationcore/internal/acceptance"
 	"allocationcore/internal/corecli"
 	"allocationcore/internal/demo"
 	"allocationcore/internal/explorer"
 	"allocationcore/internal/multi"
+	"allocationcore/internal/profiling"
 	"allocationcore/internal/review"
 	"allocationcore/internal/rulekit"
 	"allocationcore/internal/studio"
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,6 +25,25 @@ func main() {
 		return
 	}
 	switch os.Args[1] {
+	case "data":
+		// Data mappings never connect to databases implicitly. External SQL and
+		// Cube connectors can use the same ingest.Source Go API.
+		if len(os.Args) != 6 || os.Args[2] != "csv" || os.Args[3] != "--config" {
+			fmt.Fprintln(os.Stderr, "usage: AllocationCore data csv --config mapping.json OUTPUT.csv")
+			os.Exit(2)
+		}
+		r, e := adapter.ImportCSVConfig(context.Background(), os.Args[4], os.Args[5])
+		if e != nil {
+			fmt.Fprintln(os.Stderr, "Data import failed:", e)
+			os.Exit(1)
+		}
+		b, _ := json.MarshalIndent(r, "", "  ")
+		fmt.Println(string(b))
+	case "profile":
+		if e := profiling.CLI(os.Args[2:]); e != nil {
+			fmt.Fprintln(os.Stderr, "Profiling failed:", e)
+			os.Exit(1)
+		}
 	case "reconcile":
 		acceptance.CLI()
 	case "run", "validate", "explain", "doctor", "inspect", "compare", "trace", "vault", "batch", "serve-core", "capacity":
@@ -78,9 +101,9 @@ func main() {
 		}
 		fmt.Printf("Synthetic example files generated: %d (local only)\n", n)
 	case "version", "--version":
-		fmt.Println("Allocation Core Clean / v4")
+		fmt.Println("Allocation Core Clean / v5")
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown command %q. Use 'serve', 'core', 'multi', 'rule', 'explorer', 'review' or double-click the application.\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, "Unknown command %q. Use 'serve', 'core', 'multi', 'rule', 'explorer', 'data', 'profile', 'review' or double-click the application.\n", os.Args[1])
 		os.Exit(2)
 	}
 }

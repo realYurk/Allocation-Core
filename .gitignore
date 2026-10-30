@@ -35,3 +35,6 @@ AllocationCore.exe
 **/reconciliation-*/
 **/multi-jobs/
 **/.reconcile-*/
+# CPU/heap profiling artifacts and local inspection outputs
+**/*.profile/
+**/*.profile/**

@@ -18,8 +18,10 @@ jobs:
         run: |
           go test ./...
           go vet ./...
-          go test -race ./internal/multi ./internal/studio ./internal/engine
+          go test -race ./internal/multi ./internal/studio ./internal/engine ./adapter ./internal/profiling
           ./AllocationCore inspect examples/manufacturing/rule.json
+          ./AllocationCore data csv --config examples/import_mapping.json output/ci-normalized.csv
+          ./AllocationCore profile examples/manufacturing/rule.json output/ci-profile --workers 2 --disk-partitions 4 --evidence-gzip
           ./AllocationCore run examples/manufacturing/rule.json output/ci-simple --workers 4
           ./AllocationCore multi inspect -project testdata/multi_sample -json > output/ci-preflight.json
           ./AllocationCore multi -project testdata/multi_sample -out output/ci-multi -engine ./AllocationCore
@@ -43,6 +45,8 @@ jobs:
           go build -trimpath -ldflags="-s -w" -o AllocationCore.exe .
           .\AllocationCore.exe demo .
           .\AllocationCore.exe inspect examples/manufacturing/rule.json
+          .\AllocationCore.exe data csv --config examples/import_mapping.json output\ci-normalized.csv
+          .\AllocationCore.exe profile examples/manufacturing/rule.json output\ci-profile --workers 2 --disk-partitions 4
           .\AllocationCore.exe run examples/manufacturing/rule.json output\ci-simple --workers 2
           $bin = (Resolve-Path .\AllocationCore.exe).Path
           .\AllocationCore.exe multi inspect -project testdata\multi_sample -json

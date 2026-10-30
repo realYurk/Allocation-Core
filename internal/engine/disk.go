@@ -75,15 +75,19 @@ func stageShardKey(row Row, st Stage, dims []string) string {
 	if !Enabled(st.Enabled) || st.Operation == "PASS" {
 		return key(row.Coord, dims)
 	}
-	coord := make(map[string]string, len(dims))
-	for _, d := range dims {
+	// Encode directly in dimension order. Creating a temporary coordinate map
+	// for EVERY spooled row used to multiply allocations and GC pressure.
+	// This retains exactly the original JSON key bytes, sharding and order.
+	values := make([]string, len(dims))
+	for i, d := range dims {
 		if st.Source.Grouping[d] == "AS_IS" {
-			coord[d] = row.Coord[d]
+			values[i] = row.Coord[d]
 		} else {
-			coord[d] = poolMember
+			values[i] = poolMember
 		}
 	}
-	return key(coord, dims)
+	encoded, _ := json.Marshal(values)
+	return string(encoded)
 }
 
 // partitionSpool reopens the one-file inbox and creates N buckets in a single

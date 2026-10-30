@@ -1,4 +1,4 @@
-# Allocation Core Clean V4 / 通用分摊引擎
+# Allocation Core Clean V5 / 通用分摊引擎
 
 **One Go module · One Windows executable · One workspace.**
 **一个 Go 模块、一个 Windows 程序、一个业务工作台。**
@@ -24,6 +24,14 @@ go build -trimpath -ldflags="-s -w" -o AllocationCore.exe .
 ```
 
 Build once, run the same executable for all modes. / 只编译一个程序，所有功能共用它。
+
+## New in Clean V5 / 本轮新增
+
+- **Adaptive dimension-ID grouping / 自适应维度编码**: repeated coordinates are grouped with compact temporary integer IDs; sparse mostly-unique workloads retain their existing path. Original full-coordinate sorting and monetary semantics are preserved. / 对重复坐标使用临时整数 ID，对大部分唯一坐标保留原路径，不更改金额、证据和输出顺序。
+- **Performance profiling / CPU、内存与磁盘剖析**: `AllocationCore.exe profile RULE.json OUTPUT_DIR --workers 4 --disk-partitions 8 --evidence-gzip` writes local CPU/heap profiles and measurements alongside normal verified outputs. / CPU、Go 堆内存和输出体积统计均本地保存。
+- **Unified read-only data mapping / 统一只读数据映射**: `AllocationCore.exe data csv --config examples/import_mapping.json output/normalized.csv` is ready to use. MySQL (`database/sql`) and multidimensional Cube expose shared Go streaming interfaces; **live DB/Cube connectors and credentials are NOT bundled**. / CSV 可直接使用；MySQL 与多维 Cube 已有只读适配接口，但没有宣称生产直连。
+
+See [`docs/INPUT.md`](docs/INPUT.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). / 详细操作和架构说明见这两份中英双语文档。
 
 ## New in Clean Core V4 / V4 新功能
 

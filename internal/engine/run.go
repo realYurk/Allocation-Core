@@ -569,6 +569,9 @@ func mergeRows(rows []Row, dims []string) ([]Row, error) {
 	if len(rows) == 0 {
 		return rows, nil
 	}
+	if shouldUsePackedMerge(rows, dims) {
+		return mergeRowsIndexed(rows, dims)
+	}
 	m := map[string]Row{}
 	for _, r := range rows {
 		k := key(r.Coord, dims)

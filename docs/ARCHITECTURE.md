@@ -43,3 +43,51 @@ The financial engine is unchanged. The optional, read-only `internal/acceptance`
 The disk Driver cache key is formed from the source content SHA-256, selected weight column, Driver filters, target constraints, dimensions and hierarchies. Allocation labels, shares and negative Driver policy do not alter the stored index and therefore do not fragment its identity. Every cached entry is verified against its source and the committed data digest before reuse. Cache hit/build counts are diagnostic only, never a correctness verdict. / Driver 索引缓存只依赖确实影响索引内容的输入和语义，不再依赖计算后才使用的规则名称和份额。缓存读取仍验证源数据和索引 SHA-256，命中计数只是性能诊断，不代表业务验收通过。
 
 Native MySQL/Cube connectors remain future work: upstream systems must explicitly map to the generic coordinate-and-amount contract. The reference verifier neither infers column mappings nor performs cross-source joins. / MySQL 和 Cube 原生连接器暂未实现，仍需在外部转换为明确的稀疏坐标＋金额契约；验收器不会猜测字段或擅自进行跨来源关联。
+
+## Clean V5: data source boundary / 数据源边界
+
+The core financial engine remains independent of database and Cube vendors. A new read-only streaming contract is implemented in `adapter`:
+
+**中文**：核心金额算法不接触数据库凭据和厂商 SDK。所有数据源必须通过统一的 `Source.Open(context.Context) (Rows, error)` / `Rows.Columns` / `Rows.Next` / `Rows.Close` 流式接口，并由 `ImportCSV` 严格映射成维度列＋精确数值列的规范化 CSV。整个过程不得推断或补齐维度，不得隐式笛卡尔展开，不得自动汇总重复坐标。
+
+**English:** Database and Cube providers stream records through the same `Source`/`Rows` contract and `Mapping` validator. The adapter never auto-expands sparse dimensions, invents missing values, rounds amounts, or aggregates duplicates. The financial engine consumes the same normalized CSV regardless of the upstream vendor.
+
+| Provider / 来源 | Current V5 status / 状态 | Safety boundary / 安全边界 |
+|---|---|---|
+| Headered CSV | **Executable CLI + API / 已实现且可直接使用** | Read-only source; atomic normalized output |
+| MySQL via `database/sql` | **Executable, driver-injected Go adapter / 已实现 Go 接口** | Generated SELECT only, parameterized equality, read-only transaction, caller-supplied least-privilege credentials; **no bundled MySQL driver or live DB validation** |
+| Multidimensional Cube | **Executable, vendor-neutral cell cursor adapter / 已实现抽象接口** | Caller implements `CellCursor.Next`; each cell retains explicit dimension members, including legitimate unassigned values; **no vendor SDK or live TM1 connection** |
+
+### Data path / 数据流
+
+```mermaid
+flowchart TD
+    CSV[CSV file] --> S[Read-only Source]
+    SQL[MySQL table via injected driver] --> S
+    CUBE[Cube cell cursor from private connector] --> S
+    S --> MAP[Strict dimension and decimal Mapping]
+    MAP --> NC[Canonical sparse CSV]
+    NC --> CORE[Existing deterministic allocation engine]
+    CORE --> AUDIT[Conservation / evidence / coordinate comparison]
+```
+
+In V5, `data csv` is a **local CSV normalization command only**. MySQL and Cube are validated Go interfaces, not claims of turnkey database connectivity. A private integration module can supply `SQLSource` with a registered driver or `CubeSource` with a cursor without modifying the engine. / V5 命令行仅直接支持 CSV；MySQL 和 Cube 需要调用方提供驱动或单元格读取器，不能将“接口支持”宣传为“生产直连已完成”。
+
+## Coordinate and intermediate-data optimization / 坐标与中间数据优化
+
+- `stageShardKey`: emit the original canonical JSON partition key without constructing a temporary dimension `map` for every record. **Exact old byte representation is retained**, including UTF-8 and JSON escaping. / 磁盘分区直接构造原字节键，去掉逐行临时维度 Map。
+- `coordinateDictionary`: temporary 32-bit member IDs **per dimension**; pack into fixed-length in-memory keys. These IDs never appear in business outputs or lineages. / 维度成员临时编码成整数 ID，仅用于进程内分组；外部审计维度值不变。
+- `mergeRows`: adaptive branch uses packed keys only for sufficiently large, repeated-coordinate workloads; sparse/mostly-unique coordinates retain legacy logic. The final merge still sorts by the legacy JSON key. / 多重复坐标时启用压缩分组，几乎全是唯一坐标时保持原算法；输出顺序与行 ID 不变。
+- **Financial apportionment remains unchanged.** / 金额分配、舍入、负数和守恒公式未改。
+
+### Profiling boundaries / 性能剖析边界
+
+`AllocationCore profile RULE.json OUTPUT_DIR --workers 4 [--disk-partitions 8] [--evidence-gzip]` creates the usual complete allocation output plus a local `OUTPUT_DIR.profile/` containing `cpu.pprof`, `heap.pprof`, `metrics.json`.
+
+**中文**：可以用 `go tool pprof -top <profile>/cpu.pprof` 查 CPU 热点，用 `go tool pprof -top <profile>/heap.pprof` 看堆对象。报告记录**采样的 Go HeapAlloc 峰值**，不是 OS 物理 RSS 峰值；Linux 读取进程 `/proc/self/io`，Windows 使用原生 `GetProcessIoCounters` 获取传输计数；两种口径不同，均不代表精确的物理磁盘写入量。`persisted_output_bytes` 仅是最终发布目录大小，不等于包含临时文件的全部磁盘写入量。生成 Profile 会产生额外 CPU/磁盘开销，不宜把该耗时直接当正式吞吐基准。
+
+**English:** The peak heap value is sampled, not process RSS. Linux uses `/proc/self/io`; Windows uses `GetProcessIoCounters` transfer counters, which are not comparable to Linux physical read/write counters. Final persisted output bytes exclude temporary spool and cache I/O. CPU profiling adds overhead. Profile files may contain sensitive paths and must stay outside Git.
+
+### Next measured bottleneck / 下一步经测量确认的瓶颈
+
+The 50k-row disk-profile experiment identified the JSON intermediate-spool decoder and allocation churn as meaningful CPU/heap costs; importantly, they are part of audit-preserving disk processing. A future binary/columnar spool format needs version markers, checkpoint backward compatibility, error recovery, and byte-identical final evidence BEFORE deployment. / 5 万行 Profile 表明 JSON 中间记录反序列化以及临时对象分配是热点。但新二进制/列式中间格式必须同时满足旧检查点兼容、失败恢复、严格相同的账务输出与证据，不能只凭快就替换。
