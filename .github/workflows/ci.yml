@@ -18,6 +18,7 @@ jobs:
         run: |
           go test ./...
           go vet ./...
+          ./AllocationCore inspect examples/manufacturing/rule.json
           ./AllocationCore run examples/manufacturing/rule.json output/ci-simple --workers 4
           ./AllocationCore multi -project testdata/multi_sample -out output/ci-multi -engine ./AllocationCore
       - name: Public source audit
@@ -35,6 +36,7 @@ jobs:
         run: |
           go build -trimpath -ldflags="-s -w" -o AllocationCore.exe .
           .\AllocationCore.exe demo .
+          .\AllocationCore.exe inspect examples/manufacturing/rule.json
           .\AllocationCore.exe run examples/manufacturing/rule.json output\ci-simple --workers 2
           $bin = (Resolve-Path .\AllocationCore.exe).Path
           .\AllocationCore.exe multi -project testdata\multi_sample -out output\ci-multi -engine $bin

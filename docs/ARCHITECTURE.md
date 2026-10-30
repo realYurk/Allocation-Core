@@ -29,3 +29,9 @@ All components live in **one Go module** `allocationcore`, most under `internal/
 ### Performance strategy / 性能策略
 
 Current Go engine uses sparse grouping, parallel pools, optional disk partitions and content-addressed Driver cache. The cleanup itself does not prove a speedup. The next performance gate requires CPU/heap/I/O profiling for million-to-hundred-million row workloads under identical settings before adopting integer-coded dimensions or custom columnar storage. / 清理本身不代表提升性能；先用同条件真实基准剖析，再决定坐标编码等重构。
+
+## V2 pool scheduling / V2 分摊池调度
+
+A stage creates a bounded set of workers **once**. Pools are still processed in batches of at most `2 × workers`, and the coordinator publishes each batch in sorted pool order. Workers do not write shared output files. / 每个阶段创建一次固定工作池；内存仍被 `2 × workers` 的批次限制；写出严格按有序分摊池顺序执行，财务结果与血缘顺序不随线程执行顺序变化。
+
+This improves repeated goroutine setup cost without changing rounding, rule routing, evidence contracts, or the input/output file format. It does not remove multi-account child-process overhead. / 该优化只降低协程调度成本，不改金额计算与审计协议，千科目子进程开销仍有进一步优化空间。

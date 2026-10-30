@@ -20,7 +20,7 @@ func main() {
 		return
 	}
 	switch os.Args[1] {
-	case "run", "validate", "explain", "doctor", "compare", "trace", "vault", "batch", "serve-core", "capacity":
+	case "run", "validate", "explain", "doctor", "inspect", "compare", "trace", "vault", "batch", "serve-core", "capacity":
 		if os.Args[1] == "serve-core" {
 			os.Args[1] = "serve"
 		}
@@ -73,7 +73,7 @@ func main() {
 		}
 		fmt.Printf("Synthetic example files generated: %d (local only)\n", n)
 	case "version", "--version":
-		fmt.Println("Allocation Core Clean / v1")
+		fmt.Println("Allocation Core Clean / v2")
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command %q. Use 'serve', 'core', 'multi', 'rule', 'explorer', 'review' or double-click the application.\n", os.Args[1])
 		os.Exit(2)

@@ -630,6 +630,37 @@ func Run() {
 		stop(err)
 	}
 	switch cmd {
+	case "inspect":
+		if len(args) > 3 || (len(args) == 3 && args[2] != "--json") {
+			stop(fmt.Errorf("usage: AllocationCore inspect RULE.json [--json]"))
+		}
+		report := engine.InspectInputs(file, spec)
+		if len(args) == 3 {
+			printJSON(report)
+		} else {
+			fmt.Printf("INPUT INSPECTION: %s (structure and numeric values only)\n", report.Status)
+			fmt.Printf("Rule dimensions: %d | stages: %d | scan: %d ms\n", report.Dimensions, report.Stages, report.ElapsedMS)
+			for _, c := range report.Checks {
+				fmt.Printf("  %-7s %-16s rows=%d", c.Kind, c.Dataset, c.Rows)
+				if c.Kind == "AMOUNT" {
+					fmt.Printf(" amount=%s", c.Sum)
+				}
+				if c.ZeroValues > 0 || c.NegativeValues > 0 {
+					fmt.Printf(" zero_values=%d negative_values=%d", c.ZeroValues, c.NegativeValues)
+				}
+				if c.Error != "" {
+					fmt.Printf(" ERROR: %s", c.Error)
+				}
+				fmt.Println()
+			}
+			fmt.Println("NOTE: PASS does not verify eligible drivers, allocation math or reference system results.")
+			if report.Status == "PASS" {
+				fmt.Println("NEXT: AllocationCore run RULE.json output/my-run --workers 4")
+			}
+		}
+		if report.Status != "PASS" {
+			stop(fmt.Errorf("input inspection BLOCK; review the errors above"))
+		}
 	case "doctor":
 		lines, e := engine.Doctor(file, spec)
 		if e != nil {
@@ -768,6 +799,7 @@ Evidence and indexed tracing:
 HTTP service:
   alloc serve --root ./examples --store ./service_data --listen 127.0.0.1:8787 --jobs 2 [--token SECRET] [--budget-file BUDGET.json]
 Original commands:
+  alloc inspect RULE.json    # streaming preflight: rows, amounts, drivers, numeric validity
   alloc validate RULE.json
   alloc explain RULE.json
   alloc doctor RULE.json

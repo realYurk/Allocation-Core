@@ -1,4 +1,4 @@
-# Allocation Core Clean / 通用分摊引擎
+# Allocation Core Clean V2 / 通用分摊引擎
 
 **One Go module · One Windows executable · One workspace.**
 **一个 Go 模块、一个 Windows 程序、一个业务工作台。**
@@ -25,6 +25,15 @@ go build -trimpath -ldflags="-s -w" -o AllocationCore.exe .
 
 Build once, run the same executable for all modes. / 只编译一个程序，所有功能共用它。
 
+## New in Clean Core V2 / 本轮更新
+
+- **Streaming input inspection / 流式输入体检**: `AllocationCore.exe inspect RULE.json` checks actual CSV rows, generic dimensions, decimal validity and the weight columns referenced by the rule. It prints source sums and counts without loading a full CSV into memory. / 运行前先扫描源数据，检查字段、数值、坐标，统计金额与因子记录数；无需把整个 CSV 加载到内存。
+- **Machine-readable inspection / 机器可读报告**: `AllocationCore.exe inspect RULE.json --json`. Invalid input returns a non-zero exit code; no output is published. / 可给 Java、Python 或 CI 读取，检查失败不发布分摊结果。
+- **Persistent pool workers / 可复用分摊池工作线程**: worker goroutines are reused within a stage, but batch memory and deterministic output order are unchanged. / 单阶段内重复复用计算协程，保留有界内存和稳定结果顺序。
+- **No new executables / 不增加程序**: still a single Windows EXE, one Go module and four bilingual Markdown documents. / 仍然只有一个 Windows 程序。
+
+**Inspection PASS is not allocation PASS. / 输入体检通过不等于分摊正确。** Driver eligibility and conservation still require an actual engine run; equivalence to another system requires a full-coordinate golden comparison. / 因子匹配与金额守恒必须实际运行；与原系统一致性还要对完整业务坐标。
+
 ## Input and rule quickstart / 数据与规则快速接入
 
 The engine does not connect to a company database or understand company account names. / 引擎不直接认识企业数据库、专用账户或业务口径。
@@ -43,6 +52,7 @@ After preparing a rule whose dataset paths are relative to the rule file: / 准�
 
 ```bash
 AllocationCore.exe validate input/rules/rule.json
+AllocationCore.exe inspect input/rules/rule.json
 AllocationCore.exe run input/rules/rule.json output/my-run --workers 4 --evidence-gzip
 ```
 

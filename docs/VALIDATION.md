@@ -38,3 +38,34 @@ Windows binaries are cross-compiled and structurally inspected in Linux; Windows
 ## Publishing safety / 公开安全
 
 The public source does not bundle proprietary business logic. `.gitignore` keeps private input and outputs out of Git by default, but does **not** erase an earlier repository's history or replace legal/IT approval. Do not commit real account codes, rule tables, credentials, exported data, or reference output. / 默认不提交私有数据，公开前仍必须审查原仓库历史、授权及内部知识产权要求。
+
+## Clean Core V2 acceptance / V2 验收补充
+
+Use the **same data**, settings and hardware to compare before/after. / 所有性能数据必须在相同输入、硬件和选项下比较。
+
+```bash
+AllocationCore.exe demo .
+AllocationCore.exe inspect examples/manufacturing/rule.json
+AllocationCore.exe inspect examples/manufacturing/rule.json --json
+AllocationCore.exe run examples/manufacturing/rule.json output/check-v2 --workers 4 --evidence-gzip
+go test ./...
+go vet ./...
+go test -race ./internal/engine ./internal/multi ./internal/studio ./internal/explorer
+go test ./internal/engine -run '^$' -bench BenchmarkPoolScheduler -benchmem
+```
+
+**Measured in the development Linux container (not Windows): / 开发容器实测（不是 Windows 实机）**
+
+| Test / 测试 | Old Clean / 原版 | V2 / 新版 |
+|---|---:|---:|
+| Pool scheduler, 4 workers, 4096 synthetic pools, median / 微基准中位数 | 1.94 ms/op | 0.79 ms/op |
+| Allocations in same microbenchmark / 单轮分配次数 | 3584 | 1031 |
+| 1000-account synthetic end-to-end / 千科目合成计算单次运行 | 7.81 s | 7.31 s |
+| Actual output matching / 完整业务结果 | identical 4000 records / 4000 条一致 | identical / 一致 |
+| Inspect 1,000,000 synthetic source records / 流式扫描百万记录 | not available / 无 | 0.71 s, ~14.6 MB process peak RSS |
+
+The microbenchmark **only** measures pool scheduling overhead; it cannot be extrapolated as an end-to-end speedup. Single end-to-end timings are subject to noise. The inspection benchmark does not include allocation execution. / 微基准只测调度器，不能换算为整体分摊提速；单次端到端结果有随机波动；输入扫描不等于执行分摊。
+
+**Byte-for-byte evidence checks / 证据字节级一致：** identical `results.csv`, `reconciliation.csv`, `ledger.csv.gz`, `source_to_pool.csv.gz`, `lineage_links.csv.gz`, `evidence_stream_manifest.json` for the same two-stage rule and inputs. Run summaries contain timestamps and are compared by business fields. / 对同一两阶段样例，上述六个结果与证据文件字节级一致；任务摘要的时间字段不参加字节比较。
+
+**Outstanding / 仍待完成:** realistic million-row and hundred-million-row allocation benchmarks, Java/Python golden cross-language tests, Windows hardware validation and native database connectors. / 真实复杂业务百万至亿级压力测试、跨语言黄金对账、Windows 实机与原生数据库接入仍需单独验收。

@@ -138,9 +138,10 @@ func calculatePool(st Stage, dims, immutable []string, precision int, poolKey st
 	return result
 }
 
-// parallelPools computes a BOUNDED batch with one goroutine per worker.
-// The callback is always invoked by the calling goroutine in ascending pool
-// order: no CSV writer, summary or routing map is touched by worker goroutines.
+// parallelPools uses persistent workers for the whole stage instead of
+// recreating goroutines after every 2*workers pools. It retains the original
+// bounded batch size, stable coordinator output order and error semantics.
+// Compute callbacks must not mutate shared state without synchronization.
 func parallelPools(keys []string, workerCount int, compute func(string) poolResult, consume func(string, poolResult) error) error {
 	if workerCount < 1 {
 		workerCount = 1
@@ -150,7 +151,7 @@ func parallelPools(keys []string, workerCount int, compute func(string) poolResu
 	}
 	if workerCount > 32 {
 		workerCount = 32
-	} // prevent oversized concurrent pool fragments
+	}
 	if workerCount <= 1 {
 		for _, k := range keys {
 			r := compute(k)
@@ -163,6 +164,30 @@ func parallelPools(keys []string, workerCount int, compute func(string) poolResu
 		}
 		return nil
 	}
+	if len(keys) == 0 {
+		return nil
+	}
+	if workerCount > len(keys) {
+		workerCount = len(keys)
+	}
+	type task struct {
+		key  string
+		dst  *poolResult
+		done *sync.WaitGroup
+	}
+	jobs := make(chan task, workerCount)
+	var workers sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for j := range jobs {
+				*j.dst = compute(j.key)
+				j.done.Done()
+			}
+		}()
+	}
+	defer func() { close(jobs); workers.Wait() }()
 	batchSize := workerCount * 2
 	for start := 0; start < len(keys); start += batchSize {
 		end := start + batchSize
@@ -171,31 +196,17 @@ func parallelPools(keys []string, workerCount int, compute func(string) poolResu
 		}
 		batch := keys[start:end]
 		results := make([]poolResult, len(batch))
-		tasks := make(chan int)
-		var wg sync.WaitGroup
-		n := workerCount
-		if n > len(batch) {
-			n = len(batch)
+		var done sync.WaitGroup
+		done.Add(len(batch))
+		for i, k := range batch {
+			jobs <- task{key: k, dst: &results[i], done: &done}
 		}
-		for i := 0; i < n; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for idx := range tasks {
-					results[idx] = compute(batch[idx])
-				}
-			}()
-		}
-		for idx := range batch {
-			tasks <- idx
-		}
-		close(tasks)
-		wg.Wait()
-		for idx, k := range batch {
-			if results[idx].err != nil {
-				return results[idx].err
+		done.Wait()
+		for i, k := range batch {
+			if results[i].err != nil {
+				return results[i].err
 			}
-			if err := consume(k, results[idx]); err != nil {
+			if err := consume(k, results[i]); err != nil {
 				return err
 			}
 		}

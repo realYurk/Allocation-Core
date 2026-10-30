@@ -54,3 +54,23 @@ A native, live MySQL driver is **not yet included**. The engine must not hold pr
 ## 6. Reference comparison / 分摊前后对比
 
 The Cube-style viewer compares `before`, `after` and `engine` datasets by actual coordinates. It cannot automatically infer that a coarse source member is equivalent to a set of detail targets. Select an explicit aggregation grain to compare sums; use full target coordinates for exact validation. / 数据对比支持原始记账粒度与结果明细；粗粒度和细粒度不得自动一一映射，必须明确汇总口径。
+
+## 7. Preflight without calculation / 运行前完整体检
+
+After preparing data and `rule.json`, use / 放入 CSV 和规则后：
+
+```bash
+AllocationCore.exe validate input/rules/rule.json
+AllocationCore.exe inspect input/rules/rule.json
+AllocationCore.exe inspect input/rules/rule.json --json
+AllocationCore.exe run input/rules/rule.json output/my-run --workers 4
+```
+
+`inspect` uses streaming CSV reads and bounded memory. It checks all amount rows and the driver fields actually used by enabled stages, scans a shared driver dataset once, reports numeric errors with row/column, and sums amounts as exact decimal strings. / `inspect` 流式读取每一条金额记录，并对所有启用规则使用的因子字段做扫描；同一 Driver 文件不会重复扫描。报错给出行号与字段，金额通过精确整数累计。
+
+- `PASS`: structure and input numeric values pass, **not** a claim that the allocation itself is correct. / 仅代表输入格式与数值可用，不是分摊结果 PASS。
+- `BLOCK`: missing file, missing/duplicate header, malformed coordinates or decimals, invalid row length, or empty dataset. / 数据文件、字段、行宽、坐标或数值错误时拒绝。
+- `--json`: structured output for external systems; a failed check returns nonzero. / 供其他系统读取，失败时返回非零退出码。
+- A coarse-grained member like `Unassigned` or `No Model` is legitimate. Do not expand it to every product before running. / 未细分成员仍属于合法记账粒度，不做预展开。
+
+Input inspection does **not** check per-pool driver coverage, zero denominator, business routing, or reference-system correctness. These require execution and comparison. / 输入体检不验证每个分摊池是否有合格 Driver、分母是否为零，也不验证业务规则与原系统完全一致。
