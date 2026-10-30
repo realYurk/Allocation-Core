@@ -42,7 +42,8 @@ jobs:
       - name: Build one executable
         shell: pwsh
         run: |
-          go build -trimpath -ldflags="-s -w" -o AllocationCore.exe .
+          go mod download
+          go build -tags mysql -trimpath -ldflags="-s -w" -o AllocationCore.exe .
           .\AllocationCore.exe demo .
           .\AllocationCore.exe inspect examples/manufacturing/rule.json
           .\AllocationCore.exe data csv --config examples/import_mapping.json output\ci-normalized.csv
@@ -55,7 +56,7 @@ jobs:
       - name: Archive one-folder product
         shell: pwsh
         run: |
-          $include = @('AllocationCore.exe','go.mod','main.go','README.md','.gitignore','internal','examples','testdata','docs','input')
+          $include = @('AllocationCore.exe','go.mod','go.sum','main.go','README.md','.gitignore','adapter','internal','examples','testdata','docs','input')
           New-Item -ItemType Directory -Force dist\Allocation-Core-Clean | Out-Null
           foreach ($item in $include) { Copy-Item -Recurse -Force $item dist\Allocation-Core-Clean\ }
           Get-ChildItem dist\Allocation-Core-Clean -Recurse -File | Where-Object { $_.Extension -in @('.csv','.xlsx','.xls','.db','.sqlite') } | Remove-Item -Force
@@ -64,3 +65,35 @@ jobs:
         with:
           name: Allocation-Core-Clean-Windows
           path: dist/Allocation-Core-Clean-Windows.zip
+
+  mysql-integration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: temporary_ci_only
+          MYSQL_DATABASE: allocation_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptemporary_ci_only --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Download pinned official MySQL dependency
+        run: go mod download
+      - name: Native driver build and isolated InnoDB integration
+        env:
+          ALLOCATION_MYSQL_TEST_EPHEMERAL: "1"
+          ALLOCATION_TEST_MYSQL_DSN: "root:temporary_ci_only@tcp(127.0.0.1:3306)/allocation_ci"
+        run: |
+          go build -tags mysql -o AllocationCore .
+          go test -tags "mysql mysql_integration" ./adapter -run TestLiveMySQLSnapshot -count=1 -v
+          go test -tags mysql ./adapter -count=1
+          go vet -tags mysql ./adapter

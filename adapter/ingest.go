@@ -161,6 +161,9 @@ func ImportCSV(ctx context.Context, src Source, m Mapping, dst string) (report R
 	if e := tmp.Close(); e != nil {
 		return report, e
 	}
+	if e := rows.Close(); e != nil {
+		return report, fmt.Errorf("closing source snapshot failed: %w", e)
+	}
 	if e := os.Rename(tmpPath, dst); e != nil {
 		return report, e
 	}

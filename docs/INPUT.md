@@ -171,3 +171,31 @@ report, err := adapter.ImportCSV(ctx, src, mapping, privateOutputPath)
 For a private Cube API client, implement `adapter.CellCursor` and return `adapter.Cell{Members:..., Value:"123.45"}` with **explicit source grain**. Then pass `adapter.CubeSource{Cursor: cursor, Dimensions: dimensions, ValueColumn: "amount"}` to `adapter.ImportCSV`. / 对 Cube 只需实现单元格迭代器，返回明确的维度成员和金额字符串，绝不能把未分配成员擅自替换为默认商品。
 
 **Current integration boundary / 当前限制：** This repository uses a short local Go module path (`allocationcore`). The public `adapter` package is usable inside this module or a local Go workspace; publishing a separately versioned external Go SDK requires canonical module-path/version governance. / 当前适配包已公开在代码根目录，可供同一工程或 Go Workspace 使用；未来要把它作为外部独立依赖，还需要正式治理公开模块路径和版本兼容。
+
+## Clean V6 — Real MySQL read-only connector / 原生 MySQL 只读连接器
+
+**状态 / Status:** Source implementation uses the maintained `github.com/go-sql-driver/mysql` driver (v1.9.3 with Go 1.23) under the Go build tag `mysql`. The precompiled **offline** binary is intentionally **not** claimed to contain this external driver; GitHub Actions builds the **MySQL-enabled Windows single EXE** and tests against an ephemeral MySQL 8.4 server. Local compilation of the enabled binary requires normal dependency access: `go build -tags mysql -o AllocationCore.exe .`. / 源码已包含基于官方驱动的实际 TCP/TLS MySQL 连接器；本交付离线预编译 EXE 未包含下载不到的外部驱动，请使用 GitHub CI 生成的启用 MySQL 的单 EXE 或在能下载 Go 依赖的电脑上编译，**不得把离线 EXE 当作 MySQL 版**。
+
+### Before connecting / 接入前检查
+
+- Use an independent **SELECT-only** MySQL user limited to the source schema/table. Never use an admin account or production update privilege. / 使用独立的只读账号，不允许使用管理员、可更新账号。
+- Require **InnoDB base tables**, a **unique, not-null, signed BIGINT single-column key** per source, plus a trusted TLS CA and certificate server name. The connector checks engine and key metadata before import. / 源表必须是 InnoDB 实表，每表一个单列唯一、非空、有符号 BIGINT 键；连接强制验证 TLS 证书与服务端名称。
+- Credentials must be supplied via the environment variables named by `user_env` and `password_env`. The JSON and logs must never contain credentials. / 用户名、密码通过运行环境安全注入，配置和日志不写口令。
+- The public JSON under `examples/mysql_mapping.example.json` and `examples/mysql_bundle.example.json` contains only synthetic placeholders. Copy it to your **private** `input/mapping` and edit host, selected columns, filters and mapping. / 公共示例没有真实企业地址、数据或凭据；私有配置放 `input/mapping`。
+
+### One file vs one snapshot bundle / 单文件与同快照多文件
+
+```text
+AllocationCore.exe data mysql --config input/mapping/mysql.json output/costs.csv
+AllocationCore.exe data mysql-bundle --config input/mapping/mysql-bundle.json output/snapshot-001
+```
+
+`data mysql` uses a single repeatable-read, read-only transaction for one table. `data mysql-bundle` exports multiple amount/driver tables in **one** repeatable-read snapshot transaction and makes **one atomic directory publication**, containing CSVs plus `manifest.json`. The destination **must not exist beforehand**, and all source tables must be InnoDB from **the same MySQL server/database connection**. / 单表每次使用一个只读可重复读事务；金额与 Driver 多表导出优先使用 `mysql-bundle`，避免两次独立导出出现不同读取时点。全部通过后才原子发布目录。不同服务器或非事务表无法承诺同一快照。
+
+**Batching / 分批:** Query builder accepts **only quoted whitelisted identifiers**, parameterized equality filters, and an indexed signed BIGINT cursor. It reads `ORDER BY id ASC LIMIT ?` then `WHERE id > ? ORDER BY id ASC LIMIT ?`; never uses `OFFSET`. Repeated, descending, invalid or overflowed keys and malformed DECIMALs fail closed. Do not rewrite the keyset queries with arbitrary client SQL. / 不允许传任意 SQL；按单列唯一数字主键 Keyset 分页，不用 OFFSET；主键不严格递增、非法金额、NULL 和精度越界均立即失败。
+
+**Precision / 精度:** MySQL `DECIMAL` is consumed as exact text/bytes; floating-point SQL values are rejected, not rounded. Amount precision is 0–6 decimals; Driver numeric fields follow their declared precision. Sparse source coordinates and duplicate rows are left intact. / DECIMAL 原样作为十进制字符串读取，禁止先转 float；不做隐式聚合、成员补齐或笛卡尔展开。
+
+**Recovery / 错误恢复:** No retry inside a transaction after page-read errors, because a retry could silently switch snapshots. The failed staging area is deleted. For a full retry, create a **new** uniquely named output directory and rerun from the beginning. `PASS` here means source export validation, NOT financial allocation correctness. Then use the existing `inspect → validate → run → reconcile` chain. / 分页中断不在事务内部悄悄重试，失败不发布；重新执行必须重新获取完整快照，并重新进行规则与逐坐标验收。
+
+**Limits / 边界:** The adapter's cross-table snapshot applies only to InnoDB tables on **one MySQL connection**. MySQL views, other engines, replica failover during import, moving reference datasets and cross-database snapshots from different servers are not certified. No real customer's MySQL was connected during development. The GitHub integration job uses an isolated temporary MySQL instance; a separate UAT on the target MySQL version, privileges, TLS PKI, volume and network is still mandatory. / 并非已经在贵公司数据库完成生产联调；真实网络、证书、权限、版本和千万行场景仍需专门 UAT。

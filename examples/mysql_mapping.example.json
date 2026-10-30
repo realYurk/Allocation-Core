@@ -1,0 +1,26 @@
+{
+  "source": {
+    "type": "mysql",
+    "address": "127.0.0.1:3306",
+    "database": "allocation_demo",
+    "user_env": "ALLOCATION_DB_USER",
+    "password_env": "ALLOCATION_DB_PASSWORD",
+    "tls_ca_file": "../input/mapping/mysql-ca.pem",
+    "tls_server_name": "mysql.example.internal",
+    "connect_timeout_seconds": 10,
+    "read_timeout_seconds": 1800,
+    "total_timeout_seconds": 3600,
+    "table": "allocation_demo.costs",
+    "columns": ["id", "period", "site", "product", "amount"],
+    "equal": {"period": "2026-01"},
+    "key_column": "id",
+    "batch_size": 20000
+  },
+  "mapping": {
+    "dimensions": ["period", "site", "product"],
+    "columns": {"period": "period", "site": "site", "product": "product"},
+    "value_source": "amount",
+    "value_name": "amount",
+    "precision": 2
+  }
+}

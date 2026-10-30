@@ -1,0 +1,38 @@
+{
+  "source": {
+    "type": "mysql",
+    "address": "127.0.0.1:3306",
+    "database": "allocation_demo",
+    "user_env": "ALLOCATION_DB_USER",
+    "password_env": "ALLOCATION_DB_PASSWORD",
+    "tls_ca_file": "../input/mapping/mysql-ca.pem",
+    "tls_server_name": "mysql.example.internal",
+    "total_timeout_seconds": 3600
+  },
+  "exports": [
+    {
+      "name": "amounts.csv",
+      "table": "allocation_demo.costs",
+      "columns": ["id", "period", "site", "product", "amount"],
+      "key_column": "id",
+      "batch_size": 10000,
+      "mapping": {
+        "dimensions": ["period", "site", "product"],
+        "columns": {"period": "period", "site": "site", "product": "product"},
+        "value_source": "amount", "value_name": "amount", "precision": 2
+      }
+    },
+    {
+      "name": "drivers.csv",
+      "table": "allocation_demo.drivers",
+      "columns": ["id", "period", "site", "product", "units"],
+      "key_column": "id",
+      "batch_size": 10000,
+      "mapping": {
+        "dimensions": ["period", "site", "product"],
+        "columns": {"period": "period", "site": "site", "product": "product"},
+        "value_source": "units", "value_name": "units", "precision": 6
+      }
+    }
+  ]
+}

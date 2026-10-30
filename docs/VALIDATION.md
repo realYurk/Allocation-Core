@@ -123,3 +123,11 @@ Golden regression / 黄金结果回归：same input and V4 rule must produce byt
 - **20k rows / 100 unique coordinates**, synthetic grouping microbenchmark: legacy ~9.09ms / 4.02MB allocated vs adaptive packed grouping ~4.30ms / 0.60MB allocated; **20k mostly unique coordinates**: packed path not chosen and adaptive ~16.4ms vs legacy ~16.0ms in single runs. / 高重复度坐标局部优化效果明显，稀疏唯一场景无总体提速保证。
 - **1,000 accounts, 1,000 different rules:** V4 and V5 full `results.csv` and account reconciliation SHA-256 identical. One unprofiled run V4 ~5.90s vs V5 ~6.22s on the same host, **no end-to-end speedup demonstrated**. / 千科目结果完全一致，但本轮单次耗时没有取得整体提升，不能夸大。
 - **Byte-for-byte regression** against V4 for synthetic manufacturing with memory/disk mode and compressed evidence: complete final outputs, ledger, lineage, membership and manifest agree. / 两种执行模式的金额、审计和血缘文件与 V4 完全一致。
+
+## Clean V6 native SQL connector test gate / MySQL 生产验收门槛
+
+- **Local offline tests / 离线**: `go test ./... && go vet ./...`; simulated `database/sql` driver tests verify `REPEATABLE READ + ReadOnly` transaction, cursor progression, one snapshot for two files, exact DECIMAL, SQL identifier safety, atomic failure and rollback. / 离线驱动模拟验证事务选项、分批、精度、失败隔离。
+- **Online native build / 在线**: `go mod download` then `go build -tags mysql -o AllocationCore.exe .`; only this executable includes the official MySQL driver. / 只有该构建真正包含 MySQL 协议驱动。
+- **Ephemeral real MySQL 8.4 / 隔离实库**: CI job with `mysql` + `mysql_integration` build tags tests InnoDB key metadata, cross-page consistent snapshot despite concurrent update, and multi-table bundle. CI must report PASS before production pilot. / GitHub CI 需在真实隔离 MySQL 中校验并发更新下的跨页快照。
+- **Actual enterprise UAT / 企业预生产**: Verify SELECT-only credentials, TLS PKI and hostname, schema grants, InnoDB & unique BIGINT primary key, batch sizes, 1M–10M+ rows, loss/reconnection, disk capacity, server load and end-to-end results against independent reference coordinates. / 生产环境权限、证书、负载、回滚及逐坐标财务验收必须单独执行。
+- **Prohibited claims / 禁止误报**: Mock tests do not establish connectivity. A read-only transaction is not proof that the login lacks DML rights. An import PASS is not an allocation or reference reconciliation PASS. / 模拟测试不等于实库连通，只读事务不等于账号最小权限，数据导出 PASS 不等于分摊正确。

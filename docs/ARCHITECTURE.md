@@ -91,3 +91,9 @@ In V5, `data csv` is a **local CSV normalization command only**. MySQL and Cube 
 ### Next measured bottleneck / 下一步经测量确认的瓶颈
 
 The 50k-row disk-profile experiment identified the JSON intermediate-spool decoder and allocation churn as meaningful CPU/heap costs; importantly, they are part of audit-preserving disk processing. A future binary/columnar spool format needs version markers, checkpoint backward compatibility, error recovery, and byte-identical final evidence BEFORE deployment. / 5 万行 Profile 表明 JSON 中间记录反序列化以及临时对象分配是热点。但新二进制/列式中间格式必须同时满足旧检查点兼容、失败恢复、严格相同的账务输出与证据，不能只凭快就替换。
+
+## Clean V6: shared snapshot source / 同快照数据接入
+
+MySQL-native code lives exclusively inside `adapter/mysql_enabled.go` (enabled with `-tags mysql`). The financial engine does not import a driver. Both the MySQL `SQLSource` and vendor `CubeSource` produce the same `adapter.Rows` stream and pass through unchanged `adapter.ImportCSV` validation. MySQL bundles use one read-only REPEATABLE READ transaction for all related datasets and commit as a single directory after complete validation. A future Cube vendor connector should implement the same snapshot scope plus the `Rows` or `CellCursor` contract; it **must not** embed Cube-specific aggregation or business fallback inside `internal/engine`. / 数据源负责快照与读取；统一映射层负责坐标与精确数值检查；财务引擎只消费标准稀疏数据。Cube 未来连接器使用相同契约，不能另写金额算法。
+
+The MySQL transaction read view is established by the first consistent SELECT and retained for all keyset pages. No mid-import failover/retry is permitted. An isolated connection is held until all tables have been streamed and checked. / 同一事务内的第一次一致性读建立读取视图，后续分页始终使用它；中途重连必须整批重新导出。

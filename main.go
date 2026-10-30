@@ -28,11 +28,26 @@ func main() {
 	case "data":
 		// Data mappings never connect to databases implicitly. External SQL and
 		// Cube connectors can use the same ingest.Source Go API.
-		if len(os.Args) != 6 || os.Args[2] != "csv" || os.Args[3] != "--config" {
-			fmt.Fprintln(os.Stderr, "usage: AllocationCore data csv --config mapping.json OUTPUT.csv")
+		if len(os.Args) != 6 || (os.Args[2] != "csv" && os.Args[2] != "mysql" && os.Args[2] != "mysql-bundle") || os.Args[3] != "--config" {
+			fmt.Fprintln(os.Stderr, "usage: AllocationCore data csv|mysql|mysql-bundle --config mapping.json OUTPUT.csv_OR_DIR")
 			os.Exit(2)
 		}
-		r, e := adapter.ImportCSVConfig(context.Background(), os.Args[4], os.Args[5])
+		var r adapter.Report
+		var e error
+		if os.Args[2] == "mysql-bundle" {
+			result, err := adapter.ImportMySQLBundleConfig(context.Background(), os.Args[4], os.Args[5])
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "Data import failed:", err)
+				os.Exit(1)
+			}
+			b, _ := json.MarshalIndent(result, "", "  ")
+			fmt.Println(string(b))
+			return
+		} else if os.Args[2] == "mysql" {
+			r, e = adapter.ImportMySQLConfig(context.Background(), os.Args[4], os.Args[5])
+		} else {
+			r, e = adapter.ImportCSVConfig(context.Background(), os.Args[4], os.Args[5])
+		}
 		if e != nil {
 			fmt.Fprintln(os.Stderr, "Data import failed:", e)
 			os.Exit(1)
@@ -101,7 +116,7 @@ func main() {
 		}
 		fmt.Printf("Synthetic example files generated: %d (local only)\n", n)
 	case "version", "--version":
-		fmt.Println("Allocation Core Clean / v5")
+		fmt.Println("Allocation Core Clean / v6")
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command %q. Use 'serve', 'core', 'multi', 'rule', 'explorer', 'data', 'profile', 'review' or double-click the application.\n", os.Args[1])
 		os.Exit(2)
