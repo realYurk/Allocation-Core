@@ -4,7 +4,7 @@
 <header><nav><a href="/designer">← 返回规则设计器</a><a href="/">结果检查台</a><a href="/workspace#compare" target="_top">Cube Explorer · 分摊前后对比 / Comparison</a></nav><h1>多科目分摊 · 规则编排中心</h1><p>每个科目独立选择规则，多套分摊引擎编排并行，逐科目金额守恒，所有科目 PASS 才正式发布。</p></header>
 <main><div class="grid"><section>
 <div class="card"><h2>① 创建或打开分摊项目</h2><label>项目</label><select id="project"></select><div class="row" style="margin-top:10px"><input id="newname" placeholder="例如 demo_case_01"><button onclick="createProject()">建立样例副本</button></div><p>新项目自带 4 个科目和 3 类规则，可立即试运行。正式数据请在完成验收后再接入。</p></div>
-<div class="card"><h2>② 导入你的业务数据</h2><p>数据为 CSV，带 <code>account</code>（科目）、<code>amount</code>（金额）以及规则声明的维度。可直接选择小文件上传：</p><label>目标文件</label><select id="file"><option>amounts.csv</option><option>assignments.csv</option><option>overrides.csv</option></select><label>本机 CSV 文件</label><input type="file" id="csvfile" accept=".csv,text/csv"><button style="margin-top:12px" onclick="upload()">导入并替换</button><p>前端上传上限 5 MB。大量真实数据直接复制到下方项目数据目录，避免浏览器加载几 GB CSV。</p><code id="path">请选择项目</code></div>
+<div class="card"><h2>② 导入你的业务数据</h2><p>数据为 CSV，带 <code>account</code>（科目）、<code>amount</code>（金额）以及规则声明的维度。可直接选择小文件上传：</p><label>目标文件</label><select id="file"><option>amounts.csv</option><option>assignments.csv</option><option>overrides.csv</option><option>reference.csv</option></select><label>本机 CSV 文件</label><input type="file" id="csvfile" accept=".csv,text/csv"><button style="margin-top:12px" onclick="upload()">导入并替换</button><p>前端上传上限 5 MB。大量真实数据直接复制到下方项目数据目录，避免浏览器加载几 GB CSV。</p><code id="path">请选择项目</code></div>
 <div class="card"><h2>Driver 索引缓存 / Driver cache</h2><p>项目级缓存复用可降低相同数据和相同生效规则的重复索引成本。首次运行仍需计算源 SHA-256；数据或规则变化会生成新索引。/ Reuses a validated index across runs. Source digest is still checked.</p><label><input id="persistCache" type="checkbox" style="width:auto"> 跨批次复用索引 / Reuse across runs</label> <label style="display:block;margin-top:12px"><input id="reuseWorkers" type="checkbox" style="width:auto"> 复用计算进程 / Reuse calculation workers</label> <button class="alt" onclick="saveCache()">保存缓存设置 / Save</button><small>仅在本机受信任的项目目录使用 / Trusted local projects only.</small></div><div class="card"><h2>④ 运行前数据体检 / Preflight</h2>
 <p>一次检查所有科目规则映射和实际金额 CSV，每个不同 Driver 文件仅扫描一次。不生成分摊结果，不能代替金额守恒及参考系统对账。</p>
 <button class="alt" id="inspectBtn" onclick="inspectProject()">检查全部科目和因子 / Inspect</button>
@@ -15,7 +15,12 @@
 <div class="card"><h2>⑤ 运行状态 / 结果（VNext4：重启可追溯）</h2>
 <p>Studio 重启后会恢复任务历史。<b>INTERRUPTED</b> 表示运行中断，不能直接发布；需要重新执行以获取新快照。</p>
 <div class="row" style="margin-bottom:10px"><select id="jobHistory" style="flex:1" aria-label="历史任务"></select><button class="alt" onclick="loadJobHistory()">刷新历史</button><button class="alt" onclick="retryFromHistory()">按当前数据重新执行</button></div>
-<div id="message"></div><div id="job">尚未启动任务</div><a id="download" style="display:none" target="_blank" href="#">下载完整 results.csv</a><p>分摊成功后，请查看逐科目 <code>run_summary.json</code> 和各规则组完整血缘证据，再与参考系统逐坐标比对。</p></div>
+<div id="message"></div><div id="job">尚未启动任务</div><a id="download" style="display:none" target="_blank" href="#">下载完整 results.csv</a><section style="margin-top:18px;border:1px solid #dbe7f7;border-radius:12px;padding:15px;background:#f6faff">
+<h3 style="margin:0 0 7px;font-size:15px">参考系统逐坐标验收 / Reference reconciliation</h3>
+<p>把参考结果保存为当前项目目录下的 <code>reference.csv</code>（小于 5 MB 可在左侧上传）。该文件只包含业务维度和 <code>amount</code> 或 <code>value</code>；维度名必须与结果一致。程序按完整坐标合并同坐标重复行，独立对比金额和缺失/多余坐标。当前演示数据无参考文件，不会自动判定为一致。</p>
+<div class="row"><label>金额小数位 / Precision<input id="refPrecision" type="number" min="0" max="6" value="2" style="width:85px"></label><label>允许差额 / Tolerance<input id="refTolerance" value="0" style="width:105px"></label><button class="alt" id="reconcileBtn" onclick="reconcileReference()">检查选中任务与参考结果 / Compare</button></div>
+<pre id="reconcileResult" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:240px;overflow:auto" role="status" aria-live="polite">尚未检查参考结果 / Not compared</pre>
+</section><p>分摊成功后，请查看逐科目 <code>run_summary.json</code> 和各规则组完整血缘证据，再与参考系统逐坐标比对。</p></div>
 <div class="card"><h2>⑥ 整批正式版本库（VNext3）</h2>
 <p>1000 个科目的完整结果、有效规则、快照和证据作为一份不可拆分的业务版本归档。先登记，再发布；新旧版切换遵循 CAS 校验。</p>
 <div class="row"><label style="flex:1">业务场景<input id="batchScenario" value="scenario_01" placeholder="例如 scenario_01"></label><label style="flex:1">业务版本<input id="batchVersion" value="revision_01" placeholder="例如 revision_01"></label></div>
@@ -56,6 +61,24 @@ async function inspectProject(){
  }catch(e){box.style.borderColor='#eca0a0';box.textContent='检查失败：'+e.message}
  finally{btn.disabled=false}
 }
+async function reconcileReference(){
+ const box=document.getElementById('reconcileResult'),btn=document.getElementById('reconcileBtn');
+ const id=document.getElementById('jobHistory').value||busyJob;
+ if(!active||!id){box.textContent='请先选择一个成功完成的项目任务。';return}
+ btn.disabled=true;box.textContent='正在逐坐标对齐和校验；大文件会在本机建立临时分区...';
+ try{
+  const r=(await api('/api/multi/reconcile',{name:active,job:id,precision:Number(document.getElementById('refPrecision').value),tolerance:document.getElementById('refTolerance').value.trim()})).report;
+  const lines=[`验收结论：${r.status==='MATCH'?'MATCH / 逐坐标一致':'DIFFERENCES / 发现差异'}`,
+   `已比对坐标：一致 ${r.matched} · 金额不符 ${r.different} · 缺少 ${r.missing} · 多余 ${r.extra}`,
+   `参考总金额 ${r.reference_total} · 本引擎总金额 ${r.actual_total}（只作辅助诊断）`,
+   `参考行数 ${r.reference_rows} · 引擎行数 ${r.actual_rows} · 耗时 ${r.elapsed_ms} ms`,
+   `验收科目：${r.accounts.length}，下面展示差异最大的 10 个坐标：`,
+   ...(r.top_differences||[]).slice(0,10).map(d=>`${d.kind}: ${d.coordinate} | 参考 ${d.reference_amount} / 引擎 ${d.actual_amount} / 差额 ${d.difference}`),
+   `完整报告保存在任务本地结果目录的 acceptance-* 文件夹中（summary.json / differences.csv）`,
+   `注意：仅证明两份快照按指定精度和容差进行逐坐标比较，不自动证明参考规则正确。`];
+  box.style.color=r.status==='MATCH'?'#087657':'#b42f35';box.textContent=lines.join('\n');
+ }catch(e){box.style.color='#b42f35';box.textContent='验收失败：'+e.message}finally{btn.disabled=false}
+}
 async function run(){try{const v=await api('/api/multi/run',{name:active});busyJob=v.id;document.getElementById('run').disabled=true;document.getElementById('cancel').disabled=false;document.getElementById('job').textContent='任务提交：'+busyJob;document.getElementById('download').style.display='none';if(interval)clearInterval(interval);interval=setInterval(poll,1200);await poll()}catch(e){message(e.message)}}
 async function cancelRun(){if(!busyJob)return;try{await api('/api/multi/jobs/'+busyJob+'/cancel',{});document.getElementById('cancel').disabled=true;message('已请求取消；当前引擎将停止执行并清理未发布的数据')}catch(e){message(e.message)}}
 async function poll(){try{const v=await api('/api/multi/jobs/'+busyJob);const j=v.job,summary=v.summary;document.getElementById('job').textContent=summary?
@@ -63,6 +86,7 @@ async function poll(){try{const v=await api('/api/multi/jobs/'+busyJob);const j=
    `科目：${summary.accounts} ｜ 有效规则组：${summary.groups} ｜ 明细：${summary.result_rows}`,
    `分摊前：${summary.input_amount}  →  分摊后：${summary.output_amount}`,
    `总耗时：${(summary.duration_ms/1000).toFixed(2)} 秒（包含快照、执行及结果发布）`,
+   `Driver 缓存：有效复用 ${summary.driver_cache_hits||0} 次 · 新建索引 ${summary.driver_cache_builds||0} 次（仅磁盘索引模式统计）`,
    `以下列出前20个科目的检查结果：`,
    ...(summary.details||[]).slice(0,20).map(a=>`${a.account}：${a.input_amount} → ${a.output_amount} · ${a.status}`),
    (summary.details||[]).length>20?'其余科目请下载完整对账报告。':'',

@@ -23,6 +23,7 @@ jobs:
           ./AllocationCore run examples/manufacturing/rule.json output/ci-simple --workers 4
           ./AllocationCore multi inspect -project testdata/multi_sample -json > output/ci-preflight.json
           ./AllocationCore multi -project testdata/multi_sample -out output/ci-multi -engine ./AllocationCore
+          ./AllocationCore reconcile --actual output/ci-multi/results.csv --reference output/ci-multi/results.csv --out output/ci-acceptance --precision 2 --tolerance 0
           ./AllocationCore demo . 1000
           ./AllocationCore multi inspect -project testdata/scale_1000 -json > output/ci-preflight-1000.json
           ./AllocationCore multi -project testdata/scale_1000 -out output/ci-pooled-1000 -engine ./AllocationCore
@@ -46,6 +47,7 @@ jobs:
           $bin = (Resolve-Path .\AllocationCore.exe).Path
           .\AllocationCore.exe multi inspect -project testdata\multi_sample -json
           .\AllocationCore.exe multi -project testdata\multi_sample -out output\ci-multi -engine $bin
+          .\AllocationCore.exe reconcile --actual output\ci-multi\results.csv --reference output\ci-multi\results.csv --out output\ci-acceptance --precision 2 --tolerance 0
       - name: Archive one-folder product
         shell: pwsh
         run: |

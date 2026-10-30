@@ -419,6 +419,13 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 				if e != nil {
 					return summary, e
 				}
+				if options.DriverDiskIndex && options.DriverCacheDir != "" {
+					if idx.cacheHit {
+						summary.DriverCacheHits++
+					} else {
+						summary.DriverCacheBuilds++
+					}
+				}
 				// Also close on any later failure before the working dir is removed.
 				if idx.ix.disk != nil {
 					defer idx.ix.disk.close()

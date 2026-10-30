@@ -21,6 +21,9 @@ func TestDriverContentAddressedCache(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	if first.cacheHit {
+		t.Fatal("fresh cache reported hit")
+	}
 	firstPath := first.ix.disk.path
 	var rowCount int
 	e = first.ix.disk.forEach(`["01"]`, func(r DriverRow) error { rowCount++; return nil })
@@ -34,6 +37,9 @@ func TestDriverContentAddressedCache(t *testing.T) {
 	second, e := buildCachedDiskDriverIndex(p, "units", filepath.Join(dir, "run2"), cache, a, st, dims, nil)
 	if e != nil {
 		t.Fatal(e)
+	}
+	if !second.cacheHit {
+		t.Fatal("validated entry should report cache hit")
 	}
 	if second.ix.disk.path != firstPath {
 		t.Fatalf("cache miss on exact input: %s vs %s", second.ix.disk.path, firstPath)
@@ -105,4 +111,44 @@ func TestDriverCacheParallelBuild(t *testing.T) {
 	if n != 5 {
 		t.Fatalf("only %d successful builds", n)
 	}
+}
+
+// The sorted index is a function of source bytes, weight field, driver
+// filters, target modes and dimensions. IDs, shares and negative policies are
+// applied after index lookup and must not fragment the cache.
+func TestCacheReusesAcrossDifferentRuleLabels(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "weights.csv")
+	if err := os.WriteFile(file, []byte("period,sku,units\n01,A,3\n01,B,1\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	st := Stage{Target: map[string]Target{"period": {Mode: "SOURCE"}, "sku": {Mode: "INCLUDE", Include: []string{"A", "B"}}}}
+	a := Allocation{ID: "cost_A", Share: "1", WeightField: "units", NegativePolicy: "REJECT"}
+	b := Allocation{ID: "cost_B", Share: "0.5", WeightField: "units", NegativePolicy: "ALLOW_SIGNED"}
+	one, e := buildCachedDiskDriverIndex(file, "units", filepath.Join(dir, "first"), filepath.Join(dir, "cache"), a, st, []string{"period", "sku"}, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if one.cacheHit {
+		t.Fatal("first should build")
+	}
+	firstPath := one.ix.disk.path
+	one.ix.disk.close()
+	two, e := buildCachedDiskDriverIndex(file, "units", filepath.Join(dir, "second"), filepath.Join(dir, "cache"), b, st, []string{"period", "sku"}, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if !two.cacheHit || two.ix.disk.path != firstPath || two.alloc.ID != "cost_B" {
+		t.Fatal("different allocation identity should reuse same immutable index with correct runtime rule")
+	}
+	two.ix.disk.close()
+	b.DriverFilters = map[string]Filter{"sku": {Include: []string{"A"}}}
+	three, e := buildCachedDiskDriverIndex(file, "units", filepath.Join(dir, "third"), filepath.Join(dir, "cache"), b, st, []string{"period", "sku"}, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if three.cacheHit || three.ix.disk.path == firstPath {
+		t.Fatal("changed driver eligibility must force a new index")
+	}
+	three.ix.disk.close()
 }

@@ -35,3 +35,11 @@ Current Go engine uses sparse grouping, parallel pools, optional disk partitions
 A stage creates a bounded set of workers **once**. Pools are still processed in batches of at most `2 × workers`, and the coordinator publishes each batch in sorted pool order. Workers do not write shared output files. / 每个阶段创建一次固定工作池；内存仍被 `2 × workers` 的批次限制；写出严格按有序分摊池顺序执行，财务结果与血缘顺序不随线程执行顺序变化。
 
 This improves repeated goroutine setup cost without changing rounding, rule routing, evidence contracts, or the input/output file format. It does not remove multi-account child-process overhead. / 该优化只降低协程调度成本，不改金额计算与审计协议，千科目子进程开销仍有进一步优化空间。
+
+## V4: independent acceptance and shared Driver indexes / V4：独立验收与 Driver 索引共享
+
+The financial engine is unchanged. The optional, read-only `internal/acceptance` package compares a published `results.csv` against independently prepared `reference.csv` using every business dimension, grouping duplicate full coordinates with fixed-point `big.Int` arithmetic. It uses 32 local hash partitions to reduce peak coordinate-map memory. Missing/extra coordinates are hard differences even if their amounts are zero; a matching grand total is not a sufficient test. No comparison results are published if either CSV is malformed or the operation is canceled. / 财务金额算法保持不变。新的只读验收组件按全部业务坐标归并重复记录并准确对比。采用 32 个本地分区降低聚合峰值内存；即使金额为零，缺失或多余坐标仍计为不一致；任何输入错误或取消都不发布结果。
+
+The disk Driver cache key is formed from the source content SHA-256, selected weight column, Driver filters, target constraints, dimensions and hierarchies. Allocation labels, shares and negative Driver policy do not alter the stored index and therefore do not fragment its identity. Every cached entry is verified against its source and the committed data digest before reuse. Cache hit/build counts are diagnostic only, never a correctness verdict. / Driver 索引缓存只依赖确实影响索引内容的输入和语义，不再依赖计算后才使用的规则名称和份额。缓存读取仍验证源数据和索引 SHA-256，命中计数只是性能诊断，不代表业务验收通过。
+
+Native MySQL/Cube connectors remain future work: upstream systems must explicitly map to the generic coordinate-and-amount contract. The reference verifier neither infers column mappings nor performs cross-source joins. / MySQL 和 Cube 原生连接器暂未实现，仍需在外部转换为明确的稀疏坐标＋金额契约；验收器不会猜测字段或擅自进行跨来源关联。

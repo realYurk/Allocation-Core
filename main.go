@@ -1,6 +1,7 @@
 package main
 
 import (
+	"allocationcore/internal/acceptance"
 	"allocationcore/internal/corecli"
 	"allocationcore/internal/demo"
 	"allocationcore/internal/explorer"
@@ -20,6 +21,8 @@ func main() {
 		return
 	}
 	switch os.Args[1] {
+	case "reconcile":
+		acceptance.CLI()
 	case "run", "validate", "explain", "doctor", "inspect", "compare", "trace", "vault", "batch", "serve-core", "capacity":
 		if os.Args[1] == "serve-core" {
 			os.Args[1] = "serve"
@@ -75,7 +78,7 @@ func main() {
 		}
 		fmt.Printf("Synthetic example files generated: %d (local only)\n", n)
 	case "version", "--version":
-		fmt.Println("Allocation Core Clean / v3")
+		fmt.Println("Allocation Core Clean / v4")
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command %q. Use 'serve', 'core', 'multi', 'rule', 'explorer', 'review' or double-click the application.\n", os.Args[1])
 		os.Exit(2)

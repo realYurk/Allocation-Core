@@ -1,4 +1,4 @@
-# Allocation Core Clean V2 / 通用分摊引擎
+# Allocation Core Clean V4 / 通用分摊引擎
 
 **One Go module · One Windows executable · One workspace.**
 **一个 Go 模块、一个 Windows 程序、一个业务工作台。**
@@ -24,6 +24,22 @@ go build -trimpath -ldflags="-s -w" -o AllocationCore.exe .
 ```
 
 Build once, run the same executable for all modes. / 只编译一个程序，所有功能共用它。
+
+## New in Clean Core V4 / V4 新功能
+
+**Reference reconciliation / 参考系统逐坐标验收.** After an allocation has passed conservation checks, import a privately stored `reference.csv` into the same project. The workspace now compares **every full business coordinate** with the authoritative `results.csv`: matching amounts, differing amounts, missing coordinates and extra coordinates are counted separately. Two files with the same grand total can still **FAIL**. Use the reference-check card on the Multi page, or run:
+
+**参考结果验收：** 完成并通过分摊后，把独立参考系统的 `reference.csv` 放进对应项目目录。在“多科目分摊”页面点击“检查选中任务与参考结果”，即可按**全部业务维度成员坐标**核对金额，不会将总额守恒误判成分摊准确。也可在命令行执行：
+
+```bash
+AllocationCore reconcile --actual output/run/results.csv --reference input/reference/reference.csv --out output/acceptance-01 --precision 2 --tolerance 0
+```
+
+The reference file needs all **same business coordinate names** (column order may differ), and exactly one `amount` or `value` column. The engine ignores only its generated provenance fields `row_id` and `terminal_stage`; it does not infer mappings or discard any other dimension. Duplicate full coordinates are aggregated exactly. Large comparisons use 32 local temporary partitions and fixed-point integer amounts; no arbitrary result data is uploaded. Results are `summary.json` and `differences.csv` in a **new** private directory. Exit status 0=matched, 3=differences, 1/2=input error. The matching verdict is limited to the chosen snapshots and configured precision/tolerance.
+
+参考 CSV 需具备完全相同名称的**业务维度列**（可不同顺序），以及唯一的 `amount` 或 `value` 金额列；仅忽略 `row_id`、`terminal_stage` 两个引擎元数据字段。相同完整坐标会精确汇总，绝不会自动忽略公司专属维度。分区临时文件和验收结果均保留在本机私有目录，成功后输出 `summary.json` 和 `differences.csv`。只有 MATCH 才返回退出码 0；存在差异返回 3；输入错误返回 1/2。**与参考文件一致仍不等于参考规则本身正确。**
+
+**Safer cache sharing / 更充分但受控的 Driver 索引复用.** Cache identity now depends on source bytes, weight field, Driver filters, target constraints, dimension schema and hierarchies, not on allocation labels or shares that are used *after* lookup. Changed input or filtering always invalidates the key. Core and Multi summaries expose `driver_cache_hits` / `driver_cache_builds` only in disk-index/cache mode. / 共享仅发生在索引内容真正一致的规则之间，金额算法和负 Driver 处理策略不变。
 
 ## New in Clean Core V2 / 本轮更新
 

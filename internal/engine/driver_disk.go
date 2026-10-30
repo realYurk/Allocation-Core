@@ -461,14 +461,14 @@ func cacheKey(path, field string, a Allocation, st Stage, dims []string, h map[s
 		return "", "", e
 	}
 	semantic := struct {
-		Version     int                            `json:"version"`
-		SHA         string                         `json:"source_sha256"`
-		Field       string                         `json:"field"`
-		Allocation  Allocation                     `json:"allocation"`
-		Target      map[string]Target              `json:"target"`
-		Dimensions  []string                       `json:"dimensions"`
-		Hierarchies map[string]map[string][]string `json:"hierarchies"`
-	}{1, sourceHash, field, a, st.Target, dims, h}
+		Version       int                            `json:"version"`
+		SHA           string                         `json:"source_sha256"`
+		Field         string                         `json:"field"`
+		DriverFilters map[string]Filter              `json:"driver_filters"`
+		Target        map[string]Target              `json:"target"`
+		Dimensions    []string                       `json:"dimensions"`
+		Hierarchies   map[string]map[string][]string `json:"hierarchies"`
+	}{2, sourceHash, field, a.DriverFilters, st.Target, dims, h}
 	b, e := json.Marshal(semantic)
 	if e != nil {
 		return "", "", e
@@ -531,6 +531,7 @@ func buildCachedDiskDriverIndex(path, field, prefix, cacheDir string, a Allocati
 		return ref, true
 	}
 	if loaded, ok := tryLoad(); ok {
+		loaded.cacheHit = true
 		return loaded, nil
 	}
 	lockPath := filepath.Join(cacheDir, id+".lock")
@@ -538,6 +539,7 @@ func buildCachedDiskDriverIndex(path, field, prefix, cacheDir string, a Allocati
 	deadline := time.Now().Add(30 * time.Second)
 	for {
 		if loaded, ok := tryLoad(); ok {
+			loaded.cacheHit = true
 			return loaded, nil
 		}
 		lock, e = os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
@@ -557,6 +559,7 @@ func buildCachedDiskDriverIndex(path, field, prefix, cacheDir string, a Allocati
 	// A previous failed build may have left an orphan data file; metadata is
 	// the commit marker. The fresh build uses a unique scratch prefix.
 	if loaded, ok := tryLoad(); ok {
+		loaded.cacheHit = true
 		return loaded, nil
 	}
 	scratch := prefix + "_cachebuild_" + id[:12]
@@ -595,7 +598,9 @@ func buildCachedDiskDriverIndex(path, field, prefix, cacheDir string, a Allocati
 	if e = os.Rename(tmpMeta, metaPath); e != nil {
 		return ref, e
 	}
-	return tryCachedOrError(tryLoad)
+	fresh, err := tryCachedOrError(tryLoad)
+	fresh.cacheHit = false
+	return fresh, err
 }
 func tryCachedOrError(f func() (driverRef, bool)) (driverRef, error) {
 	ref, ok := f()

@@ -69,6 +69,7 @@ func (a *Application) registerMulti(m *http.ServeMux) *MultiApp {
 	m.HandleFunc("/api/multi/create", x.create)
 	m.HandleFunc("/api/multi/project", x.project)
 	m.HandleFunc("/api/multi/preflight", x.preflight)
+	m.HandleFunc("/api/multi/reconcile", x.reconcile)
 	m.HandleFunc("/api/multi/cache", x.cacheScope)
 	m.HandleFunc("/api/multi/assign", x.assign)
 	m.HandleFunc("/api/multi/factor", x.factor)
@@ -483,8 +484,8 @@ func (x *MultiApp) upload(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, e)
 		return
 	}
-	if req.File != "amounts.csv" && req.File != "assignments.csv" && req.File != "overrides.csv" {
-		fail(w, 422, errors.New("只允许上传 amounts.csv / assignments.csv / overrides.csv"))
+	if req.File != "amounts.csv" && req.File != "assignments.csv" && req.File != "overrides.csv" && req.File != "reference.csv" {
+		fail(w, 422, errors.New("只允许上传 amounts.csv / assignments.csv / overrides.csv / reference.csv"))
 		return
 	}
 	rd := csv.NewReader(strings.NewReader(strings.TrimPrefix(req.Content, "\ufeff")))

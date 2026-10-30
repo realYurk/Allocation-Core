@@ -79,3 +79,19 @@ The microbenchmark **only** measures pool scheduling overhead; it cannot be extr
 5. For a failed driver/invalid rule or canceled task, assert no published output directory. / 失败或取消绝不能发布正式结果。
 
 Timings must include the machine, workload, cache settings and evidence configuration. A 1000-group tiny synthetic benchmark does not predict multi-million-row production speed. / 必须注明机器、数据和证据选项；小数据量 1000 组规则结果不能外推为生产吞吐。
+
+
+## Clean V4 verification / V4 验收
+
+- New `internal/acceptance` tests check shuffled header order, duplicate-coordinate aggregation, offsetting-but-wrong amounts, missing/extra coordinates, failed-input nonpublication, tolerance, negatives and cancellation. / 新增逐坐标验收测试覆盖错配抵消、缺失/多余、负数、容差和失败不发布。
+- New HTTP integration test verifies that a successful job can be checked against its own project's private `reference.csv`, while cross-project use and symlinked reference inputs are blocked. / 新增接口测试覆盖正确使用、跨项目隔离和符号链接阻断。
+- Driver cache keys exclude allocation labels and shares that do not affect the stored index; data bytes and filtering changes always invalidate the index. `driver_cache_hits` and `driver_cache_builds` are reported when persistent disk indices are used. / 索引键进一步收敛到真正影响数据的语义；金额分摊语义保持不变。
+
+```bash
+go test ./...
+go vet ./...
+go test -race ./internal/acceptance ./internal/engine ./internal/multi ./internal/studio
+AllocationCore reconcile --actual output/example/results.csv --reference input/reference/reference.csv --out output/acceptance-new --precision 2 --tolerance 0
+```
+
+**Performance boundary / 性能边界：** The 32-partition comparison bounds aggregation to the largest partition but still uses disk proportional to the inputs; extremely skewed data can create an oversized partition. Initial cache hash verification still re-reads the source data. Neither feature guarantees a fixed speedup. / 对账采用分区聚合，但临时磁盘占用随输入增长，极端倾斜也可能造成分区内存峰值过高；Driver 缓存仍需重新校验源文件哈希，不能承诺固定提速。

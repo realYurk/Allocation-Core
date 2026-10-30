@@ -23,21 +23,23 @@ import (
 )
 
 type Summary struct {
-	DataSHA256   map[string]string `json:"data_sha256"`
-	Schema       string            `json:"schema"`
-	Engine       string            `json:"engine"`
-	Name         string            `json:"name"`
-	RuleSHA256   string            `json:"rule_sha256"`
-	StartedUTC   string            `json:"started_utc"`
-	Stages       []StageSummary    `json:"stages"`
-	InputAmount  string            `json:"input_amount"`
-	OutputAmount string            `json:"output_amount"`
-	PoolChecks   int               `json:"pool_checks"`
-	OutputRows   int               `json:"output_rows"`
-	TerminalRows int               `json:"terminal_rows"` // final result rows, excluding intermediate stages
-	LedgerRows   int               `json:"ledger_rows"`
-	Status       string            `json:"status"`
-	ReusedStages int               `json:"reused_stages,omitempty"`
+	DataSHA256        map[string]string `json:"data_sha256"`
+	Schema            string            `json:"schema"`
+	Engine            string            `json:"engine"`
+	Name              string            `json:"name"`
+	RuleSHA256        string            `json:"rule_sha256"`
+	StartedUTC        string            `json:"started_utc"`
+	Stages            []StageSummary    `json:"stages"`
+	InputAmount       string            `json:"input_amount"`
+	OutputAmount      string            `json:"output_amount"`
+	PoolChecks        int               `json:"pool_checks"`
+	OutputRows        int               `json:"output_rows"`
+	TerminalRows      int               `json:"terminal_rows"` // final result rows, excluding intermediate stages
+	LedgerRows        int               `json:"ledger_rows"`
+	Status            string            `json:"status"`
+	DriverCacheHits   int               `json:"driver_cache_hits,omitempty"`
+	DriverCacheBuilds int               `json:"driver_cache_builds,omitempty"`
+	ReusedStages      int               `json:"reused_stages,omitempty"`
 }
 type StageSummary struct {
 	Stage      string `json:"stage"`
@@ -283,6 +285,7 @@ type driverRef struct {
 	alloc        Allocation
 	ix           driverIndex
 	targetChecks map[string]func(string) bool
+	cacheHit     bool // index was reused from a fully validated committed entry
 }
 
 // csvSink may transparently write an on-the-fly gzip file, preserving the

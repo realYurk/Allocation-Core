@@ -29,3 +29,9 @@ AllocationCore
 AllocationCore.exe
 **/driver-cache/
 **/run_summary.json
+# V4 local cache and independent business-acceptance evidence
+**/.allocation-driver-cache/
+**/acceptance-*/
+**/reconciliation-*/
+**/multi-jobs/
+**/.reconcile-*/

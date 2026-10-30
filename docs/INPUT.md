@@ -87,3 +87,28 @@ A multi-project folder contains `project.json`, `amounts.csv`, `assignments.csv`
 - `project.json`: add `"reuse_workers": true` to reuse a bounded number of calculation processes, or `false` to retain isolated per-group startup. / 可配置复用计算进程，也可切回逐组独立进程模式。
 
 Run **Inspect** from the workspace or `AllocationCore.exe multi inspect -project PROJECT_DIR -json`. It reads data but does not write results or a persistent cache. If PASS, you may submit the allocation; the engine still snapshots and verifies its inputs during execution. / 体检为只读操作。真正执行时仍重新创建并校验输入快照，确保不会把先前的体检结论当作财务结果。
+
+
+## Reference-result acceptance (V4) / 参考系统逐坐标核验（V4）
+
+After a successful multi-account run, prepare `reference.csv` with **exactly the same dimension column names** as the engine results (ordering may differ). Use one `amount` or `value` column; stage/row ID fields from the engine are ignored, while all business dimensions are preserved. Do not create a full Cartesian product or replace legitimate coarse granularity with zero or empty strings. / 批量计算 PASS 后，准备参考结果，所有维度列名必须与新引擎输出一致；列顺序可以不同。保留原本的记账粒度，**不能为了对账预先虚构笛卡尔积或猜测占位成员**。
+
+Example / 简单示例：
+
+```csv
+account,period,product,value
+Cost-A,2026-01,Product-A,60.00
+Cost-A,2026-01,Product-B,40.00
+```
+
+Reference amounts must represent the **same units and business scope**, be independent of the calculation you are testing, and use the same configured decimal precision. If a source has different field names, transform it **outside** the engine and document the mapping. / 参考数据与计算结果必须在业务范围、金额单位和精度上对齐；如源表字段不同，应在外部适配层清洗，不能让引擎猜测映射。
+
+For Studio / 工作台操作：
+
+1. Choose a multi-account project and run it to `PASS`. / 选择多科目项目并运行成功。
+2. Copy private `reference.csv` into the displayed project folder, or upload a <=5 MB file using the new `reference.csv` option. / 将参考文件放进页面显示的本机项目目录；小文件可直接上传。
+3. Select a successful historical job; set precision (0..6) and acceptable absolute tolerance (default 0). / 选择通过的历史任务、精度和容差。
+4. Click **Compare**. Inspect status, missing and extra coordinates, mismatches and top 25 differences. / 点击“对比”，检查缺失、多余、金额不符和差异最大的坐标。
+5. Find `summary.json` and `differences.csv` under the job's newly created `acceptance-*` directory. / 在新建的本地验收目录查看完整 CSV 与摘要。
+
+**Important:** `MATCH` proves *only that these two snapshots agree at every business coordinate within tolerance*. Financial conservation alone is not equivalent to reference agreement. No reference file = not verified. The engine does not provide a native MySQL or Cube connector yet; extract into this explicit contract. / `MATCH` 只证明两份快照在所选精度和容差下逐坐标一致，**不自动证明原系统规则正确**。没有独立参考结果不得写“验收一致”。目前数据库和 Cube 仍需外部适配为明确的输入契约。

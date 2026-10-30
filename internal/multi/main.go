@@ -99,16 +99,18 @@ type AccountResult struct {
 	Status   string `json:"status"`
 }
 type Result struct {
-	Status     string          `json:"status"`
-	Started    string          `json:"started_utc"`
-	DurationMS int64           `json:"duration_ms"`
-	Accounts   int             `json:"accounts"`
-	Groups     int             `json:"groups"`
-	Input      string          `json:"input_amount"`
-	Output     string          `json:"output_amount"`
-	ResultRows int64           `json:"result_rows"`
-	Details    []AccountResult `json:"details"`
-	Engines    []Group         `json:"engines"`
+	Status            string          `json:"status"`
+	Started           string          `json:"started_utc"`
+	DurationMS        int64           `json:"duration_ms"`
+	Accounts          int             `json:"accounts"`
+	Groups            int             `json:"groups"`
+	Input             string          `json:"input_amount"`
+	Output            string          `json:"output_amount"`
+	ResultRows        int64           `json:"result_rows"`
+	DriverCacheHits   int             `json:"driver_cache_hits,omitempty"`
+	DriverCacheBuilds int             `json:"driver_cache_builds,omitempty"`
+	Details           []AccountResult `json:"details"`
+	Engines           []Group         `json:"engines"`
 }
 
 type project struct {
@@ -1040,6 +1042,12 @@ func (p *project) finish(start time.Time) (Result, error) {
 		}
 	}
 	for _, g := range p.groups {
+		if n, ok := g.Summary["driver_cache_hits"].(float64); ok {
+			r.DriverCacheHits += int(n)
+		}
+		if n, ok := g.Summary["driver_cache_builds"].(float64); ok {
+			r.DriverCacheBuilds += int(n)
+		}
 		fp := filepath.Join(g.Output, "results.csv")
 		f, er := os.Open(fp)
 		if er != nil {
