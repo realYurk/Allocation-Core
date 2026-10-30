@@ -69,3 +69,13 @@ The microbenchmark **only** measures pool scheduling overhead; it cannot be extr
 **Byte-for-byte evidence checks / 证据字节级一致：** identical `results.csv`, `reconciliation.csv`, `ledger.csv.gz`, `source_to_pool.csv.gz`, `lineage_links.csv.gz`, `evidence_stream_manifest.json` for the same two-stage rule and inputs. Run summaries contain timestamps and are compared by business fields. / 对同一两阶段样例，上述六个结果与证据文件字节级一致；任务摘要的时间字段不参加字节比较。
 
 **Outstanding / 仍待完成:** realistic million-row and hundred-million-row allocation benchmarks, Java/Python golden cross-language tests, Windows hardware validation and native database connectors. / 真实复杂业务百万至亿级压力测试、跨语言黄金对账、Windows 实机与原生数据库接入仍需单独验收。
+
+## Clean V3 verification / V3 回归验证
+
+1. `go test ./... && go vet ./...` / 全量测试和静态检查。
+2. `go test -race ./internal/multi ./internal/engine ./internal/studio` / 关键执行模块竞态检测。
+3. Create synthetic data: `AllocationCore demo . 1000`; then run `AllocationCore multi inspect -project testdata/scale_1000 -json`. / 本地按需生成千科目合成样例。
+4. Run the **same physical project directory** with `reuse_workers` off and on, using fresh output destinations. Compare `results.csv` and `account_reconciliation.csv` byte-for-byte. / 对同一项目比较逐坐标金额及逐科目对账，要求完全一致。
+5. For a failed driver/invalid rule or canceled task, assert no published output directory. / 失败或取消绝不能发布正式结果。
+
+Timings must include the machine, workload, cache settings and evidence configuration. A 1000-group tiny synthetic benchmark does not predict multi-million-row production speed. / 必须注明机器、数据和证据选项；小数据量 1000 组规则结果不能外推为生产吞吐。

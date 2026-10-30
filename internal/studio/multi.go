@@ -3,6 +3,7 @@ package studio
 // Multi-account Studio is strictly local. It never implements financial formulas;
 // it invokes allocation_multi, which in turn runs the authoritative alloc binary.
 import (
+	"allocationcore/internal/multi"
 	"context"
 	"crypto/sha256"
 	"encoding/csv"
@@ -67,6 +68,7 @@ func (a *Application) registerMulti(m *http.ServeMux) *MultiApp {
 	m.HandleFunc("/api/multi/projects", x.projects)
 	m.HandleFunc("/api/multi/create", x.create)
 	m.HandleFunc("/api/multi/project", x.project)
+	m.HandleFunc("/api/multi/preflight", x.preflight)
 	m.HandleFunc("/api/multi/cache", x.cacheScope)
 	m.HandleFunc("/api/multi/assign", x.assign)
 	m.HandleFunc("/api/multi/factor", x.factor)
@@ -189,6 +191,31 @@ func (x *MultiApp) create(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOut(w, 201, map[string]any{"project": req.Name})
 }
+
+// preflight validates all assigned accounts and the distinct driver inputs.
+// It is read-only, does not publish results, and never modifies rule files.
+func (x *MultiApp) preflight(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := multiRequest(w, r, &req, 2048); err != nil {
+		fail(w, 400, err)
+		return
+	}
+	dir, err := x.projectDir(req.Name)
+	if err != nil {
+		fail(w, 404, err)
+		return
+	}
+	// A checked response is useful even when BLOCK is found. The page displays
+	// exact issues rather than treating the response as an opaque HTTP error.
+	jsonOut(w, 200, multi.InspectProject(r.Context(), dir))
+}
+
 func readAssignments(path string) ([]map[string]string, error) {
 	f, e := os.Open(path)
 	if e != nil {
@@ -249,19 +276,22 @@ func (x *MultiApp) project(w http.ResponseWriter, r *http.Request) {
 	}
 	cfgBytes, cfgErr := os.ReadFile(filepath.Join(dir, "project.json"))
 	cfgScope := "run"
+	reuseWorkers := false
 	cfgHash := ""
 	if cfgErr == nil {
 		var cfg struct {
 			DriverCacheScope string `json:"driver_cache_scope"`
 			DriverDiskIndex  bool   `json:"driver_disk_index"`
+			ReuseWorkers     bool   `json:"reuse_workers"`
 		}
 		if json.Unmarshal(cfgBytes, &cfg) == nil && cfg.DriverCacheScope == "project" && cfg.DriverDiskIndex {
 			cfgScope = "project"
 		}
+		reuseWorkers = cfg.ReuseWorkers
 		sum := sha256.Sum256(cfgBytes)
 		cfgHash = hex.EncodeToString(sum[:])
 	}
-	jsonOut(w, 200, map[string]any{"driver_cache_scope": cfgScope, "project_sha256": cfgHash, "name": r.URL.Query().Get("name"), "assignments": assigned, "templates": options, "files": files, "count": len(assigned), "manualDataDir": dir})
+	jsonOut(w, 200, map[string]any{"reuse_workers": reuseWorkers, "driver_cache_scope": cfgScope, "project_sha256": cfgHash, "name": r.URL.Query().Get("name"), "assignments": assigned, "templates": options, "files": files, "count": len(assigned), "manualDataDir": dir})
 }
 
 // cacheScope changes only generic execution settings, never financial rules.
@@ -272,9 +302,10 @@ func (x *MultiApp) cacheScope(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Name    string `json:"name"`
-		Scope   string `json:"scope"`
-		BaseSHA string `json:"base_sha256"`
+		Name         string `json:"name"`
+		Scope        string `json:"scope"`
+		BaseSHA      string `json:"base_sha256"`
+		ReuseWorkers *bool  `json:"reuse_workers,omitempty"`
 	}
 	if e := multiRequest(w, r, &req, 4096); e != nil {
 		fail(w, 400, e)
@@ -312,6 +343,9 @@ func (x *MultiApp) cacheScope(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg["driver_cache_scope"] = req.Scope
+	if req.ReuseWorkers != nil {
+		cfg["reuse_workers"] = *req.ReuseWorkers
+	}
 	if req.Scope == "project" {
 		cfg["driver_disk_index"] = true
 		if n, ok := cfg["disk_partitions"].(float64); !ok || n < 2 {

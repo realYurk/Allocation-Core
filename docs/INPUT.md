@@ -74,3 +74,16 @@ AllocationCore.exe run input/rules/rule.json output/my-run --workers 4
 - A coarse-grained member like `Unassigned` or `No Model` is legitimate. Do not expand it to every product before running. / 未细分成员仍属于合法记账粒度，不做预展开。
 
 Input inspection does **not** check per-pool driver coverage, zero denominator, business routing, or reference-system correctness. These require execution and comparison. / 输入体检不验证每个分摊池是否有合格 Driver、分母是否为零，也不验证业务规则与原系统完全一致。
+
+## Multi-project preparation & one-click inspection / 多科目接入与一键体检
+
+Keep all company data and mappings inside your local private project directory; the public repository contains synthetic descriptors only. / 真实财务数据、规则和映射请保存在本机项目目录，不放入公开仓库。
+
+A multi-project folder contains `project.json`, `amounts.csv`, `assignments.csv`, optional `overrides.csv`, `drivers/*.csv`, and `templates/*.json`. / 一个项目包含项目配置、金额 CSV、科目分派、可选覆盖配置、Driver 和规则模板。
+
+- `assignments.csv`: `account,template` — one account per row; duplicate/missing assignments block execution. / 每个科目唯一对应一套有效规则。
+- `amounts.csv`: every declared business coordinate + `amount`; one row is one *real* sparse input coordinate, never a Cartesian expansion. / 使用稀疏真实坐标，不提前展开笛卡尔积。
+- `drivers/*.csv`: actual target coordinates and weight columns required by the effective rules. / 每份因子文件保留相应目标坐标和权重字段。
+- `project.json`: add `"reuse_workers": true` to reuse a bounded number of calculation processes, or `false` to retain isolated per-group startup. / 可配置复用计算进程，也可切回逐组独立进程模式。
+
+Run **Inspect** from the workspace or `AllocationCore.exe multi inspect -project PROJECT_DIR -json`. It reads data but does not write results or a persistent cache. If PASS, you may submit the allocation; the engine still snapshots and verifies its inputs during execution. / 体检为只读操作。真正执行时仍重新创建并校验输入快照，确保不会把先前的体检结论当作财务结果。

@@ -88,3 +88,20 @@ The second command generates 1,000 **distinct** synthetic rule templates on dema
 - Generic SQL import is supported through external adapters or CSV exports; **there is no bundled live MySQL connector**. / SQL 可通过外部适配层接入，目前未内置实时 MySQL 连接器。
 - GitHub scanning and `.gitignore` are safeguards, not a company security or IP clearance. / 技术过滤不能替代保密与知识产权审核。
 - Original repository history is not rewritten by this package. / 本包不会改写原 GitHub 历史。
+
+## Clean V3 — fewer repeat calculations / V3：减少重复执行
+
+- **Reusable worker mode / 计算进程复用**: for many different account rules, optional `"reuse_workers": true` in a private `project.json` keeps at most `jobs` cancellable worker subprocesses active, rather than starting a new process for each group. It uses the same `AllocationCore` binary, and a failed group still prevents batch publication. / 1000 科目不同规则时，复用固定数量的可取消子进程，任何一组失败仍不发布整批结果。
+- **Shared effective rule preparation / 生效规则准备复用**: identical template bytes and identical overrides are parsed and validated once per batch. Different effective rules remain separate. / 相同模板与相同覆盖配置共用规则准备；不同规则仍独立执行。
+- **One-click project preflight / 一键数据体检**: on the multi-account page, choose a project and select **检查全部科目和因子 / Inspect** before clicking Run. The preflight scans amounts once and each distinct driver file once, validating all referenced weight columns. / 页面可检查科目覆盖、金额、实际 Driver 字段与数值；同一 Driver 文件不会因被多个科目引用而重复体检。
+
+CLI / 命令行：
+
+```bash
+AllocationCore.exe multi inspect -project PATH_TO_PROJECT -json
+AllocationCore.exe multi -project PATH_TO_PROJECT -out NEW_OUTPUT_PATH -engine AllocationCore.exe
+```
+
+**Important / 注意：** preflight PASS covers input shape and numeric validity only. It does not prove driver eligibility, exact allocation correctness, conservation or reference-system equivalence. Run the authoritative engine, inspect `run_summary.json`, then compare complete business coordinates. / 体检通过不代表金额计算已经通过，更不代表与外部系统逐坐标一致。
+
+**Performance boundaries / 性能边界：** pooled workers target many *small* rule groups; they are optional and should be benchmarked under realistic workloads. For large groups, memory pressure can differ. Worker cancellation kills the responsible subprocess and leaves no published batch results. / 常驻进程适用于大量小规则组；复杂高内存负载需要另行压测。取消会终止子进程，不允许发布不完整结果。

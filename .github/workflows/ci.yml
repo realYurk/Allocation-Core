@@ -18,9 +18,14 @@ jobs:
         run: |
           go test ./...
           go vet ./...
+          go test -race ./internal/multi ./internal/studio ./internal/engine
           ./AllocationCore inspect examples/manufacturing/rule.json
           ./AllocationCore run examples/manufacturing/rule.json output/ci-simple --workers 4
+          ./AllocationCore multi inspect -project testdata/multi_sample -json > output/ci-preflight.json
           ./AllocationCore multi -project testdata/multi_sample -out output/ci-multi -engine ./AllocationCore
+          ./AllocationCore demo . 1000
+          ./AllocationCore multi inspect -project testdata/scale_1000 -json > output/ci-preflight-1000.json
+          ./AllocationCore multi -project testdata/scale_1000 -out output/ci-pooled-1000 -engine ./AllocationCore
       - name: Public source audit
         run: |
           ! git ls-files | grep -Ei '\.(csv|xlsx|xls|exe|db|sqlite|parquet)$'
@@ -39,6 +44,7 @@ jobs:
           .\AllocationCore.exe inspect examples/manufacturing/rule.json
           .\AllocationCore.exe run examples/manufacturing/rule.json output\ci-simple --workers 2
           $bin = (Resolve-Path .\AllocationCore.exe).Path
+          .\AllocationCore.exe multi inspect -project testdata\multi_sample -json
           .\AllocationCore.exe multi -project testdata\multi_sample -out output\ci-multi -engine $bin
       - name: Archive one-folder product
         shell: pwsh

@@ -37,6 +37,7 @@ type Config struct {
 	DiskPartitions   int    `json:"disk_partitions"`
 	DriverDiskIndex  bool   `json:"driver_disk_index"`
 	DriverCacheScope string `json:"driver_cache_scope,omitempty"`
+	ReuseWorkers     bool   `json:"reuse_workers,omitempty"`
 	EvidenceGzip     bool   `json:"evidence_gzip"`
 	KeepGroupOutputs bool   `json:"keep_group_outputs"`
 	TimeoutSeconds   int    `json:"timeout_seconds"`
@@ -132,6 +133,10 @@ type project struct {
 func CLI() {
 	if len(os.Args) > 1 && os.Args[1] == "batch" {
 		runBatchCLI()
+	}
+	if len(os.Args) > 1 && os.Args[1] == "inspect" {
+		runInspectCLI(os.Args[2:])
+		return
 	}
 	projectDir := flag.String("project", "", "folder containing project.json, amounts, assignments, templates and drivers")
 	output := flag.String("out", "", "new published result directory")
@@ -547,6 +552,13 @@ func (p *project) initialize() error {
 	// Cache source templates: every account sees the same template bytes, even
 	// if somebody replaces a JSON file during initialization.
 	templateCache := map[string][]byte{}
+	// Reuse identical effective plans: common templates with the same overrides
+	// are decoded, checked and normalized only once per project initialization.
+	type effectivePlan struct {
+		normalized []byte
+		rule       Rule
+	}
+	effectivePlans := map[string]effectivePlan{}
 	for _, account := range names {
 		path, er := regularWithin(filepath.Join(p.dir, "templates"), p.assign[account])
 		if er != nil {
@@ -561,47 +573,63 @@ func (p *project) initialize() error {
 			templateCache[path] = b
 			p.recordControl(path, b)
 		}
-		var root map[string]any
-		if er = json.Unmarshal(b, &root); er != nil {
+		// Include the exact template bytes and this account's ordered overrides.
+		// The stable key does not rely on account names, so common plans can be
+		// reused without weakening per-account amount conservation.
+		overrideBytes, er := json.Marshal(ovs[account])
+		if er != nil {
 			return er
 		}
-		for _, o := range ovs[account] {
-			if o.DriverDataset != "" && !safeFile(o.DriverDataset) {
-				return errors.New("unsafe driver dataset name")
+		planKey := digest(append(append(append([]byte{}, b...), 0), overrideBytes...))
+		cached, found := effectivePlans[planKey]
+		var normalized []byte
+		var rule Rule
+		if found {
+			normalized, rule = cached.normalized, cached.rule
+		} else {
+			var root map[string]any
+			if er = json.Unmarshal(b, &root); er != nil {
+				return er
 			}
-			if er = applyOverride(root, o); er != nil {
+			for _, o := range ovs[account] {
+				if o.DriverDataset != "" && !safeFile(o.DriverDataset) {
+					return errors.New("unsafe driver dataset name")
+				}
+				if er = applyOverride(root, o); er != nil {
+					return fmt.Errorf("account %s: %w", account, er)
+				}
+			}
+			prepared, er := json.Marshal(root)
+			if er != nil {
+				return er
+			}
+			rule, er = validateRuleForMulti(prepared)
+			if er != nil {
 				return fmt.Errorf("account %s: %w", account, er)
 			}
-		}
-		b, er = json.Marshal(root)
-		if er != nil {
-			return er
-		}
-		rule, er := validateRuleForMulti(b)
-		if er != nil {
-			return fmt.Errorf("account %s: %w", account, er)
+			// A group owns its amount input file; all group rules refer to
+			// the same run-local filename inside their individual directory.
+			for k := range rule.Datasets.Amounts {
+				root["datasets"].(map[string]any)["amounts"].(map[string]any)[k] = "group_amounts.csv"
+			}
+			for k, v := range rule.Datasets.Drivers {
+				driver, e := regularWithin(filepath.Join(p.dir, "drivers"), v)
+				if e != nil {
+					return fmt.Errorf("account %s driver %s: %w", account, v, e)
+				}
+				root["datasets"].(map[string]any)["drivers"].(map[string]any)[k] = driver
+			}
+			normalized, er = json.Marshal(root)
+			if er != nil {
+				return er
+			}
+			effectivePlans[planKey] = effectivePlan{normalized: normalized, rule: rule}
 		}
 		if p.precision == -1 {
 			p.precision = rule.Precision
 			p.canonicalHeader = append([]string{}, rule.Dimensions...)
 		} else if p.precision != rule.Precision || strings.Join(p.canonicalHeader, "\x00") != strings.Join(rule.Dimensions, "\x00") {
 			return fmt.Errorf("account %s has incompatible dimension order or precision", account)
-		}
-		// Only single amounts source; make the generated input relative to each group rule folder.
-		for k := range rule.Datasets.Amounts {
-			root["datasets"].(map[string]any)["amounts"].(map[string]any)[k] = "group_amounts.csv"
-		}
-		for k, v := range rule.Datasets.Drivers {
-			driver, er := regularWithin(filepath.Join(p.dir, "drivers"), v)
-			if er != nil {
-				return fmt.Errorf("account %s driver %s: %w", account, v, er)
-			}
-			root["datasets"].(map[string]any)["drivers"].(map[string]any)[k] = driver
-		}
-		// Group identical effective rules. The runtime input path is shared by this group only.
-		normalized, er := json.Marshal(root)
-		if er != nil {
-			return er
 		}
 		id := digest(normalized)[:20]
 		g := sigGroups[id]
@@ -901,6 +929,9 @@ func (p *project) driverCacheDirectory() (string, error) {
 	return dir, nil
 }
 func (p *project) execute(parent context.Context) error {
+	if p.cfg.ReuseWorkers {
+		return p.executePooled(parent)
+	}
 	// Exactly Jobs workers, regardless of 1,000+ distinct rule groups. First
 	// failure cancels in-flight Core subprocesses and prevents further dispatch.
 	ctx, cancel := context.WithCancel(parent)

@@ -10,5 +10,6 @@
   "driver_disk_index": true,
   "evidence_gzip": true,
   "keep_group_outputs": true,
-  "timeout_seconds": 120
+  "timeout_seconds": 120,
+  "reuse_workers": true
 }

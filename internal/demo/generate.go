@@ -140,7 +140,7 @@ func GenerateScale(root string, count int) error {
 			return err
 		}
 	}
-	config := map[string]any{"amounts": "amounts.csv", "assignments": "assignments.csv", "overrides": "overrides.csv", "templates": "templates", "drivers": "drivers", "workers": 2, "jobs": 4, "disk_partitions": 8, "driver_disk_index": true, "evidence_gzip": true, "keep_group_outputs": true, "timeout_seconds": 600}
+	config := map[string]any{"amounts": "amounts.csv", "assignments": "assignments.csv", "overrides": "overrides.csv", "templates": "templates", "drivers": "drivers", "workers": 2, "jobs": 4, "disk_partitions": 8, "driver_disk_index": true, "reuse_workers": true, "evidence_gzip": true, "keep_group_outputs": true, "timeout_seconds": 600}
 	content, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return err
