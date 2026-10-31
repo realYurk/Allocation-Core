@@ -819,6 +819,8 @@ func (x *MultiApp) jobDetail(w http.ResponseWriter, r *http.Request) {
 // stage, allocation; the UI cannot alter arbitrary paths or delete templates.
 func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
+		x.mu.Lock()
+		defer x.mu.Unlock()
 		dir, e := x.projectDir(r.URL.Query().Get("name"))
 		if e != nil {
 			fail(w, 404, e)
@@ -866,7 +868,14 @@ func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 				current = append(current, v)
 			}
 		}
-		jsonOut(w, 200, map[string]any{"account": account, "template": template, "rule": rule, "overrides": current})
+		// Keep the three edit tokens consistent with the account the user saw.
+		assignmentBytes, e := os.ReadFile(filepath.Join(dir, "assignments.csv"))
+		if e != nil { fail(w, 500, e); return }
+		overrideBytes, e := os.ReadFile(filepath.Join(dir, "overrides.csv"))
+		if e != nil { fail(w, 500, e); return }
+		jsonOut(w, 200, map[string]any{"account": account, "template": template, "rule": rule, "overrides": current,
+			"versions": map[string]string{"assignments": sha256Hex(assignmentBytes), "template": sha256Hex(b), "overrides": sha256Hex(overrideBytes)},
+		})
 		return
 	}
 	if r.Method != "POST" {
@@ -877,6 +886,11 @@ func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 		Name    string      `json:"name"`
 		Account string      `json:"account"`
 		Rows    []factorRow `json:"rows"`
+		Versions struct {
+			Assignments string `json:"assignments"`
+			Template string `json:"template"`
+			Overrides string `json:"overrides"`
+		} `json:"versions"`
 	}
 	if e := multiRequest(w, r, &req, 128<<10); e != nil {
 		fail(w, 400, e)
@@ -916,6 +930,18 @@ func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 	raw, e := os.ReadFile(filepath.Join(dir, "templates", template))
 	if e != nil {
 		fail(w, 500, e)
+		return
+	}
+	// Reject stale edits, including changed template assignments.
+	assignmentBytes, e := os.ReadFile(filepath.Join(dir, "assignments.csv"))
+	if e != nil { fail(w, 500, e); return }
+	overrideBytes, e := os.ReadFile(filepath.Join(dir, "overrides.csv"))
+	if e != nil { fail(w, 500, e); return }
+	if req.Versions.Assignments == "" || req.Versions.Template == "" || req.Versions.Overrides == "" ||
+		req.Versions.Assignments != sha256Hex(assignmentBytes) ||
+		req.Versions.Template != sha256Hex(raw) ||
+		req.Versions.Overrides != sha256Hex(overrideBytes) {
+		fail(w, http.StatusConflict, errors.New("科目规则或因子配置已被修改，请刷新后重新核对，未保存本次修改"))
 		return
 	}
 	var rule struct {
@@ -975,6 +1001,11 @@ func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 			fail(w, 422, errors.New("weight_field 必须是英文列名"))
 			return
 		}
+	}
+	// Validate the entire effective rule, not merely individual fractions.
+	if e := validateEffectiveFactorPlan(raw, req.Rows); e != nil {
+		fail(w, 422, e)
+		return
 	}
 	path := filepath.Join(dir, "overrides.csv")
 	old, e := factorRead(path)
