@@ -70,7 +70,7 @@ function showFinanceReadinessAccounts(){
  const filtered=filteredFinanceReadiness();
  for(const a of filtered.slice(0,300)){
   const tr=document.createElement('tr');
-  const label=a.status==='BLOCK'?'缺少数据':a.status==='CHECK_DRIVER'?'需核对因子':'输入正常';
+  const label=a.status==='BLOCK'?'缺少数据':a.status==='NOT_CHECKED'?'扫描未完成':a.status==='CHECK_DRIVER'?'需核对因子':'输入正常';
   for(const v of [a.account,a.template,a.input_rows,label,(a.notes||[]).join('；')||'—'])
    tr.appendChild(financeText('td',v));
   body.appendChild(tr);
