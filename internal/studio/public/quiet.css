@@ -28,3 +28,16 @@ input,select{border-color:#cbd5df;border-radius:5px}
 .quickstart #quickImpact{font-size:13px;color:#4c6071}
 .quickstart .quickFooter{font-size:12px;color:#66778a;margin:8px 0 0}
 @media(max-width:850px){.quickstart{margin:14px 18px}.quickstart .quickGrid{grid-template-columns:1fr}}
+
+/* Finance operator layout: readable fields, no decorative gradients. */
+.finance-factor-editor{background:#fff;border:1px solid #d9e0e7;border-radius:7px;padding:16px;margin-top:14px}
+.finance-factor-stage{border:1px solid #dfe5eb;border-radius:6px;padding:12px;margin:12px 0}
+.finance-factor-stage h3{font-size:14px;font-weight:650;margin:0 0 10px}
+.finance-factor-line{display:grid;grid-template-columns:minmax(85px,1fr) minmax(120px,1.2fr) minmax(110px,1fr) 110px;gap:9px;align-items:center;margin:8px 0}
+.finance-factor-line input,.finance-factor-line select{padding:8px}
+.finance-factor-name{margin:0;font-size:13px}
+.finance-factor-percent{display:flex;align-items:center;gap:5px;margin:0}
+.finance-factor-percent input{min-width:0;width:100%;text-align:right}
+.finance-factor-total{font-size:13px;margin:10px 0 0;font-weight:650}
+#factorValidation{font-size:13px;white-space:pre-wrap;line-height:1.5}
+@media(max-width:700px){.finance-factor-line{grid-template-columns:1fr 1fr}.finance-factor-name{grid-column:1/-1}}
