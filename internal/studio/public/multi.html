@@ -53,7 +53,7 @@
 <p>发布不会覆盖或删除旧版本；恢复会新建一个独立目录。历史清理预览不删除任何数据，实际清理需通过命令行明确加 <code>--apply</code>。</p></div>
 </section></div></main>
 <script>
-let data=null,chosen={},active='',busyJob='',interval=null,factorContext=null,accountReport=[],designerPlan=null,designerContext='';
+let data=null,chosen={},active='',busyJob='',interval=null,factorContext=null,accountReport=[],designerPlan=null,designerContext='',designerPreviewRequest=0;
 async function api(path,body){const response=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:undefined);let v;try{v=await response.json()}catch{throw new Error('服务未返回合法 JSON')};if(!response.ok)throw new Error(v.error||'HTTP '+response.status);return v}
 function message(t,ok=false){const v=document.getElementById('message');v.style.display='block';v.style.color=ok?'#087657':'#b42f35';v.textContent=t}
 async function list(){try{const v=await api('/api/multi/projects');const el=document.getElementById('project');let old=el.value;el.innerHTML=v.projects.map(x=>`<option>${x}</option>`).join('');if(v.projects.includes(old))el.value=old;if(el.value)await openProject()}catch(e){message(e.message)}}
@@ -95,6 +95,7 @@ async function onboardFromCSV(){
  }catch(e){status.textContent='导入未完成，原项目未修改：'+e.message;message(e.message)}finally{btn.disabled=false}
 }
 function clearDesignerPreview(){
+ designerPreviewRequest++;
  designerPlan=null;designerContext='';
  document.getElementById('importDesignerBtn').disabled=true;
  const box=document.getElementById('designerImportReport');
@@ -126,13 +127,14 @@ async function previewDesignerTemplate(){
  const mapping=designerMapping();
  const template=document.getElementById('designerTemplateName').value.trim();
  clearDesignerPreview();
+ const requestId=designerPreviewRequest;
  btn.disabled=true;box.textContent='正在检查设计器多阶段规则、项目维度、精度和 Driver 列头...';
  try{
   if(!active||!data)throw Error('请先选择多科目项目');
   if(!/^[A-Za-z0-9_-]{1,48}\.json$/.test(template))throw Error('新模板文件名只能用英文数字、下划线、短横线和 .json');
   if(data.templates.includes(template))throw Error('同名规则已存在，必须创建新模板，不会覆盖');
   const response=await api('/api/multi/import-template',{name:active,case:document.getElementById('designerCase').value,template,preview:true,driver_mapping:mapping});
-  if(context!==active+'|'+document.getElementById('designerCase').value+'|'+document.getElementById('designerTemplateName').value.trim())return;
+  if(requestId!==designerPreviewRequest||context!==active+'|'+document.getElementById('designerCase').value+'|'+document.getElementById('designerTemplateName').value.trim())return;
   designerContext=context;designerPlan=response;
   const panel=document.getElementById('designerDriverMapping');
   panel.replaceChildren();
@@ -156,9 +158,11 @@ async function previewDesignerTemplate(){
   ].join('\n');
   document.getElementById('importDesignerBtn').disabled=false;
  }catch(e){
-  document.getElementById('designerDriverMapping').replaceChildren();
-  box.textContent='检查未通过：'+e.message;
- }finally{btn.disabled=false}
+  if(requestId===designerPreviewRequest){
+   document.getElementById('designerDriverMapping').replaceChildren();
+   box.textContent='检查未通过：'+e.message;
+  }
+ }finally{if(requestId===designerPreviewRequest)btn.disabled=false}
 }
 async function importDesignerTemplate(){
  const box=document.getElementById('designerImportReport'),button=document.getElementById('importDesignerBtn');
