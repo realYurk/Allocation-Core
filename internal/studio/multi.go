@@ -74,6 +74,7 @@ func (a *Application) registerMulti(m *http.ServeMux) *MultiApp {
 	m.HandleFunc("/api/multi/mapping-profiles", x.mappingProfiles)
 	m.HandleFunc("/api/multi/import-template", x.importTemplateFromDesigner)
 	m.HandleFunc("/api/multi/project", x.project)
+	m.HandleFunc("/api/multi/template-guide", x.templateGuide)
 	m.HandleFunc("/api/multi/preflight", x.preflight)
 	m.HandleFunc("/api/multi/reconcile", x.reconcile)
 	m.HandleFunc("/api/multi/reference", x.referenceStatus)
