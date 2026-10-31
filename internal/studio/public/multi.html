@@ -87,6 +87,7 @@
 <section id="financeReadiness" class="finance-check" hidden aria-label="业务体检与处理建议">
   <h3>业务体检与处理建议</h3><p id="financeReadinessSummary" aria-live="polite"></p>
   <div id="financeReadinessFindings"></div>
+  <div id="financeDriverSummary"></div>
   <div class="row"><input id="financeReadinessSearch" placeholder="搜索科目、规则、提示" oninput="showFinanceReadinessAccounts()" aria-label="筛选体检科目">
   <select id="financeReadinessStatus" onchange="showFinanceReadinessAccounts()" aria-label="按体检状态筛选">
     <option value="">全部科目</option><option value="CHECK_DRIVER">需核对因子</option><option value="BLOCK">缺少金额数据</option><option value="INPUT_OK">输入正常</option>
@@ -811,7 +812,6 @@ async function inspectProject(){
     `科目 ${r.accounts} · 有效规则组 ${r.rule_groups} · 金额记录 ${r.amount_rows}`,
     `待分摊金额 ${r.input_amount} · Driver 文件 ${r.unique_driver_files} · 规则引用 ${r.driver_references}`,
     `体检耗时 ${r.elapsed_ms} ms`,
-    ...r.drivers.map(x=>`因子 ${x.name}：${x.rows} 行 · ${x.referenced_by_rule_groups} 组规则引用 · 字段 ${x.weight_fields.join(', ')}${x.error?' · ERROR '+x.error:''}`),
     ...r.problems.map(x=>'错误：'+x),
     '注意：体检不验证实际分摊比例、金额守恒或原系统结果；需执行分摊后另行对账。'];
    box.style.borderColor=r.status==='PASS'?'#88cfb4':'#eca0a0';box.textContent=lines.join('\n');
