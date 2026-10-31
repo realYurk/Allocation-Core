@@ -1,0 +1,30 @@
+/* Neutral, understated styling for enterprise finance operators. */
+:root{font-family:'Microsoft Yahei','Segoe UI',Arial,sans-serif;color:#263747;background:#f6f7f9}
+header{background:#344657;color:#fff}
+header p,nav a{color:#e3eaf0}
+.card,.workflow-nav,.quickstart{border:1px solid #d9e0e7;border-radius:8px;background:#fff;box-shadow:none}
+.card[style*="linear-gradient"]{background:#fff!important;border-color:#d9e0e7!important}
+.card[style*="background:#f6faff"]{background:#fff!important}
+button{background:#365d7a;border-radius:5px;font-weight:600}
+button.alt,.workflow-links a{background:#eef2f5;border:1px solid #d4dde5;color:#31516a}
+button:hover:not(:disabled){filter:brightness(.95)}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid #326b9a;outline-offset:2px}
+input,select{border-color:#cbd5df;border-radius:5px}
+.workflow-nav{margin-top:16px}
+.quickstart{max-width:1260px;margin:14px auto 0;padding:20px}
+.quickstart h2{margin:0 0 7px;font-size:18px}
+.quickstart .quickGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.quickstart label{font-size:13px;margin-top:8px}
+.quickstart .quickControls{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}
+.quickstart .quickControls button{font-size:13px}
+.quickstart #quickTemplateDetail{background:#fafbfc;border:1px solid #e0e5ea;border-radius:6px;padding:12px;min-height:110px}
+.quickstart .quickStage{border-top:1px solid #e2e7ec;padding-top:11px;margin-top:11px}
+.quickstart .quickStage p{margin:5px 0}
+.quickstart .quickTitle{font-size:15px}
+.quickstart .quickWarning{background:#fff8ec;color:#7b5119;border-left:3px solid #c49042;padding:8px 10px}
+.quickstart #quickNotice{border:1px solid #d7e0e8;border-radius:5px;padding:9px 12px;margin-top:12px;background:#f6f8fa;font-size:13px}
+.quickstart #quickNotice[data-kind="error"]{border-color:#e7c7bf;background:#fff7f5;color:#9d352d}
+.quickstart #quickNotice[data-kind="success"]{border-color:#c4ddcf;background:#f5faf7;color:#216a46}
+.quickstart #quickImpact{font-size:13px;color:#4c6071}
+.quickstart .quickFooter{font-size:12px;color:#66778a;margin:8px 0 0}
+@media(max-width:850px){.quickstart{margin:14px 18px}.quickstart .quickGrid{grid-template-columns:1fr}}
