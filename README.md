@@ -3,6 +3,12 @@
 **One Go module · One Windows executable · One workspace.**
 **一个 Go 模块、一个 Windows 程序、一个业务工作台。**
 
+## 财务人员快速配置 / Finance-first quick setup
+
+在现有 **/multi** 工作台顶部使用「快速配置」：选择项目，搜索科目，再选择分摊模板。系统从经过校验的真实规则自动展示分摊阶段、Driver、精确比例、目标维度和负权重风险；不读取金额明细，也不推测业务规则。选择模板后先形成未保存草稿；保存时沿用现有 SHA-256 并发保护。批量指定必须先输入筛选词并二次确认，避免误改全项目。保存后必须按 **体检 → 实际分摊 → 独立参考结果逐坐标对账** 执行，规则说明和体检通过均不代表业务计算正确。
+
+The compact quick-start reuses the same multi-account rule engine and guarded assignment API. It is a read-only template explanation followed by explicit draft / save / inspect steps. It adds no calculation logic, no user data to Git, no additional executable and no documentation file. Existing advanced Designer, mapping, auditing and batch release remain available below.
+
 This repository contains **no company data or proprietary allocation rules**. Inputs, outputs, mappings and runtime records stay outside version control. / 本仓库不包含企业真实数据和私有规则；输入、输出、映射与运行状态默认不纳入 Git。
 
 > **MySQL 注意 / IMPORTANT**：本 ZIP 内附的离线 Windows EXE 保留全部已有功能，但**不包含官方 MySQL 驱动**。需要使用在线构建的 MySQL-enabled EXE（GitHub Actions）或 `go mod download && go build -tags mysql` 才能执行 `data mysql` / `mysql-bundle`。源码已实现，模拟事务测试通过；**目标企业 MySQL 实库联调仍待执行**。
