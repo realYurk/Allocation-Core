@@ -76,6 +76,7 @@ func (a *Application) registerMulti(m *http.ServeMux) *MultiApp {
 	m.HandleFunc("/api/multi/project", x.project)
 	m.HandleFunc("/api/multi/template-guide", x.templateGuide)
 	m.HandleFunc("/api/multi/preflight", x.preflight)
+	m.HandleFunc("/api/multi/driver-coverage", x.driverCoverage)
 	m.HandleFunc("/api/multi/reconcile", x.reconcile)
 	m.HandleFunc("/api/multi/reference", x.referenceStatus)
 	m.HandleFunc("/api/multi/reference-upload", x.uploadReference)
@@ -226,6 +227,16 @@ func (x *MultiApp) preflight(w http.ResponseWriter, r *http.Request) {
 	// A checked response is useful even when BLOCK is found. The page displays
 	// exact issues rather than treating the response as an opaque HTTP error.
 	jsonOut(w, 200, multi.InspectProject(r.Context(), dir))
+}
+
+// driverCoverage checks first-source-stage Driver matching without executing a batch.
+func (x *MultiApp) driverCoverage(w http.ResponseWriter, r *http.Request) {
+ if r.Method != http.MethodPost { w.WriteHeader(http.StatusMethodNotAllowed); return }
+ var req struct { Name string `json:"name"` }
+ if err := multiRequest(w, r, &req, 2048); err != nil {fail(w, 400, err);return}
+ dir, err := x.projectDir(req.Name)
+ if err != nil {fail(w, 404, err);return}
+ jsonOut(w, 200, multi.InspectDriverCoverage(r.Context(), dir))
 }
 
 func readAssignments(path string) ([]map[string]string, error) {
