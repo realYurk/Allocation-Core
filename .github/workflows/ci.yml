@@ -18,6 +18,7 @@ jobs:
         run: |
           go test ./... -count=1
           go vet ./...
+          node --test internal/studio/factor_editor_node_test.cjs
           go test -race ./internal/multi ./internal/studio ./internal/engine ./adapter ./internal/acceptance ./internal/profiling
           # Independent rational oracle, fixed business goldens and failure injection.
           go test ./internal/engine ./adapter ./internal/acceptance -run 'TestV7|TestV8' -count=1 -v
