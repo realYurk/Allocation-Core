@@ -4,16 +4,17 @@
 
 ## Read-only Driver source-pool coverage / 运行前 Driver 来源池匹配检查
 
-In /multi step ④, click **检查 Driver 是否匹配业务坐标** after the existing input preflight. The optional inspection reads current amount pools and eligible Driver records, comparing explicit SOURCE dimensions (e.g. period/department/account), literal included target members, and signed integer weight denominators. It reports **SOURCE_MATCHED / BLOCK / REVIEW / UNVERIFIED** per account, with exact source-pool examples and CSV export. It does **not** execute the allocation, publish output, or modify the project.
+In /multi step ④, click **检查 Driver 是否匹配业务坐标** after input preflight. This read-only check compares SOURCE dimensions, literal target members and Driver weight denominators. It never executes the allocation or writes project data.
 
-The verifier intentionally certifies **only single-stage rules with a direct, 100% amount input and without hierarchy/source/Driver filters**. Multi-stage graphs, more complex filters, oversized checks, invalid input and changed CSV sources report **UNVERIFIED or PARTIAL**, never a misleading financial PASS. Individual driver weights are not proof of a valid final allocation; signed-weight risks remain REVIEW. Source and referenced Driver files are checked against pre/post SHA-256 digests. The two resource limits are 128 effective rule groups and 50,000 unique source pools; unsupported volume requires narrowing the business slice or a real Core run. Always run the engine and independently reconcile coordinates before production acceptance.
+- **SOURCE_MATCHED**: eligible source pools match their Drivers for a supported **single-stage** direct-input rule. This is not financial acceptance.
+- **ROOT_MATCHED**: the unique 100%-share direct-amounts root of a **multi-stage** graph was checked. All downstream stages remain **UNVERIFIED**, and the overall report remains PARTIAL.
+- **BLOCK**: missing Driver, nonpositive denominator or negative weight found under a rule that **rejects** signed weights. A forbidden negative weight is a definite Core policy violation, not merely an advisory warning.
+- **REVIEW**: negative weights are matched under an explicitly declared ALLOW_SIGNED exception; business purpose and final allocated target coordinates still require confirmation.
+- **UNVERIFIED**: unsupported graph shape, multiple direct roots, split input shares, filters/hierarchies, changes during scan or incomplete inspection. Do not infer a PASS.
 
-在第④步先执行原有“输入体检”，再点击“检查 Driver 是否匹配业务坐标”。目前只对**单阶段、直接读取完整金额、无层级与复杂筛选**的规则给出可确认的来源池匹配结论；其他情况明确标记“未验证”。结果仅供运行前排查，不代表金额守恒、最终结果或参考系统已经验收。全程只读，不生成分摊结果；遇到数据变化报告作废。
+Checks are bounded to 128 effective rule groups and 50,000 unique source pools and verify input SHA-256 before/after scanning. **Even SOURCE_MATCHED does not mean the financial output or independent reference agrees.** Execute Core and independently reconcile full coordinates before production acceptance.
 
-
-在 `/multi` 第 ④ 步点击“检查全部科目和因子”，工作台会显示可搜索的科目清单、原始金额记录数、Driver 字段正/零/负权重统计、中文问题和具体排查建议。可导出全部科目的输入诊断 CSV，页面只展示前 300 行以避免大项目浏览器卡顿。**检查只读取本地数据，不执行金额分摊、不改写任何来源或已发布结果。**
-
-Important boundary / 验证边界：**INPUT_OK/PASS 仅代表文件结构与输入格式检查通过，不代表 Driver 对期间/工厂/车型的目标匹配成功，也不代表财务计算或独立参考结果 MATCH。** 文件某个字段全为零或包含负值属于 `CHECK` 风险，不能误称已经证明某科目的分摊失败；必须运行实际 Core 后按完整坐标核对。关闭或切换项目时，旧诊断会失效。新增能力不引入用户资料上云、第二份引擎或新的 EXE。
+在第④步“检查 Driver 是否匹配业务坐标”：单阶段规则可判断来源池因子；多阶段规则只检查唯一、完整份额的直接金额起始阶段，标记“起始阶段已匹配，下游未验证”，不声称后续通过。匹配 Driver 存在负数但规则禁止冲销时，应直接阻断；已声明负权重业务用途时仍需复核。检查完全只读、源数据变化则报告作废；任何体检结果都不能代替运行及逐坐标独立对账。
 
 ## Finance-friendly percentage factors / 财务人员百分比因子配置
 

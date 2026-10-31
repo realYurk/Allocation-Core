@@ -1,9 +1,9 @@
-// Read-only source-stage Driver matching; never modify project rules or results.
+// Read-only direct-input root Driver matching; downstream graph remains unverified.
 let coverageReport=null,coverageToken=0;
 const coverageEl=id=>document.getElementById(id);
 function resetCoverage(){coverageReport=null;coverageToken++;const p=coverageEl('coverageResult');if(p)p.hidden=true}
 function coverageCell(tag,value){const e=document.createElement(tag);e.textContent=String(value??'');return e}
-function coverageStatus(status){return ({BLOCK:'发现匹配问题',REVIEW:'需核对负权重',UNVERIFIED:'尚未验证',SOURCE_MATCHED:'首阶段已匹配'})[status]||status}
+function coverageStatus(status){return ({BLOCK:'发现匹配问题',REVIEW:'需核对已批准的冲销',ROOT_MATCHED:'起始阶段已匹配，下游未验证',UNVERIFIED:'尚未验证',SOURCE_MATCHED:'已匹配（单阶段）'})[status]||status}
 async function inspectCoverage(){
  const project=active,btn=coverageEl('coverageBtn'),token=++coverageToken;
  if(!project){message('请先选择项目');return}
@@ -26,7 +26,7 @@ async function inspectCoverage(){
      dest.appendChild(item);
    }
    if(result.truncated_findings)dest.appendChild(coverageCell('p','其余 '+result.truncated_findings+' 条诊断未在页面展开，请缩小业务切面后检查。'));
-   if(!(result.findings||[]).length)dest.appendChild(coverageCell('p','本轮可检查的首阶段来源池已匹配；仍须运行完整计算并独立对账。'));
+   if(!(result.findings||[]).length)dest.appendChild(coverageCell('p','可检查的直接金额来源池已核对；多阶段后续仍需运行计算并独立对账。'));
    renderCoverageAccounts();
  } catch(e){if(token===coverageToken)message('Driver 匹配检查失败：'+e.message)}
  finally{btn.disabled=false;btn.textContent='检查 Driver 是否匹配业务坐标'}

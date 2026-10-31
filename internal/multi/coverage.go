@@ -1,7 +1,8 @@
 package multi
 
 // Source-pool Driver coverage is a read-only advisory check, not a financial run.
-// Only single-stage direct-source rules with literal targets can be certified.
+// It checks a single direct-amounts root stage, including the root of a
+// multi-stage graph. Downstream stages are ALWAYS explicitly unverified.
 // Unsupported paths, incomplete scans and source changes remain UNVERIFIED.
 import (
  "bufio"
@@ -53,7 +54,7 @@ type CoverageReport struct {
  Invalidated bool `json:"diagnosis_invalidated"`
 }
 type coveragePool struct {coord map[string]string;sum big.Int}
-type coveragePlan struct {group *Group;rule engine.Spec;stage engine.Stage;pools map[string]*coveragePool}
+type coveragePlan struct {group *Group;rule engine.Spec;stage engine.Stage;complete bool;pools map[string]*coveragePool}
 type coverageDriverSum struct {sum big.Int;rows int;negative bool}
 type coverageDriverIndex struct {bound []string;byKey map[string]*coverageDriverSum}
 
@@ -68,21 +69,30 @@ func coverageReview(accounts []CoverageAccount) bool {
  for _,a:=range accounts {if a.Status=="REVIEW" {return true}}
  return false
 }
-func coverageSupported(s engine.Spec) (engine.Stage,string) {
- if len(s.Stages)!=1 {return engine.Stage{},"包含多个阶段；必须运行 Core 验证后续阶段"}
- st:=s.Stages[0]
- if !engine.Enabled(st.Enabled)||st.Operation=="MERGE"||st.Operation=="PASS" {return st,"不是启用的分摊阶段"}
- if len(st.Inputs)!=1||(st.Inputs[0].Share!=""&&st.Inputs[0].Share!="1") {return st,"包含多个来源或部分来源份额"}
- if s.Datasets.Amounts[st.Inputs[0].From]=="" {return st,"来源于其他阶段"}
- if len(s.Hierarchies)!=0||len(st.Source.Filters)!=0 {return st,"包含层级或来源筛选"}
- for _,a:=range st.Allocations {if len(a.DriverFilters)!=0 {return st,"包含 Driver 筛选"}}
- return st,""
+// coverageSupported never simulates stage-to-stage routing.
+// A unique full-share direct-input root can be checked, even in a multi-stage
+// graph. Subsequent stages remain explicitly UNVERIFIED.
+func coverageSupported(s engine.Spec) (engine.Stage,string,bool) {
+ if len(s.Datasets.Amounts)!=1 {return engine.Stage{},"包含多个金额来源，无法仅靠来源池证明匹配",false}
+ roots:=[]engine.Stage{}
+ for _,st:=range s.Stages {
+  for _,input:=range st.Inputs {
+   if s.Datasets.Amounts[input.From]!="" {roots=append(roots,st);break}
+  }
+ }
+ if len(roots)!=1 {return engine.Stage{},"需要唯一的直接金额来源起始阶段；多来源图仍须运行 Core",false}
+ st:=roots[0]
+ if !engine.Enabled(st.Enabled)||st.Operation=="MERGE"||st.Operation=="PASS" {return st,"直接金额来源的起始阶段不是启用的分摊阶段",false}
+ if len(st.Inputs)!=1||(st.Inputs[0].Share!=""&&st.Inputs[0].Share!="1") {return st,"起始阶段含多个来源或部分来源份额",false}
+ if len(s.Hierarchies)!=0||len(st.Source.Filters)!=0 {return st,"起始阶段含层级或来源筛选",false}
+ for _,a:=range st.Allocations {if len(a.DriverFilters)!=0 {return st,"起始阶段含 Driver 筛选",false}}
+ return st,"",len(s.Stages)==1
 }
 
 // InspectDriverCoverage does not create output files and does not publish results.
 // SOURCE_MATCHED means eligible first-stage pool/weight matching only.
 func InspectDriverCoverage(ctx context.Context,projectDir string) (r CoverageReport) {
- r=CoverageReport{Status:"PARTIAL",Scope:"仅验证单阶段、直接金额来源、无层级与筛选规则的来源池 Driver 匹配；不验证多阶段、最终金额和参考系统。",Findings:[]CoverageFinding{},Accounts:[]CoverageAccount{}}
+ r=CoverageReport{Status:"PARTIAL",Scope:"检查唯一直接金额来源起始阶段的 Driver 匹配；多阶段仅检查第一阶段，后续阶段、最终金额和参考系统对账均未验证。",Findings:[]CoverageFinding{},Accounts:[]CoverageAccount{}}
  dir,e:=filepath.Abs(projectDir)
  if e!=nil {r.add(CoverageFinding{Level:"UNVERIFIED",Reason:e.Error()});return r}
  p:=&project{dir:dir,ctx:ctx}
@@ -121,7 +131,7 @@ func InspectDriverCoverage(ctx context.Context,projectDir string) (r CoverageRep
   }
   for _,a:=range sortedAccounts(p.assign) {
    r.Accounts=append(r.Accounts,*statuses[a])
-   if statuses[a].Status=="UNVERIFIED" {r.UnverifiedAccounts++}
+   if statuses[a].Status=="UNVERIFIED"||statuses[a].Status=="ROOT_MATCHED" {r.UnverifiedAccounts++}
   }
   if r.Invalidated {
    r.CheckedPairs=0
@@ -140,10 +150,15 @@ func InspectDriverCoverage(ctx context.Context,projectDir string) (r CoverageRep
   if i>=coverageMaxGroups {r.add(CoverageFinding{Level:"UNVERIFIED",Reason:"超过规则组安全检查上限，其余组未核对"});break}
   s,err:=engine.ParseSpec([]byte(g.Rule))
   if err!=nil {r.add(CoverageFinding{Level:"UNVERIFIED",Reason:err.Error()});continue}
-  st,why:=coverageSupported(s)
+  st,why,complete:=coverageSupported(s)
   if why!="" {r.add(CoverageFinding{Level:"UNVERIFIED",Account:g.Accounts[0],Stage:st.ID,Reason:why,Advice:"运行 Core 并独立对账。"});continue}
-  plans[g.ID]=&coveragePlan{group:g,rule:s,stage:st,pools:map[string]*coveragePool{}}
-  for _,a:=range g.Accounts {statuses[a].Status="SOURCE_MATCHED"}
+  plans[g.ID]=&coveragePlan{group:g,rule:s,stage:st,complete:complete,pools:map[string]*coveragePool{}}
+  matchedStatus:="ROOT_MATCHED"
+  if complete {matchedStatus="SOURCE_MATCHED"}
+  for _,a:=range g.Accounts {statuses[a].Status=matchedStatus}
+  if !complete {
+   r.add(CoverageFinding{Level:"UNVERIFIED",Account:g.Accounts[0],Stage:st.ID,Reason:fmt.Sprintf("已选择直接金额起始阶段作来源池检查；后续 %d 个阶段不能在不计算时证明匹配",len(s.Stages)-1),Advice:"先核对本阶段的 Driver 结果，再用 Core 执行完整规则并做独立参考对账。"})
+  }
  }
  if len(plans)==0 {return r}
  source,e:=regularWithin(dir,p.cfg.Amounts)
@@ -219,9 +234,14 @@ func InspectDriverCoverage(ctx context.Context,projectDir string) (r CoverageRep
      reason:="没有符合当前来源池和目标成员的 Driver"
      if sum!=nil&&sum.rows>0 {reason="已有匹配 Driver，但有效权重合计不大于零"}
      r.add(CoverageFinding{Level:"BLOCK",Account:account,Stage:pl.stage.ID,Driver:filepath.Base(pl.rule.Datasets.Drivers[a.DriverDataset]),Field:a.WeightField,Pool:pool.coord,Reason:reason,Advice:"检查期间、部门、目标成员和 Driver 权重。"})
-    } else if sum.negative&&a.NegativePolicy!="ALLOW_SIGNED"&&entry.Status!="BLOCK" {
-     entry.Status="REVIEW"
-     r.add(CoverageFinding{Level:"REVIEW",Account:account,Stage:pl.stage.ID,Driver:filepath.Base(pl.rule.Datasets.Drivers[a.DriverDataset]),Field:a.WeightField,Pool:pool.coord,Reason:"匹配数据中出现负权重，需核对规则是否允许冲销",Advice:"先检查实际目标权重，普通费用规则应拒绝负值。"})
+    } else if sum.negative {
+     if a.NegativePolicy!="ALLOW_SIGNED" {
+      entry.Status="BLOCK";entry.Problems++;r.BlockedPairs++
+      r.add(CoverageFinding{Level:"BLOCK",Account:account,Stage:pl.stage.ID,Driver:filepath.Base(pl.rule.Datasets.Drivers[a.DriverDataset]),Field:a.WeightField,Pool:pool.coord,Reason:"匹配的 Driver 含负权重，但此规则未启用冲销；Core 运行将拒绝该数据",Advice:"检查原始 Driver 是否录入错误；确需使用负权重时，按冲销业务流程明确声明用途。"})
+     } else if entry.Status!="BLOCK" {
+      entry.Status="REVIEW"
+      r.add(CoverageFinding{Level:"REVIEW",Account:account,Stage:pl.stage.ID,Driver:filepath.Base(pl.rule.Datasets.Drivers[a.DriverDataset]),Field:a.WeightField,Pool:pool.coord,Reason:"已启用负权重冲销，需核对业务用途及最终分摊方向",Advice:"确认该科目的冲销政策，运行 Core 并按目标坐标对账。"})
+     }
     }
    }
    if e!=nil {break}
