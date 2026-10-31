@@ -1,11 +1,68 @@
+## 发布准入与金额概览 / Release readiness and exact totals
+
+Studio 案例概览已改为**完整流式扫描**金额来源，使用与 Core 一致的固定精度整数解析，拒绝格式错误、精度超限及溢出；不会再将前 500 行的金额当作全量金额。案例详情仍然只展示**每份来源文件最多 500 行的预览**，需要完整数据应使用 Multi 工作台、真实计算及独立逐坐标对账。
+
+The `version` command reports the build revision and whether the MySQL driver is actually linked. The CI Windows ZIP includes the driver; a plain offline source build omits it. No formal stable GitHub Release or LICENSE has been chosen yet. Public visibility alone does not grant third-party reuse rights; licensing requires an explicit ownership and permission decision. Enterprise reference reconciliation and target-device UAT remain outstanding.
 # Allocation Core — Business Onboarding Update / 通用分摊引擎
+
+## Historical run-to-run financial comparison / 两次历史任务差异对比
+
+在 **/multi → 历史任务** 选择两个同项目、已成功发布的任务，点击「比较两个历史任务」。工作台依次核对当次保存的金额/Driver/控制文件 SHA-256、逐科目生效规则 SHA-256，并复用原有 32 分区精确逐坐标对账器比较 **新结果 − 旧结果**。页面提供科目级差异数量、完整 `run_differences.csv` 下载以及结果文件的 SHA-256。
+
+- **输入或规则有变化，不等于已证明差异根因。** 即使 Driver 文件内容变化，最终业务坐标仍可能完全一致；反过来总额相同也可能存在错误分配。只陈述经证据证明的变化，不自动给出因果判断。
+- 对比完全只读：不修改源项目、历史任务或财务结果。每次生成一个独立私有报告目录，文件保存后不覆盖；下载前校验差异明细 SHA-256。历史数据在比较期间变化则拒绝生成报告。
+- **幂等历史比较 / Idempotent replay**：同一项目、同一有序任务对，且两次结果、保存的输入指纹和生效规则指纹全部不变时，复用已验证的历史对比报告，不因重复点击产生新的大型差异文件。复用前仍会读取两份历史结果并检查完整 SHA-256、已保存的报告与差异明细；任何篡改都会阻断而不是覆盖。首次创建会增加一次结果哈希扫描，不宣称首次比较更快；不同快照仍独立留档。
+- 使用已有 `acceptance.Compare` 对大结果流式分区聚合：内存随最大分区的**不同坐标数**增长，而不是宣称恒定内存。并发对比限制为 2 个，避免大量历史任务比较争抢磁盘。
+- 输入指纹来自成功任务已保存的快照清单；对比结果包含当次扫描文件指纹。此工具不替代企业独立参考系统验收，也不证明历史文件在创建之后从未被修改，生产归档仍需完整的证据保存与现场验收。
+
+**English:** Select two PASS jobs in `/multi` to compare saved input/driver/control fingerprints, per-account effective rule fingerprints and exact final business-coordinate amounts. Coordinate changes and source changes are independently observed; causality is **not inferred**. Reports are separate, never overwrite jobs, and download integrity is checked. This does not replace independent reference-system reconciliation.
+
+## 财务运行前体检 / Finance readiness checklist
+
+## Read-only Driver source-pool coverage / 运行前 Driver 来源池匹配检查
+
+In /multi step ④, click **检查 Driver 是否匹配业务坐标** after input preflight. This read-only check compares SOURCE dimensions, literal target members and Driver weight denominators. It never executes the allocation or writes project data.
+
+- **SOURCE_MATCHED**: eligible source pools match their Drivers for a supported **single-stage** direct-input rule. This is not financial acceptance.
+- **ROOT_MATCHED**: the unique 100%-share direct-amounts root of a **multi-stage** graph was checked. All downstream stages remain **UNVERIFIED**, and the overall report remains PARTIAL.
+- **BLOCK**: missing Driver, nonpositive denominator or negative weight found under a rule that **rejects** signed weights. A forbidden negative weight is a definite Core policy violation, not merely an advisory warning.
+- **REVIEW**: negative weights are matched under an explicitly declared ALLOW_SIGNED exception; business purpose and final allocated target coordinates still require confirmation.
+- **UNVERIFIED**: unsupported graph shape, multiple direct roots, split input shares, filters/hierarchies, changes during scan or incomplete inspection. Do not infer a PASS.
+
+Checks are bounded to 128 effective rule groups and 50,000 unique source pools and verify input SHA-256 before/after scanning. **Even SOURCE_MATCHED does not mean the financial output or independent reference agrees.** Execute Core and independently reconcile full coordinates before production acceptance.
+
+在第④步“检查 Driver 是否匹配业务坐标”：单阶段规则可判断来源池因子；多阶段规则只检查唯一、完整份额的直接金额起始阶段，标记“起始阶段已匹配，下游未验证”，不声称后续通过。匹配 Driver 存在负数但规则禁止冲销时，应直接阻断；已声明负权重业务用途时仍需复核。检查完全只读、源数据变化则报告作废；任何体检结果都不能代替运行及逐坐标独立对账。
+
+## Finance-friendly percentage factors / 财务人员百分比因子配置
+
+In /multi → 科目规则 → 独立因子配置, enter 75% / 25% instead of fractional JSON values. Shares are checked exactly to 0.0001% precision and must sum to 100% for each active stage.
+
+Go validates the entire effective rule before writing overrides.csv; stale pages return HTTP 409 and cannot overwrite changed account assignments, templates, or factor overrides. Saved rules still require Inspect, Run and independent coordinate-level reconciliation.
+
+Compatibility: external API clients calling POST /api/multi/factor must provide the versions object (SHA-256 for assignments, template and overrides) returned from GET /api/multi/factor. Missing/stale tokens are rejected.
+
+一个 EXE、一个工作台，不改变现有金额计算算法；保存成功不等于业务验收。
 
 **One Go module · One Windows executable · One workspace.**
 **一个 Go 模块、一个 Windows 程序、一个业务工作台。**
 
+## 财务人员快速配置 / Finance-first quick setup
+
+在现有 **/multi** 工作台顶部使用「快速配置」：选择项目，搜索科目，再选择分摊模板。系统从经过校验的真实规则自动展示分摊阶段、Driver、精确比例、目标维度和负权重风险；不读取金额明细，也不推测业务规则。选择模板后先形成未保存草稿；保存时沿用现有 SHA-256 并发保护。批量指定必须先输入筛选词并二次确认，避免误改全项目。保存后必须按 **体检 → 实际分摊 → 独立参考结果逐坐标对账** 执行，规则说明和体检通过均不代表业务计算正确。
+
+The compact quick-start reuses the same multi-account rule engine and guarded assignment API. It is a read-only template explanation followed by explicit draft / save / inspect steps. It adds no calculation logic, no user data to Git, no additional executable and no documentation file. Existing advanced Designer, mapping, auditing and batch release remain available below.
+
 This repository contains **no company data or proprietary allocation rules**. Inputs, outputs, mappings and runtime records stay outside version control. / 本仓库不包含企业真实数据和私有规则；输入、输出、映射与运行状态默认不纳入 Git。
 
-> **MySQL 注意 / IMPORTANT**：本 ZIP 内附的离线 Windows EXE 保留全部已有功能，但**不包含官方 MySQL 驱动**。需要使用在线构建的 MySQL-enabled EXE（GitHub Actions）或 `go mod download && go build -tags mysql` 才能执行 `data mysql` / `mysql-bundle`。源码已实现，模拟事务测试通过；**目标企业 MySQL 实库联调仍待执行**。
+> **MySQL 构建能力 / IMPORTANT**：GitHub Actions 的 Windows 构建使用 `-tags mysql`，**包含官方 MySQL 驱动**；手动运行默认 `go build` 得到的离线程序则不包含。运行 `AllocationCore.exe version` 可查看真实 Revision 和 MySQL 驱动链接状态。驱动已链接**不代表**目标企业数据库权限、TLS 及业务联调已经验收。
+
+## Financial semantics and adversarial verification / 财务语义与对抗验证
+
+- **Rounding policy / 尾差政策:** Optional `"rounding_policy":"LARGEST_REMAINDER_IDENTITY"`. Omitting it preserves the historical integer allocation and output bytes; ties follow stable target identity, not CSV order. Other policies are rejected until independently validated. / 缺省维持旧算法，不会默默重算历史结果。
+- **Signed drivers / 负因子准入:** Default remains REJECT. `"negative_driver_policy":"ALLOW_SIGNED"` now requires an explicit `"signed_driver_reason":"<specific finance purpose>"` per allocation (8..256 characters, one line), recorded in rule SHA-256 and displayed in Multi effective rule explanations. Signed weights may produce negative or above-source target amounts. **Migration:** existing custom ALLOW_SIGNED rules without a reason must be updated to run. This is a business-intent record, **not an approval or identity-control system**. / 负权重需要明确业务用途，旧配置须补字段，不冒充真正审批。
+- **Exact decimal input / 数值契约:** Allowed scale 0..6; maximum 128 text bytes after trimming surrounding spaces, no silent rounding or truncation. Existing accepted syntax (`1.`, `+1.23`, outer spaces) is preserved. Signed int64 limits and malformed inputs have boundary tests and a Go native fuzz target. / 固定精度且拒绝超长输入，保持既有格式兼容。
+- **Multi-stage independent oracle / 多阶段独立对账:** Tests cover +101/-101 minimum money units, three non-divisible stages and 27 leaf coordinates, including a strict per-coordinate drift bound **only for the tested nonnegative single-path graph**, and memory/disk parity. This is not a universal bound for merged or signed DAGs; enterprise reference acceptance is still required. / 三阶段测试不能替代企业真实业务对账。
+- **Late-skew disk guard / 延迟重复坐标:** Intermediate shards >=16 MiB use streaming coalescing rather than relying on the first 256-row sample. Smaller shards retain the prior heuristic. Streaming memory still depends on coordinate cardinality; **not fixed RAM**. Test checks exact output/lineage parity. / 大分区规避首段采样误判，但没有宣称恒定内存。
 
 ## Business onboarding: a visible product improvement / 新版：从金额 CSV 自动创建业务项目
 
@@ -21,6 +78,41 @@ This repository contains **no company data or proprietary allocation rules**. In
 
 **Boundaries:** This onboarding is for CSV input, not Excel `.xlsx`, automatic business-rule inference, a live MySQL connection, or a guarantee of correct financial allocations. Import PASS only verifies input format; business validation still requires real Drivers, eligibility checks, and independent reference reconciliation. For data larger than 256 MiB, use the local project folder. / 注意：此向导不自动识别企业分摊政策，不支持直接上传 XLSX，也不等于业务结果正确；超大文件可放入本地项目目录。
 
+## Business onboarding: reusable mapping profiles / 跨场景字段映射配置复用
+
+The unified /multi workspace can now save and reuse **amount** and **Driver** CSV column mappings across projects with matching dimensions, precision and required weight fields. Saved profiles contain only explicit source column names and the canonical schema: **no business values, source CSV data, credentials or project paths**. Profiles live under the private local data directory `mapping-profiles/`, outside Git and outside published results.
+
+- Select a compatible profile to restore field mappings before importing a new file; the real CSV header and every row are still checked.
+- Explicitly export a small JSON profile to move it to another machine; importing a profile never imports financial data.
+- Existing names cannot be overwritten. Broken, ambiguous or incompatible mappings fail closed.
+- Always run Inspect, actual Core allocation and independent coordinate-level reconciliation. A mapping profile is not a claim of financial correctness.
+
+金额与 Driver 的字段映射可跨项目/版本复用，同名拒绝覆盖；导出 JSON 只包含字段关系，可能含企业字段名，分享前请检查。正式分摊仍须完成数据体检、运行和独立对账。
+
+## Unified visual business-rule workflow / 可视化规则直接进入多科目分摊
+
+No new editor, executable, or documentation tree is needed. / 不新增设计器、不新增 EXE、不扩张文档体系。
+
+1. Double-click **AllocationCore.exe**. From **/designer**, clone or open a saved rule and visually configure one or more stages, inputs, driver shares, target dimensions and conservation keys. For multi-account use, **account must be an immutable dimension, AS_IS/SOURCE and a conservation key in every stage**. / 在规则设计器中配置多阶段、因子、目标维度；多科目规则必须始终保持 account 不变并守恒。
+2. Open **/multi** and choose an existing business project. Under **可视化设计规则 → 多科目模板**, refresh designer cases and choose the saved rule. Enter a new template filename. / 进入多科目工作台，选中当前项目，选择设计器保存的规则，输入新模板文件名。
+3. Click **检查规则与 Driver 映射**. The server checks the existing project's dimension order/precision and the rule's full graph. Map driver dataset aliases to project-local `drivers/*.csv`. Missing files or columns are shown, **not** invented or copied from the designer. / 预览检查维度、精度、守恒、阶段依赖与 Driver 列头，缺失的真实 Driver 需自行补齐。
+4. Click **创建新规则模板**, then explicitly choose the new template for the required accounts and save. Imports never replace an existing template, amount CSV, assignment or published run. / 导入仅创建独立新规则，不会自动改任何科目。
+5. **Inspect → Run → Compare to independent reference**. Preflight PASS or driver-header readiness is not a valid financial acceptance by itself. / 完成完整体检、执行与独立参考结果逐坐标验收。
+
+The same workspace also exports/imports all account-to-rule mappings as Excel-compatible CSV drafts and shows searchable, downloadable per-account run summaries. / 科目规则分派可通过 Excel 兼容 CSV 批量调整；逐科目运行结果可搜索、筛选、导出。
+
+**CI evidence:** [Windows + Go + MySQL + TLS, all PASS (2026-10-31)](https://github.com/realYurk/Allocation-Core/actions/runs/41157325587). This covers synthetic integration tests only; enterprise rules and production data still require business acceptance. / 全部 CI 已通过，但企业真实数据与业务规则仍需单独验收。
+
+## Historical stage and Driver evidence / 历史阶段与分摊因子说明
+
+After a successful Multi job, select an account and optionally a period in **按科目查看实际分摊阶段**. The read-only view streams the actual Core `ledger.csv(.gz)` from the job's retained group output, calculates exact fixed-point totals for each stage/allocation, shows the Driver alias and weight field, and provides a compact CSV export. It reads only the job's saved effective rule; edits to the current project never reinterpret old results. When the Core evidence manifest exists, the stored ledger SHA-256 is verified before displaying numbers. / 成功任务可查看每个科目的真实阶段、因子、金额以及来源池样例，并导出摘要；来自历史任务，当前配置修改不会篡改说明。
+
+**Scope:** These are actual *post-run* ledger amounts, not a predicted result, not a reconstruction of failed/unpublished tasks, and not an independent business-reference comparison. A sum across successive stages would double-count the same money; use the existing independent reconciliation to verify final business coordinates. For successful jobs with no evidence manifest, the UI explicitly marks the ledger as *unverified*. No financial formulas or checkpoint formats are changed. / 仅说明历史成功任务的计算过程；阶段之间禁止重复求和，仍需独立参考对账。
+
+## Finance runtime failure guidance / 财务运行失败定位
+
+When a multi-account run fails inside Core, Studio saves **run-time evidence** beside the FAILED job journal: failing rule group, affected account candidates, rule stage/allocation, actual Driver dataset/weight field and original Driver filename. If Core reports a complete source-pool coordinate, the period/department/account is shown as **EXACT_POOL**; otherwise the UI explicitly displays **RULE_GROUP** without inventing exact coordinates. Common failure types have finance-friendly advice (no matched Driver, nonpositive factor denominator, rejected negative weight and missing weight field). Historical diagnoses are generated from the original failed run, not the project's later edits. Failed runs never publish financial outputs; re-run and independently reconcile after fixing inputs. / 失败任务保留当次规则、科目与 Driver 排查证据；只有真实来源池坐标才表示精确定位。历史任务不以当前已修改规则解释旧错误；修复后仍须重新运行并独立对账。
+
 ## Clean V10: Skewed coordinate coalescing & verified CI readiness / V10 偏斜坐标合并及 CI 就绪校验
 
 **What changed / 本轮改进**
@@ -28,7 +120,7 @@ This repository contains **no company data or proprietary allocation rules**. In
 - **Low-cardinality disk merge / 低基数磁盘合并**: MERGE stages keep just one aggregate row per complete business coordinate instead of buffering an entire input shard in `[]Row`. Large nonterminal-stage shards use the same streaming approach **only** when they exceed 2 MiB and the 256-row sample shows >=32 repeated coordinates. Mostly-unique rows keep the existing single-pass fast path. / MERGE 阶段只保存每个完整业务坐标的一条累计记录；大型且坐标高度重复的非终结阶段合并也采用流式算法，稀疏高基数场景维持旧路径。
 - **Lineage stays exact / 血缘证据不变**: For coalesced rows the target identity is always the first source row's ID. We can therefore write `COALESCE` edges in original input order while streaming, without buffering every source row. Negative amounts and signed overflow checks are unchanged. / 在首次出现完整坐标时锁定合并后的目标行 ID，按原始顺序输出血缘；金额精度、负数及溢出保护不变。
 - **Cross-version replay / 旧版检查点恢复**: A V9 disk checkpoint was resumed with V10, and the five published financial CSV and compressed evidence files were byte identical. / V9 检查点由 V10 恢复，财务结果与压缩证据逐字节一致。
-- **MySQL TLS CI readiness / TLS 集成测试就绪门槛**: V9's latest online run showed successful Linux/Windows/normal MySQL jobs, but the TLS job failed **before import**, at container initialization, because `mysqladmin ping` did not guarantee authenticated readiness. V10 waits until a real authenticated `SELECT 1` succeeds. **This fix is not yet verified by an online CI rerun.** / V9 TLS CI 败于容器尚未完成管理员认证，V10 用真实认证 SQL 作为就绪条件，仍待 GitHub 新运行确认。
+- **MySQL TLS CI readiness / TLS 集成测试就绪门槛**: V9's latest online run showed successful Linux/Windows/normal MySQL jobs, but the TLS job failed **before import**, at container initialization, because `mysqladmin ping` did not guarantee authenticated readiness. V10 waits until a real authenticated `SELECT 1` succeeds. **Historical note:** the initial V10 readiness change alone did not resolve MySQL 8.4's removed `have_ssl` variable; the current CI verifies a certificate-checked TCP/TLS handshake and passes. / 历史记录：V10 的就绪检查尚不足以修复 MySQL 8.4 的旧变量问题；当前 CI 已通过真实 TLS 握手验证。
 
 **Performance evidence / 性能边界**: In a synthetic 30,000-row/100-coordinate coalesce microbenchmark, cumulative allocations fell from about 28 MB to 21 MB. However, a 250,000-row PASS→MERGE end-to-end case showed similar elapsed time and process RSS to V9; **do not claim overall throughput or peak-RSS improvement**. The optimization bounds retained rows by distinct coordinate count, not by a fixed memory quota. / 局部减分配已验证，完整计算未证明显著提速，也不能保证高基数时内存固定。
 
@@ -37,7 +129,7 @@ This repository contains **no company data or proprietary allocation rules**. In
 ## Clean V9: CI reliability and bounded disk sharding / V9 CI 修复与分区内存优化
 
 - **Fix GitHub Linux CI / 修复 Linux CI**: Create `output/` before redirecting benchmark output. Prior GitHub test results showed the financial/race tests had passed; the job only failed at the benchmark redirect (`No such file or directory`). / 在写 `output/ci-benchmark.txt` 前创建目录，防止 CI 假失败。
-- **MySQL TLS read-only integration / 严格 TLS 只读验收**: The isolated MySQL test database and `REQUIRE SSL` SELECT-only account are now provisioned through the container-local administrative socket. The Go integration test verifies **the real production TLS connector**, a non-empty server-side TLS cipher, a rejected `UPDATE`, exact DECIMAL import and wrong-SAN rejection. The job checks `have_ssl=YES` and `require_secure_transport=ON`, and prints container logs if the test fails. **CI must be run after updating GitHub; it has not been demonstrated as passing yet.** / 隔离 MySQL 管理员仅负责准备数据；正式验证改由 TLS 校验的只读账号完成，并在失败时输出诊断。尚需更新仓库后运行 CI。
+- **MySQL TLS read-only integration / 严格 TLS 只读验收**: The isolated MySQL test database and `REQUIRE SSL` SELECT-only account are now provisioned through the container-local administrative socket. The Go integration test verifies **the real production TLS connector**, a non-empty server-side TLS cipher, a rejected `UPDATE`, exact DECIMAL import and wrong-SAN rejection. The current CI requires secure transport and confirms a real SELECT-only TCP session with verified CA/identity and a negotiated TLS cipher; the job passed on GitHub. / CI 已验证强制 TLS、只读账号、证书身份与加密协商，相关 GitHub 测试通过。
 - **Bounded partition buffers / 有界分区缓冲**: Up to 64 temporary JSONL shards use a **2 MiB aggregate user-space buffer budget**, instead of the previous 16 MiB eager allocation. Shard files are opened lazily; empty shard files are preserved for existing readers. / 分区写入器按需创建，64 分区缓冲预算从 16 MiB 降到 2 MiB；旧文件名与 JSONL 格式完全兼容。
 - **No change to financial arithmetic or checkpoints / 金额及检查点不变**: Decimal arithmetic, rule evaluation, ledger, lineage, deterministic output and checkpoint record format are unchanged. An actual V8 checkpoint was resumed by V9 with all five outputs identical. / 本次不修改分摊公式、尾差、计算规则、审计或检查点格式；已用 V8 检查点在 V9 续算并核对五份结果。
 
@@ -58,7 +150,7 @@ AllocationCore.exe run examples/manufacturing/rule.json output/v9-verify --worke
 - **Import integrity / 输入文件指纹**: every normalized CSV report now contains exact output `SHA-256` and byte size. MySQL bundle manifest records these for all exported files. / 输出记录哈希与字节数，便于后续验证。
 - **Strict duplicate-coordinate option / 严格重复坐标验收**: `reconcile --reject-duplicates` rejects repeated full business coordinates on either side, rather than silently aggregating. The legacy aggregation mode remains available and now reports duplicate counts. The Studio page offers a checkbox. / 同坐标重复金额既可按旧方式显式聚合并报告数量，也可严格拒绝。
 
-**What is NOT proven / 尚未完成的验收**: official-driver TLS/SAN client-to-server test with a purpose-issued certificate; real enterprise MySQL credentials/permissions, concurrent DDL fault injection, multi-million-row representative business references and Windows target-device UAT. Current bundled offline EXE does not link the external MySQL driver; build with `-tags mysql` in a networked environment or use the corresponding GitHub CI artifact. / 官方驱动 TLS 全链路、目标企业生产前 UAT、复杂业务大规模基准仍需独立验证；离线 EXE 不含外部 MySQL 驱动。
+**What is NOT proven / 尚未完成的验收**: enterprise-specific MySQL credentials and permissions, representative million-row business-reference reconciliation and Windows target-device UAT. The isolated official-driver TLS/SAN and concurrent DDL CI gates have passed, but they are not a substitute for enterprise acceptance. Offline EXE builds without `-tags mysql` do not include the native driver. / 已通过隔离 TLS/SAN 和并发 DDL 集成测试；仍需目标企业真实数据、权限与现场 Windows 验收。
 
 Quick verification / 快速检查：
 
@@ -97,8 +189,8 @@ Build once, run the same executable for all modes. / 只编译一个程序，所
 
 - **Temporary JSONL spool passthrough / 临时中间文件透传**: intermediate disk-shard routing decodes each JSONL row once, uses its original raw record bytes in the destination shard, and avoids the second JSON serialization. The durable checkpoint format and public financial CSV outputs are **unchanged**. Oversized records, truncated records and exact-byte preservation have new regression tests. / 中间磁盘分区减少重复 JSON 编码；检查点格式和正式结果不变，新增超长行及损坏文件的失败关闭测试。
 - **Independent TLS policy tests / 独立 TLS 证书测试**: ephemeral CA + signed server cert are tested without any database dependency; valid chain/SAN succeeds, wrong SAN or untrusted CA fails, with TLS 1.2 minimum. / 本地无需数据库即可验证 CA、SAN、服务器名称和最小 TLS 版本。
-- **Live MySQL fault gates / 实库故障门槛**: CI now defines an **additional** ephemeral TLS-required MySQL 8.4 job with a temporary CA/SAN certificate and a negative wrong-hostname test; its standard MySQL job also tests blocking a concurrent DDL until the read-only snapshot is released. These jobs are **not validated locally** and must actually pass on GitHub after updating the repository. / 新增隔离实库 TLS 和并发 DDL 检验，必须在 GitHub CI 真正运行通过后才能声明已验收。
-- **No new executables / 不增加入口**: one Go Module, one Windows EXE, no CMD or BAT. This package's offline Windows EXE has no linked native MySQL driver; to build a MySQL-enabled EXE, use `go mod download && go build -tags mysql -o AllocationCore.exe .` online (or the CI Windows artifact). / 交付仍只有一个用户程序；离线 EXE 不包含官方 MySQL 驱动。
+- **Live MySQL fault gates / 实库故障门槛**: CI now defines an **additional** ephemeral TLS-required MySQL 8.4 job with a temporary CA/SAN certificate and a negative wrong-hostname test; its standard MySQL job also tests blocking a concurrent DDL until the read-only snapshot is released. These isolated jobs have passed on GitHub; real enterprise connectivity remains unverified. / 隔离集成测试已在 GitHub 通过，目标企业实库连接仍未验收。
+- **No new executables / 不增加入口**: one Go Module, one Windows EXE, no CMD or BAT. CI Windows binaries include the official MySQL driver (`-tags mysql`); ordinary offline `go build` binaries do not. Run `AllocationCore.exe version` to check the actual executable. / 交付仍只有一个用户程序；离线 EXE 不包含官方 MySQL 驱动。
 
 ## Clean V5 baseline / V5 已有基础
 
@@ -207,6 +299,6 @@ AllocationCore.exe multi -project PATH_TO_PROJECT -out NEW_OUTPUT_PATH -engine A
 
 ## Clean V6 MySQL / MySQL 只读接入
 
-**中文**：新增原生 MySQL 只读接入源码、Keyset 分页、同事务多表快照、精确 DECIMAL 校验与失败不发布。MySQL 官方驱动需在线构建：`go build -tags mysql -o AllocationCore.exe .`；本离线交付的预编译程序不包含外部驱动，**不能据此宣称 MySQL 已在本机生产连接成功**。配置模板见 `examples/mysql_mapping.example.json` 和 `examples/mysql_bundle.example.json`。凭据只通过环境注入，必须使用独立只读账号和验证 TLS。参见 `docs/INPUT.md`。
+**中文**：新增原生 MySQL 只读接入源码、Keyset 分页、同事务多表快照、精确 DECIMAL 校验与失败不发布。MySQL 官方驱动需在线构建：`go build -tags mysql -o AllocationCore.exe .`；CI Windows 发行包包含官方驱动，本地默认构建则不包含；**驱动可用不代表企业生产数据库联调通过**。配置模板见 `examples/mysql_mapping.example.json` 和 `examples/mysql_bundle.example.json`。凭据只通过环境注入，必须使用独立只读账号和验证 TLS。参见 `docs/INPUT.md`。
 
-**English**: Native MySQL source implements verified TLS, read-only REPEATABLE READ, strict signed-BIGINT keyset pagination, exact DECIMAL streaming, and multi-table atomic snapshot bundles. Build with the official driver and `-tags mysql` on a network-connected developer machine or use the MySQL-enabled Windows artifact generated by CI. The included offline-build executable is **not** a MySQL-enabled binary. Live acceptance on the target company's DB remains required.
+**English**: Native MySQL source implements verified TLS, read-only REPEATABLE READ, strict signed-BIGINT keyset pagination, exact DECIMAL streaming, and multi-table atomic snapshot bundles. Build with the official driver and `-tags mysql` on a network-connected developer machine or use the MySQL-enabled Windows artifact generated by CI. The CI Windows executable is MySQL-enabled; the default offline source build is not. Live acceptance on the target company's DB remains required.

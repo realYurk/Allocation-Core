@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -141,17 +142,21 @@ func readOnboardingTemplate(source, template string) (int, []string, error) {
 	if !seen["account"] {
 		return 0, nil, errors.New("selected template has no account dimension")
 	}
+	if seen["amount"] || seen["row_id"] {
+		return 0, nil, errors.New("amount and row_id are reserved CSV fields, not business dimensions")
+	}
 	return cfg.Precision, cfg.Dimensions, nil
 }
 
 type onboardPreview struct {
-	Accounts  int    `json:"accounts"`
-	Rows      int64  `json:"amount_rows"`
-	Total     string `json:"input_amount"`
-	Precision int    `json:"precision"`
-	Template  string `json:"default_template"`
-	SHA256    string `json:"amounts_sha256"`
-	Bytes     int64  `json:"amounts_bytes"`
+	Accounts     int    `json:"accounts"`
+	Rows         int64  `json:"amount_rows"`
+	Total        string `json:"input_amount"`
+	Precision    int    `json:"precision"`
+	Template     string `json:"default_template"`
+	SHA256       string `json:"amounts_sha256"`
+	SourceSHA256 string `json:"source_sha256,omitempty"`
+	Bytes        int64  `json:"amounts_bytes"`
 }
 
 func streamOnboardingAmounts(ctx context.Context, source io.Reader, dst string, precision int, dims []string, template string) (onboardPreview, []string, error) {
@@ -283,6 +288,27 @@ func writeOnboardingAssignments(path, template string, accounts []string) error 
 	return ce
 }
 
+// A project-local normalization receipt retains the exact mapping and both
+// content digests. It never includes source rows or claims business correctness.
+type onboardingReceipt struct {
+	Kind                             string            `json:"kind"`
+	Project                          string            `json:"project"`
+	SourceProject                    string            `json:"source_project"`
+	SourceFilename                   string            `json:"source_filename"`
+	RuleTemplate                     string            `json:"rule_template"`
+	RuleTemplateSHA256               string            `json:"rule_template_sha256"`
+	Mapping                          map[string]string `json:"column_mapping,omitempty"`
+	SourceSHA256                     string            `json:"source_sha256"`
+	AmountsSHA256                    string            `json:"normalized_amounts_sha256"`
+	AmountRows                       int64             `json:"amount_rows"`
+	Accounts                         int               `json:"accounts"`
+	Total                            string            `json:"input_amount"`
+	Precision                        int               `json:"precision"`
+	Dimensions                       []string          `json:"dimensions"`
+	DriversCopiedFromTemplateProject bool              `json:"drivers_copied_from_template_project"`
+	Status                           string            `json:"status"`
+}
+
 // FormData fields in order: name, source, template, csv. Destination is new.
 // Strict streaming keeps the browser and the server from materializing the
 // entire data file in RAM; it is intentionally limited to 256 MiB per upload.
@@ -291,7 +317,7 @@ func (x *MultiApp) createFromAmountsCSV(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxOnboardingUpload+8192)
+	r.Body = http.MaxBytesReader(w, r.Body, maxOnboardingUpload+(32<<10))
 	mr, err := r.MultipartReader()
 	if err != nil {
 		fail(w, 400, err)
@@ -333,6 +359,24 @@ func (x *MultiApp) createFromAmountsCSV(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	upload, err := mr.NextPart()
+	var mapping map[string]string
+	if err == nil && upload.FormName() == "mapping" && upload.FileName() == "" {
+		raw, e := io.ReadAll(io.LimitReader(upload, 8193))
+		_ = upload.Close()
+		if e != nil || len(raw) > 8192 {
+			fail(w, 422, errors.New("column mapping exceeds 8 KiB"))
+			return
+		}
+		if e = json.Unmarshal(raw, &mapping); e != nil {
+			fail(w, 422, fmt.Errorf("invalid column mapping: %w", e))
+			return
+		}
+		if _, e = checkAmountMapping(mapping, dimensions); e != nil {
+			fail(w, 422, e)
+			return
+		}
+		upload, err = mr.NextPart()
+	}
 	if err != nil || upload.FormName() != "csv" || upload.FileName() == "" || !strings.EqualFold(filepath.Ext(upload.FileName()), ".csv") {
 		fail(w, 400, errors.New("expected uploaded .csv file in csv field"))
 		return
@@ -351,7 +395,20 @@ func (x *MultiApp) createFromAmountsCSV(w http.ResponseWriter, r *http.Request) 
 		fail(w, 422, err)
 		return
 	}
-	report, accounts, err := streamOnboardingAmounts(r.Context(), upload, filepath.Join(stage, "amounts.csv"), precision, dimensions, template)
+	// A concurrent edit to the source template must not make the copied
+	// project's financial coordinate contract disagree with the chosen one.
+	stagePrecision, stageDimensions, e := readOnboardingTemplate(stage, template)
+	if e != nil || stagePrecision != precision || !reflect.DeepEqual(stageDimensions, dimensions) {
+		fail(w, 409, errors.New("source rule template changed while preparing project; retry"))
+		return
+	}
+	var report onboardPreview
+	var accounts []string
+	if mapping == nil {
+		report, accounts, err = streamOnboardingAmounts(r.Context(), upload, filepath.Join(stage, "amounts.csv"), precision, dimensions, template)
+	} else {
+		report, accounts, err = streamMappedOnboardingAmounts(r.Context(), upload, filepath.Join(stage, "amounts.csv"), precision, dimensions, template, mapping)
+	}
 	if err != nil {
 		fail(w, 422, err)
 		return
@@ -378,6 +435,33 @@ func (x *MultiApp) createFromAmountsCSV(w http.ResponseWriter, r *http.Request) 
 		fail(w, 500, err)
 		return
 	}
+	rule, err := os.ReadFile(filepath.Join(stage, "templates", template))
+	if err != nil {
+		fail(w, 500, err)
+		return
+	}
+	digest := sha256.Sum256(rule)
+	inputSHA := report.SourceSHA256
+	if inputSHA == "" {
+		inputSHA = report.SHA256
+	}
+	receipt := onboardingReceipt{
+		Kind: "business-onboarding/v1", Project: newName, SourceProject: sourceName,
+		SourceFilename: upload.FileName(), RuleTemplate: template,
+		RuleTemplateSHA256: hex.EncodeToString(digest[:]), Mapping: mapping,
+		SourceSHA256: inputSHA, AmountsSHA256: report.SHA256,
+		AmountRows: report.Rows, Accounts: report.Accounts,
+		Total: report.Total, Precision: precision, Dimensions: dimensions,
+		DriversCopiedFromTemplateProject: true, Status: "INPUT_ONLY_NOT_BUSINESS_VERIFIED",
+	}
+	receiptJSON, err := json.MarshalIndent(receipt, "", "  ")
+	if err == nil {
+		err = os.WriteFile(filepath.Join(stage, "onboarding_manifest.json"), receiptJSON, 0600)
+	}
+	if err != nil {
+		fail(w, 500, err)
+		return
+	}
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	destination := filepath.Join(x.root, newName)
@@ -392,5 +476,5 @@ func (x *MultiApp) createFromAmountsCSV(w http.ResponseWriter, r *http.Request) 
 		fail(w, 500, err)
 		return
 	}
-	jsonOut(w, http.StatusCreated, map[string]any{"project": newName, "import": report, "note": "Amounts and assignments validated. Rule eligibility and replacement driver data must be checked with Inspect before Run; existing projects remain untouched."})
+	jsonOut(w, http.StatusCreated, map[string]any{"project": newName, "import": report, "manifest": "onboarding_manifest.json", "note": "Amounts and assignments validated. Rule eligibility and replacement driver data must be checked with Inspect before Run; existing projects remain untouched."})
 }

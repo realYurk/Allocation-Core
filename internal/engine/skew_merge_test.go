@@ -135,3 +135,32 @@ func BenchmarkV10SkewCoalescing(b *testing.B) {
 		}
 	})
 }
+
+
+// A unique first-256 prefix must not push a large, late-skewed spool into
+// the full []Row path. Compare both financial rows and provenance edges.
+func TestLargeLateRepeatedCoordinateSpool(t *testing.T) {
+ dims:=[]string{"period","product"}
+ path:=filepath.Join(t.TempDir(),"late-repeat.jsonl")
+ w,err:=openSpool(path);if err!=nil{t.Fatal(err)}
+ for i:=0;i<13500;i++{
+  product:="HotProduct"
+  if i<256{product=fmt.Sprintf("Unique-%03d",i)}
+  row:=Row{Coord:map[string]string{"period":"2026-01","product":product},Amount:int64(i%7-3),IDs:[]string{fmt.Sprintf("id-%06d-%s",i,strings.Repeat("x",1400))}}
+  if err:=w.put(row);err!=nil{t.Fatal(err)}
+ }
+ if err:=w.close();err!=nil{t.Fatal(err)}
+ info,err:=os.Stat(path);if err!=nil{t.Fatal(err)}
+ if info.Size()<16<<20{t.Fatalf("fixture size %d less than cutoff",info.Size())}
+ use,err:=shouldStreamCoalesceSpool(path,dims)
+ if err!=nil||!use{t.Fatalf("large delayed skew not protected: use=%v err=%v",use,err)}
+ var original []Row
+ if err:=scanSpool(path,func(r Row)error{original=append(original,r);return nil});err!=nil{t.Fatal(err)}
+ expected,err:=mergeRows(original,dims);if err!=nil{t.Fatal(err)}
+ var oldTrace,newTrace [][]string
+ if err:=linkCoalesced(original,expected,dims,"S1",2,func(v []string)error{oldTrace=append(oldTrace,append([]string(nil),v...));return nil});err!=nil{t.Fatal(err)}
+ actual,err:=streamCoalescedSpool(path,dims,"S1",2,func(v []string)error{newTrace=append(newTrace,append([]string(nil),v...));return nil})
+ if err!=nil{t.Fatal(err)}
+ if !reflect.DeepEqual(expected,actual)||!reflect.DeepEqual(oldTrace,newTrace){t.Fatal("spool path changed outputs or lineage")}
+ if len(actual)!=257{t.Fatalf("expected 257 coordinates, got %d",len(actual))}
+}

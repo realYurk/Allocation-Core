@@ -1,0 +1,103 @@
+/* Neutral, understated styling for enterprise finance operators. */
+:root{font-family:'Microsoft Yahei','Segoe UI',Arial,sans-serif;color:#263747;background:#f6f7f9}
+header{background:#344657;color:#fff}
+header p,nav a{color:#e3eaf0}
+.card,.workflow-nav,.quickstart{border:1px solid #d9e0e7;border-radius:8px;background:#fff;box-shadow:none}
+.card[style*="linear-gradient"]{background:#fff!important;border-color:#d9e0e7!important}
+.card[style*="background:#f6faff"]{background:#fff!important}
+button{background:#365d7a;border-radius:5px;font-weight:600}
+button.alt,.workflow-links a{background:#eef2f5;border:1px solid #d4dde5;color:#31516a}
+button:hover:not(:disabled){filter:brightness(.95)}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid #326b9a;outline-offset:2px}
+input,select{border-color:#cbd5df;border-radius:5px}
+.workflow-nav{margin-top:16px}
+.quickstart{max-width:1260px;margin:14px auto 0;padding:20px}
+.quickstart h2{margin:0 0 7px;font-size:18px}
+.quickstart .quickGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.quickstart label{font-size:13px;margin-top:8px}
+.quickstart .quickControls{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}
+.quickstart .quickControls button{font-size:13px}
+.quickstart #quickTemplateDetail{background:#fafbfc;border:1px solid #e0e5ea;border-radius:6px;padding:12px;min-height:110px}
+.quickstart .quickStage{border-top:1px solid #e2e7ec;padding-top:11px;margin-top:11px}
+.quickstart .quickStage p{margin:5px 0}
+.quickstart .quickTitle{font-size:15px}
+.quickstart .quickWarning{background:#fff8ec;color:#7b5119;border-left:3px solid #c49042;padding:8px 10px}
+.quickstart #quickNotice{border:1px solid #d7e0e8;border-radius:5px;padding:9px 12px;margin-top:12px;background:#f6f8fa;font-size:13px}
+.quickstart #quickNotice[data-kind="error"]{border-color:#e7c7bf;background:#fff7f5;color:#9d352d}
+.quickstart #quickNotice[data-kind="success"]{border-color:#c4ddcf;background:#f5faf7;color:#216a46}
+.quickstart #quickImpact{font-size:13px;color:#4c6071}
+.quickstart .quickFooter{font-size:12px;color:#66778a;margin:8px 0 0}
+@media(max-width:850px){.quickstart{margin:14px 18px}.quickstart .quickGrid{grid-template-columns:1fr}}
+
+/* Finance operator layout: readable fields, no decorative gradients. */
+.finance-factor-editor{background:#fff;border:1px solid #d9e0e7;border-radius:7px;padding:16px;margin-top:14px}
+.finance-factor-stage{border:1px solid #dfe5eb;border-radius:6px;padding:12px;margin:12px 0}
+.finance-factor-stage h3{font-size:14px;font-weight:650;margin:0 0 10px}
+.finance-factor-line{display:grid;grid-template-columns:minmax(85px,1fr) minmax(120px,1.2fr) minmax(110px,1fr) 110px;gap:9px;align-items:center;margin:8px 0}
+.finance-factor-line input,.finance-factor-line select{padding:8px}
+.finance-factor-name{margin:0;font-size:13px}
+.finance-factor-percent{display:flex;align-items:center;gap:5px;margin:0}
+.finance-factor-percent input{min-width:0;width:100%;text-align:right}
+.finance-factor-total{font-size:13px;margin:10px 0 0;font-weight:650}
+#factorValidation{font-size:13px;white-space:pre-wrap;line-height:1.5}
+@media(max-width:700px){.finance-factor-line{grid-template-columns:1fr 1fr}.finance-factor-name{grid-column:1/-1}}
+
+/* Business preflight: compact, accessible diagnostics; no decorative color. */
+.finance-check{border-top:1px solid #d9e0e7;margin-top:16px;padding-top:12px}
+.finance-check[hidden]{display:none!important}
+.finance-check h3{font-size:15px;margin:0 0 7px;color:#263747}
+.finance-check #financeReadinessSummary{font-size:13px;font-weight:600}
+.finance-check-finding{border:1px solid #d9e0e7;border-radius:5px;padding:10px 12px;margin:9px 0;background:#fbfcfd}
+.finance-check-finding strong{font-size:13px}
+.finance-check-finding p{font-size:12px;line-height:1.5;margin:6px 0}
+.finance-check-finding small{font-size:12px;color:#526577}
+.finance-check-action{font-weight:550;color:#31516a}
+.finance-check .row{margin:12px 0;align-items:center}
+.finance-check .row input{min-width:150px;flex:1}
+.finance-check .row select{max-width:170px}
+.finance-check .tablebox{max-height:350px;overflow:auto}
+.finance-check td{font-size:12px;white-space:normal;overflow-wrap:anywhere}
+
+.finance-check #financeDriverSummary{max-height:230px;overflow:auto;margin:12px 0}
+.finance-check #financeDriverSummary table{width:100%;border-collapse:collapse}
+.finance-check #financeDriverSummary th,.finance-check #financeDriverSummary td{padding:6px 8px;border-bottom:1px solid #e5e9ed;font-size:12px;text-align:left}
+.finance-check-subhead{font-size:12px;font-weight:600;margin:7px 0}
+
+/* Finance-grade, quiet runtime failure guidance. */
+.failure-diagnosis{margin-top:14px;padding:14px;border:1px solid #bac6d2;border-left:3px solid #345e86;border-radius:6px;background:#fff;color:#273746}
+.failure-diagnosis h3{font-size:15px;margin:0 0 10px}
+.failure-diagnosis h4{font-size:13px;margin:12px 0 6px}
+.failure-diagnosis .diagnosis-title{font-weight:600;color:#243d56}
+.failure-diagnosis .diagnosis-context{font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;background:#f6f7f9;border:1px solid #e2e7ec;padding:10px;border-radius:5px}
+.failure-diagnosis li{margin:6px 0;font-size:13px;line-height:1.5}
+.failure-diagnosis .diagnosis-limit{font-size:12px;color:#586676}
+
+/* Driver coverage: quiet enterprise-finance diagnostics. */
+.coverage-action{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0}
+.coverage-action small{color:#566779;font-size:12px}
+.coverage-panel{border-top:1px solid #d9e0e7;margin-top:16px;padding-top:14px}
+.coverage-panel[hidden]{display:none!important}
+.coverage-panel h3{font-size:15px;margin:0 0 8px}
+.coverage-panel #coverageSummary{font-weight:600;font-size:13px}
+.coverage-finding{border:1px solid #dce3e9;background:#fbfcfd;border-radius:5px;padding:10px;margin:8px 0}
+.coverage-finding strong{font-size:13px}
+.coverage-finding p{font-size:12px;margin:5px 0;line-height:1.5;overflow-wrap:anywhere}
+.coverage-panel .row{margin:14px 0}
+.coverage-panel .tablebox{max-height:320px;overflow:auto}
+.coverage-panel td{font-size:12px}
+
+/* Read-only published stage evidence: plain finance table, not another dashboard. */
+.stage-evidence{margin:14px 0;padding:16px;border:1px solid #d9e0e7;background:#fff;border-radius:7px}
+.stage-evidence h3{font-size:15px;margin:0 0 8px;color:#263747}
+.stage-evidence label{font-size:13px;color:#3a4d5b}
+.stage-evidence select,.stage-evidence input{margin-left:6px;max-width:220px}
+.stage-evidence #stageEvidenceNotice{white-space:pre-wrap;line-height:1.5}
+.stage-evidence details p{font-size:12px;overflow-wrap:anywhere;max-width:360px}
+
+/* A restrained historical comparison, using existing finance table styles. */
+.run-comparison{padding:16px;margin:14px 0;border:1px solid #d9e0e7;border-radius:7px;background:#fff}
+.run-comparison h3{font-size:15px;margin:0 0 8px;color:#263747}
+.run-comparison label{font-size:13px}
+.run-comparison select{max-width:250px}
+.run-comparison #runCompareStatus{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65;border:1px solid #e0e6ec;background:#f8f9fa;border-radius:5px;padding:12px}
+.run-comparison .tablebox{max-height:330px;overflow:auto}

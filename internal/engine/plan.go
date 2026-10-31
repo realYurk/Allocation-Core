@@ -4,12 +4,16 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 func Compile(s Spec) (Planned, error) {
 	p := Planned{Spec: s, Outgoing: map[string][]route{}}
 	if s.Schema != Schema {
 		return p, fail("schema must be %s", Schema)
+	}
+	if s.RoundingPolicy != "" && s.RoundingPolicy != RoundingLargestRemainderIdentity {
+		return p, fail("unsupported rounding_policy %q; legacy uses %s", s.RoundingPolicy, RoundingLargestRemainderIdentity)
 	}
 	if s.Precision < 0 || s.Precision > 6 {
 		return p, fail("precision must be 0..6")
@@ -120,6 +124,14 @@ func Compile(s Spec) (Planned, error) {
 				}
 				if a.NegativePolicy != "" && a.NegativePolicy != "REJECT" && a.NegativePolicy != "ALLOW_SIGNED" {
 					return p, fail("stage %s invalid negative policy", st.ID)
+				}
+				if a.NegativePolicy == "ALLOW_SIGNED" {
+					reason := strings.TrimSpace(a.SignedDriverReason)
+					if !utf8.ValidString(reason) || utf8.RuneCountInString(reason) < 8 || utf8.RuneCountInString(reason) > 256 || strings.ContainsAny(reason, "\r\n") {
+						return p, fail("stage %s allocation %s: ALLOW_SIGNED requires a business reason (8..256 chars, one line)", st.ID, a.ID)
+					}
+				} else if a.SignedDriverReason != "" {
+					return p, fail("stage %s allocation %s: signed_driver_reason requires ALLOW_SIGNED", st.ID, a.ID)
 				}
 				share := a.Share
 				if share == "" {

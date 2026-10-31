@@ -68,15 +68,28 @@ func (a *Application) registerMulti(m *http.ServeMux) *MultiApp {
 	m.HandleFunc("/api/multi/projects", x.projects)
 	m.HandleFunc("/api/multi/create", x.create)
 	m.HandleFunc("/api/multi/onboard", x.createFromAmountsCSV)
+	m.HandleFunc("/api/multi/visual-draft", x.createVisualDraft)
+	m.HandleFunc("/api/multi/driver-needs", x.driverNeeds)
+	m.HandleFunc("/api/multi/driver-import", x.importMappedDriver)
+	m.HandleFunc("/api/multi/mapping-profiles", x.mappingProfiles)
+	m.HandleFunc("/api/multi/import-template", x.importTemplateFromDesigner)
 	m.HandleFunc("/api/multi/project", x.project)
+	m.HandleFunc("/api/multi/template-guide", x.templateGuide)
 	m.HandleFunc("/api/multi/preflight", x.preflight)
+	m.HandleFunc("/api/multi/driver-coverage", x.driverCoverage)
 	m.HandleFunc("/api/multi/reconcile", x.reconcile)
+	m.HandleFunc("/api/multi/reference", x.referenceStatus)
+	m.HandleFunc("/api/multi/reference-upload", x.uploadReference)
+	m.HandleFunc("/api/multi/acceptance", x.acceptanceEvidence)
 	m.HandleFunc("/api/multi/cache", x.cacheScope)
 	m.HandleFunc("/api/multi/assign", x.assign)
 	m.HandleFunc("/api/multi/factor", x.factor)
+	m.HandleFunc("/api/multi/account-plan", x.accountPlan)
 	m.HandleFunc("/api/multi/upload", x.upload)
 	m.HandleFunc("/api/multi/run", x.run)
 	m.HandleFunc("/api/multi/jobs", x.jobList)
+	m.HandleFunc("/api/multi/stage-evidence", x.stageEvidence)
+	m.HandleFunc("/api/multi/compare-runs", x.compareRuns)
 	m.HandleFunc("/api/multi/jobs/", x.jobDetail)
 	m.HandleFunc("/api/multi/batch/status", x.batchStatus)
 	m.HandleFunc("/api/multi/batch/records", x.batchRecords)
@@ -218,6 +231,27 @@ func (x *MultiApp) preflight(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 200, multi.InspectProject(r.Context(), dir))
 }
 
+// driverCoverage checks first-source-stage Driver matching without executing a batch.
+func (x *MultiApp) driverCoverage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := multiRequest(w, r, &req, 2048); err != nil {
+		fail(w, 400, err)
+		return
+	}
+	dir, err := x.projectDir(req.Name)
+	if err != nil {
+		fail(w, 404, err)
+		return
+	}
+	jsonOut(w, 200, multi.InspectDriverCoverage(r.Context(), dir))
+}
+
 func readAssignments(path string) ([]map[string]string, error) {
 	f, e := os.Open(path)
 	if e != nil {
@@ -248,16 +282,28 @@ func (x *MultiApp) project(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(405)
 		return
 	}
+	// Snapshot both the visible assignments and their edit token under
+	// the same lock as rule writes. A second Studio tab must not silently
+	// overwrite a newer assignment decision.
+	x.mu.Lock()
+	defer x.mu.Unlock()
 	dir, e := x.projectDir(r.URL.Query().Get("name"))
 	if e != nil {
 		fail(w, 404, e)
 		return
 	}
-	assigned, e := readAssignments(filepath.Join(dir, "assignments.csv"))
+	assignmentPath := filepath.Join(dir, "assignments.csv")
+	assigned, e := readAssignments(assignmentPath)
 	if e != nil {
 		fail(w, 422, e)
 		return
 	}
+	assignmentBytes, e := os.ReadFile(assignmentPath)
+	if e != nil {
+		fail(w, 500, e)
+		return
+	}
+	assignmentHash := sha256.Sum256(assignmentBytes)
 	ents, e := os.ReadDir(filepath.Join(dir, "templates"))
 	if e != nil {
 		fail(w, 422, e)
@@ -302,7 +348,7 @@ func (x *MultiApp) project(w http.ResponseWriter, r *http.Request) {
 		sum := sha256.Sum256(cfgBytes)
 		cfgHash = hex.EncodeToString(sum[:])
 	}
-	jsonOut(w, 200, map[string]any{"reuse_workers": reuseWorkers, "driver_cache_scope": cfgScope, "project_sha256": cfgHash, "name": r.URL.Query().Get("name"), "assignments": assigned, "templates": options, "template_columns": templateColumns, "template_precisions": templatePrecisions, "files": files, "count": len(assigned), "manualDataDir": dir})
+	jsonOut(w, 200, map[string]any{"reuse_workers": reuseWorkers, "driver_cache_scope": cfgScope, "project_sha256": cfgHash, "assignments_sha256": hex.EncodeToString(assignmentHash[:]), "name": r.URL.Query().Get("name"), "assignments": assigned, "templates": options, "template_columns": templateColumns, "template_precisions": templatePrecisions, "files": files, "count": len(assigned), "manualDataDir": dir})
 }
 
 // cacheScope changes only generic execution settings, never financial rules.
@@ -386,8 +432,9 @@ func (x *MultiApp) assign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Name    string `json:"name"`
-		Updates []struct {
+		Name       string `json:"name"`
+		BaseSHA256 string `json:"base_sha256"`
+		Updates    []struct {
 			Account  string `json:"account"`
 			Template string `json:"template"`
 		} `json:"updates"`
@@ -411,9 +458,20 @@ func (x *MultiApp) assign(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, e)
 		return
 	}
-	data, e := readAssignments(filepath.Join(dir, "assignments.csv"))
+	assignmentPath := filepath.Join(dir, "assignments.csv")
+	data, e := readAssignments(assignmentPath)
 	if e != nil {
 		fail(w, 422, e)
+		return
+	}
+	previous, e := os.ReadFile(assignmentPath)
+	if e != nil {
+		fail(w, 500, e)
+		return
+	}
+	currentHash := sha256.Sum256(previous)
+	if req.BaseSHA256 == "" || req.BaseSHA256 != hex.EncodeToString(currentHash[:]) {
+		fail(w, 409, errors.New("科目规则分派已被其他操作修改；请刷新项目并重新核对更改 / assignments changed, reload before saving"))
 		return
 	}
 	positions := map[string]int{}
@@ -494,8 +552,8 @@ func (x *MultiApp) upload(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, e)
 		return
 	}
-	if req.File != "amounts.csv" && req.File != "assignments.csv" && req.File != "overrides.csv" && req.File != "reference.csv" {
-		fail(w, 422, errors.New("只允许上传 amounts.csv / assignments.csv / overrides.csv / reference.csv"))
+	if req.File != "amounts.csv" && req.File != "overrides.csv" {
+		fail(w, 422, errors.New("高级上传仅允许 amounts.csv / overrides.csv；科目分派请走冲突校验接口，参考文件请走流式上传接口"))
 		return
 	}
 	rd := csv.NewReader(strings.NewReader(strings.TrimPrefix(req.Content, "\ufeff")))
@@ -662,6 +720,9 @@ func (x *MultiApp) complete(j *Job, status, reason, stdout string) {
 	j.Status = status
 	j.Error = reason
 	j.Log = stdout
+	if status == "FAILED" {
+		j.Diagnosis, j.Log = extractMultiFailure([]byte(stdout))
+	}
 	j.End = time.Now().Format(time.RFC3339)
 	delete(x.busy, j.Case)
 	delete(x.cancels, j.ID)
@@ -785,6 +846,8 @@ func (x *MultiApp) jobDetail(w http.ResponseWriter, r *http.Request) {
 // stage, allocation; the UI cannot alter arbitrary paths or delete templates.
 func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
+		x.mu.Lock()
+		defer x.mu.Unlock()
 		dir, e := x.projectDir(r.URL.Query().Get("name"))
 		if e != nil {
 			fail(w, 404, e)
@@ -832,7 +895,20 @@ func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 				current = append(current, v)
 			}
 		}
-		jsonOut(w, 200, map[string]any{"account": account, "template": template, "rule": rule, "overrides": current})
+		// Keep the three edit tokens consistent with the account the user saw.
+		assignmentBytes, e := os.ReadFile(filepath.Join(dir, "assignments.csv"))
+		if e != nil {
+			fail(w, 500, e)
+			return
+		}
+		overrideBytes, e := os.ReadFile(filepath.Join(dir, "overrides.csv"))
+		if e != nil {
+			fail(w, 500, e)
+			return
+		}
+		jsonOut(w, 200, map[string]any{"account": account, "template": template, "rule": rule, "overrides": current,
+			"versions": map[string]string{"assignments": sha256Hex(assignmentBytes), "template": sha256Hex(b), "overrides": sha256Hex(overrideBytes)},
+		})
 		return
 	}
 	if r.Method != "POST" {
@@ -840,9 +916,14 @@ func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Name    string      `json:"name"`
-		Account string      `json:"account"`
-		Rows    []factorRow `json:"rows"`
+		Name     string      `json:"name"`
+		Account  string      `json:"account"`
+		Rows     []factorRow `json:"rows"`
+		Versions struct {
+			Assignments string `json:"assignments"`
+			Template    string `json:"template"`
+			Overrides   string `json:"overrides"`
+		} `json:"versions"`
 	}
 	if e := multiRequest(w, r, &req, 128<<10); e != nil {
 		fail(w, 400, e)
@@ -882,6 +963,24 @@ func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 	raw, e := os.ReadFile(filepath.Join(dir, "templates", template))
 	if e != nil {
 		fail(w, 500, e)
+		return
+	}
+	// Reject stale edits, including changed template assignments.
+	assignmentBytes, e := os.ReadFile(filepath.Join(dir, "assignments.csv"))
+	if e != nil {
+		fail(w, 500, e)
+		return
+	}
+	overrideBytes, e := os.ReadFile(filepath.Join(dir, "overrides.csv"))
+	if e != nil {
+		fail(w, 500, e)
+		return
+	}
+	if req.Versions.Assignments == "" || req.Versions.Template == "" || req.Versions.Overrides == "" ||
+		req.Versions.Assignments != sha256Hex(assignmentBytes) ||
+		req.Versions.Template != sha256Hex(raw) ||
+		req.Versions.Overrides != sha256Hex(overrideBytes) {
+		fail(w, http.StatusConflict, errors.New("科目规则或因子配置已被修改，请刷新后重新核对，未保存本次修改"))
 		return
 	}
 	var rule struct {
@@ -941,6 +1040,11 @@ func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 			fail(w, 422, errors.New("weight_field 必须是英文列名"))
 			return
 		}
+	}
+	// Validate the entire effective rule, not merely individual fractions.
+	if e := validateEffectiveFactorPlan(raw, req.Rows); e != nil {
+		fail(w, 422, e)
+		return
 	}
 	path := filepath.Join(dir, "overrides.csv")
 	old, e := factorRead(path)

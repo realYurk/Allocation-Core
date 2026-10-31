@@ -1,38 +1,162 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Allocation Studio · 多科目规则中心</title>
 <style>
-:root{font-family:Inter,'Microsoft Yahei',Arial,sans-serif;color:#172c4b;background:#f4f7fc}*{box-sizing:border-box}body{margin:0}header{background:#082d62;color:white;padding:23px max(25px,calc((100% - 1260px)/2))}header h1{margin:0;font-size:23px}header p{font-size:13px;color:#bcd6f8;margin:8px 0 0}a{color:#1f66cc}nav a{color:#bcd6f8;font-size:13px;margin-right:18px}main{max-width:1260px;margin:25px auto;padding:0 18px}.grid{display:grid;grid-template-columns:330px 1fr;gap:20px}@media(max-width:850px){.grid{grid-template-columns:1fr}}.card{background:#fff;border:1px solid #e2eaf6;border-radius:15px;padding:20px;box-shadow:0 3px 12px #10356c09;margin-bottom:18px}h2{font-size:16px;margin:0 0 15px}p,small{font-size:13px;line-height:1.6;color:#5b6e87}label{display:block;font-size:12px;font-weight:700;margin:12px 0 6px}input,select,button{font:inherit}input,select{width:100%;border:1px solid #cbd8e9;border-radius:8px;background:#fff;padding:10px;color:#18395c}button{border:0;background:#1262cb;border-radius:8px;padding:10px 16px;color:white;cursor:pointer;font-weight:700}button:disabled{opacity:.5;cursor:not-allowed}button.alt{background:#e9f2ff;color:#0a56ad}.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.row>*{min-width:0}.row input{flex:1}.muted{font-size:12px;color:#6e7f96}table{border-collapse:collapse;width:100%;font-size:13px}th{text-align:left;background:#f1f6fc;color:#60748b}td,th{padding:9px;border-bottom:1px solid #e6edf6}td select{padding:7px;width:100%}.tablebox{max-height:470px;overflow:auto}code{background:#eaf1f9;padding:3px 6px;border-radius:5px;font-size:12px;overflow-wrap:anywhere}.good{color:#19825a}.bad{color:#c14d45}#message{white-space:pre-wrap;padding:10px;border-radius:8px;background:#edf4ff;font-size:13px;display:none}#job{white-space:pre-wrap;max-height:370px;overflow:auto;background:#f2f7ff;padding:12px;border-radius:10px}.stat{font-size:25px;font-weight:800;color:#164783}</style></head><body>
+:root{font-family:Inter,'Microsoft Yahei',Arial,sans-serif;color:#172c4b;background:#f4f7fc}*{box-sizing:border-box}body{margin:0}header{background:#082d62;color:white;padding:23px max(25px,calc((100% - 1260px)/2))}header h1{margin:0;font-size:23px}header p{font-size:13px;color:#bcd6f8;margin:8px 0 0}a{color:#1f66cc}nav a{color:#bcd6f8;font-size:13px;margin-right:18px}main{max-width:1260px;margin:25px auto;padding:0 18px}.grid{display:grid;grid-template-columns:330px 1fr;gap:20px}@media(max-width:850px){.grid{grid-template-columns:1fr}}.card{background:#fff;border:1px solid #e2eaf6;border-radius:15px;padding:20px;box-shadow:0 3px 12px #10356c09;margin-bottom:18px}h2{font-size:16px;margin:0 0 15px}p,small{font-size:13px;line-height:1.6;color:#5b6e87}label{display:block;font-size:12px;font-weight:700;margin:12px 0 6px}input,select,button{font:inherit}input,select{width:100%;border:1px solid #cbd8e9;border-radius:8px;background:#fff;padding:10px;color:#18395c}button{border:0;background:#1262cb;border-radius:8px;padding:10px 16px;color:white;cursor:pointer;font-weight:700}button:disabled{opacity:.5;cursor:not-allowed}button.alt{background:#e9f2ff;color:#0a56ad}.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.row>*{min-width:0}.row input{flex:1}.muted{font-size:12px;color:#6e7f96}table{border-collapse:collapse;width:100%;font-size:13px}th{text-align:left;background:#f1f6fc;color:#60748b}td,th{padding:9px;border-bottom:1px solid #e6edf6}td select{padding:7px;width:100%}.tablebox{max-height:470px;overflow:auto}code{background:#eaf1f9;padding:3px 6px;border-radius:5px;font-size:12px;overflow-wrap:anywhere}.good{color:#19825a}.bad{color:#c14d45}#message{white-space:pre-wrap;padding:10px;border-radius:8px;background:#edf4ff;font-size:13px;display:none}#job{white-space:pre-wrap;max-height:370px;overflow:auto;background:#f2f7ff;padding:12px;border-radius:10px}.stat{font-size:25px;font-weight:800;color:#164783}.workflow-nav{margin:22px auto 0;max-width:1260px;padding:15px 18px;background:#fff;border:1px solid #e2eaf6;border-radius:13px}.workflow-nav strong{font-size:14px}.workflow-links{display:flex;gap:9px;flex-wrap:wrap;margin-top:11px}.workflow-links a{display:inline-flex;align-items:center;background:#f1f6fc;border:1px solid #dde9f6;color:#244f82;padding:9px 12px;border-radius:9px;font-size:12px;font-weight:650;text-decoration:none}.workflow-links a:focus-visible{outline:2px solid #1262cb}.workflow-nav small{display:block;margin-top:8px}.acceptance-table{max-height:380px;overflow:auto}.acceptance-table th,.acceptance-table td{white-space:nowrap}.acceptance-actions a{font-size:12px}.acceptance-title{font-size:14px;color:#17446e;font-weight:700}html{scroll-behavior:smooth}</style><link rel="stylesheet" href="/assets/quiet.css"></head><body>
 <header><nav><a href="/designer">← 返回规则设计器</a><a href="/">结果检查台</a><a href="/workspace#compare" target="_top">Cube Explorer · 分摊前后对比 / Comparison</a></nav><h1>多科目分摊 · 规则编排中心</h1><p>每个科目独立选择规则，多套分摊引擎编排并行，逐科目金额守恒，所有科目 PASS 才正式发布。</p></header>
+<div class="workflow-nav"><strong>业务工作流 / Business workflow</strong><div class="workflow-links"><a href="#flow-input">1 · 导入金额</a><a href="#flow-driver">2 · 准备 Driver</a><a href="#flow-rules">3 · 分派规则</a><a href="#flow-preflight">4 · 体检与计算</a><a href="#flow-acceptance">5 · 逐科目验收</a></div><small>按顺序完成，不需要操作命令行。体检 PASS ≠ 计算正确；金额守恒 PASS ≠ 业务对账 MATCH。</small></div>
+<section class="quickstart" id="quick-guide" aria-labelledby="quick-guide-title">
+  <h2 id="quick-guide-title">快速配置 · 初次使用从这里开始</h2>
+  <p>选择项目、科目和分摊依据，先预览规则，再保存。高级字段映射、多阶段规则、对账和归档仍保留在下方工作台。</p>
+  <div class="quickGrid">
+    <div>
+      <label for="quickProject">1. 当前使用哪个项目？</label><select id="quickProject" onchange="quickProjectChanged()"></select>
+      <label for="quickSearch">2. 哪个科目需要配置？输入编码或名称筛选</label>
+      <input id="quickSearch" type="search" placeholder="例如 Cost-A / 能源费" oninput="quickGuideAccounts()">
+      <select id="quickAccount" onchange="quickGuideImpact()" aria-label="选择待配置科目"></select>
+      <p class="muted" id="quickAccountCount"></p>
+      <label for="quickTemplate">3. 使用哪一种分摊规则？</label>
+      <select id="quickTemplate" onchange="quickGuideLoadTemplate()"></select>
+      <p id="quickImpact" aria-live="polite">请先选择项目。</p>
+    </div>
+    <div><label>规则解释（根据实际规则自动生成）</label>
+      <div id="quickTemplateDetail" aria-live="polite">请选择项目和模板。</div>
+    </div>
+  </div>
+  <div class="quickControls">
+    <button type="button" id="quickApplyOne" onclick="quickGuideStage(false)" disabled>应用到选中科目（待保存）</button>
+    <button type="button" class="alt" id="quickApplyFiltered" onclick="quickGuideStage(true)" disabled>批量应用到筛选科目…</button>
+    <button type="button" id="quickSave" onclick="quickGuideSave()">确认保存规则分派</button><button type="button" class="alt" onclick="financeFactorQuick()">配置选中科目的分摊比例（%）</button>
+    <button type="button" class="alt" onclick="quickGuideInspect()">检查当前项目数据和因子</button>
+  </div>
+  <p class="quickFooter">规则选择不代表业务验收。真实 Driver、各科目独立覆盖和最终结果仍须通过下方“体检 → 运行 → 参考对账”确认。</p>
+  <div id="quickNotice" role="status" aria-live="polite" data-kind="neutral">请先选择一个项目。</div>
+</section>
+
 <main><div class="grid"><section>
-<div class="card"><h2>① 创建或打开分摊项目</h2><label>项目</label><select id="project"></select><div class="row" style="margin-top:10px"><input id="newname" placeholder="例如 demo_case_01"><button onclick="createProject()">建立样例副本</button></div><p>新项目自带 4 个科目和 3 类规则，可立即试运行。正式数据请在完成验收后再接入。</p></div>
+<div class="card" id="flow-input"><h2>① 创建或打开分摊项目</h2><label>项目</label><select id="project"></select><div class="row" style="margin-top:10px"><input id="newname" placeholder="例如 demo_case_01"><button onclick="createProject()">建立样例副本</button></div><p>新项目自带 4 个科目和 3 类规则，可立即试运行。正式数据请在完成验收后再接入。</p></div>
 <div class="card" style="border-color:#b9d4f7;background:linear-gradient(140deg,#fff,#f6faff)">
 <h2>② 从自己的金额 CSV 创建项目 / Import wizard</h2>
 <p>无需手写 <code>assignments.csv</code>。选择已存在的规则项目作为模板，上传一份包含 <code>account</code>、<code>amount</code> 和业务维度的 CSV，就会自动识别所有科目并为它们分配初始规则。<b>始终创建新项目，绝不覆盖原项目。</b></p>
 <label>新项目名称 / New project</label><input id="onboardName" placeholder="例如 finance_import_01 / financial_project_01">
-<label>所有科目初始规则 / Default template</label><select id="onboardTemplate" onchange="showOnboardColumns()"></select>
+<label>所有科目初始规则 / Default template</label><select id="onboardTemplate" onchange="showOnboardColumns();prepareAmountMapping();refreshMappingProfileSelects()"></select>
 <div class="row" style="margin:8px 0"><button class="alt" onclick="downloadOnboardTemplate()" type="button">下载 CSV 表头模板 / Download header</button></div>
 <div id="onboardColumns" style="white-space:pre-wrap;word-break:break-word;background:#edf5ff;padding:10px;border-radius:9px;font-size:12px;color:#294d79" role="note">先选择一个模板项目，查看必需字段。</div>
-<label>金额文件 / Amount CSV（最大 256 MiB）</label><input id="onboardFile" type="file" accept=".csv,text/csv">
+<label>金额文件 / Amount CSV（最大 256 MiB）</label><input id="onboardFile" type="file" accept=".csv,text/csv" onchange="prepareAmountMapping()">
+<div style="background:#f3f8ff;border:1px solid #dce9fa;border-radius:10px;padding:12px;margin-top:12px">
+<label style="display:flex;gap:8px;align-items:center;margin:0"><input type="checkbox" id="onboardMapEnabled" style="width:auto" onchange="renderAmountMapping()">源文件表头不同？映射到标准字段（不修改原文件）</label>
+<div id="onboardMapStatus" class="muted" role="status" aria-live="polite" style="white-space:pre-wrap;margin:8px 0">请选择金额 CSV，系统只读取文件表头，不会在浏览器加载全部金额。</div>
+<div id="onboardMappings" style="display:none"></div>
+<div style="border-top:1px solid #d8e6f6;padding-top:10px;margin-top:12px">
+<label>复用金额字段映射 / Saved amount mappings</label>
+<select id="amountProfileSelect" aria-label="选择金额映射配置"></select>
+<div class="row" style="margin-top:8px"><button type="button" class="alt" onclick="applySavedMapping('amount')">应用到当前字段</button><button type="button" class="alt" onclick="exportSavedMapping('amount')">导出配置 JSON</button></div>
+<div class="row" style="margin-top:8px"><input id="amountProfileName" placeholder="新配置名称，例如 company_amounts" aria-label="新金额映射配置名称"><button type="button" class="alt" onclick="saveCurrentMapping('amount')">保存当前字段映射</button></div>
+<label>从其他场景导入配置 JSON（只包含字段名，不含金额）<input id="amountProfileImport" type="file" accept=".json,application/json" onchange="importSavedMapping('amount')"></label>
+</div>
+</div>
 <button id="onboardBtn" onclick="onboardFromCSV()" style="margin-top:12px">导入、识别科目并创建新项目</button>
 <pre id="onboardStatus" role="status" aria-live="polite" style="white-space:pre-wrap;word-break:break-word;font-size:12px;background:#f3f8ff;padding:10px;border-radius:8px">尚未导入</pre>
 <p><b>重要：</b>规则模板及 Driver 文件从选中的来源项目复制，可能仍是合成演示数据；导入后请配置真实 Driver、检查规则，再点击运行前体检。此导入只检查金额和维度格式，<b>不代表业务分摊结果正确</b>。大于 256 MiB 的数据请通过本地项目文件夹接入。</p>
 </div>
-<div class="card"><h2>其他文件更新 / Advanced CSV replacement</h2><p>少量更新某个已有项目的控制文件时使用；首次导入金额和自动识别科目请用上方向导。数据为 CSV，带 <code>account</code>（科目）、<code>amount</code>（金额）以及规则声明的维度。可直接选择小文件上传：</p><label>目标文件</label><select id="file"><option>amounts.csv</option><option>assignments.csv</option><option>overrides.csv</option><option>reference.csv</option></select><label>本机 CSV 文件</label><input type="file" id="csvfile" accept=".csv,text/csv"><button style="margin-top:12px" onclick="upload()">导入并替换</button><p>这里仍只支持 5 MB 的小文件覆盖；大金额文件请使用上方“创建新项目”流式向导。大规模 Driver 和参考结果可复制到下方项目目录，再执行体检。覆盖前请自行备份项目。</p><code id="path">请选择项目</code></div>
-<div class="card"><h2>Driver 索引缓存 / Driver cache</h2><p>项目级缓存复用可降低相同数据和相同生效规则的重复索引成本。首次运行仍需计算源 SHA-256；数据或规则变化会生成新索引。/ Reuses a validated index across runs. Source digest is still checked.</p><label><input id="persistCache" type="checkbox" style="width:auto"> 跨批次复用索引 / Reuse across runs</label> <label style="display:block;margin-top:12px"><input id="reuseWorkers" type="checkbox" style="width:auto"> 复用计算进程 / Reuse calculation workers</label> <button class="alt" onclick="saveCache()">保存缓存设置 / Save</button><small>仅在本机受信任的项目目录使用 / Trusted local projects only.</small></div><div class="card"><h2>④ 运行前数据体检 / Preflight</h2>
+<div class="card" style="border-color:#bad2f5"><h2>③ 从当前项目生成可视化规则草稿</h2>
+<p>不需要手动复制 JSON 或重新排列维度。以当前项目现有模板为起点，在规则设计器中修改阶段、因子、目标和来源。<b>草稿仅有表头、没有任何真实财务数据行</b>，保存时只校验结构，正式验证仍在本项目完成。</p>
+<label>当前项目规则模板</label><select id="draftSourceTemplate"></select>
+<label>新草稿标识（英文）</label><input id="draftName" placeholder="例如 cost_by_volume_2026">
+<button id="makeDraft" type="button" onclick="createVisualDraft()" style="margin-top:10px">生成规则草稿并打开 Designer</button>
+<pre id="draftStatus" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:#f3f8ff;padding:10px;border-radius:8px" role="status" aria-live="polite">先选择一个当前项目模板。</pre></div>
+<div class="card" id="flow-driver" style="border-color:#bad2f5"><h2>④ 导入自己的 Driver · 字段映射</h2>
+<p>支持 CSV 原始列名与标准维度/权重列名不同的情况。不改原文件，不猜测金额，不修改规则。导入后可在上面的“设计器规则导入”中选用新 Driver。</p>
+<label>依据哪个现有规则识别 Driver 字段</label><select id="driverSourceTemplate" onchange="loadDriverRequirements()"></select>
+<label>Driver 数据集</label><select id="driverAlias" onchange="renderDriverColumnMappings();refreshMappingProfileSelects()"></select>
+<label>新建目标文件（永不覆盖已有文件）</label><input id="driverNewFile" placeholder="例如 sales_2026.csv" value="business_driver.csv">
+<label>原始 Driver CSV · 最大 256 MiB</label><input id="driverSourceFile" type="file" accept=".csv,text/csv" onchange="inspectDriverFile()">
+<div id="driverMappings" style="margin-top:10px;border:1px solid #e5edf8;border-radius:9px;padding:10px"></div>
+<div style="border:1px solid #dce9fa;border-radius:10px;padding:12px;margin-top:12px;background:#f6faff">
+<label>复用 Driver 字段映射 / Saved driver mappings</label><select id="driverProfileSelect" aria-label="选择 Driver 映射配置"></select>
+<div class="row" style="margin-top:8px"><button class="alt" type="button" onclick="applySavedMapping('driver')">应用到当前 Driver</button><button class="alt" type="button" onclick="exportSavedMapping('driver')">导出配置 JSON</button></div>
+<div class="row" style="margin-top:8px"><input id="driverProfileName" placeholder="新配置名称，例如 common_driver" aria-label="新 Driver 映射配置名称"><button class="alt" type="button" onclick="saveCurrentMapping('driver')">保存当前字段映射</button></div>
+<label>从其他场景导入配置 JSON<input id="driverProfileImport" type="file" accept=".json,application/json" onchange="importSavedMapping('driver')"></label>
+</div>
+<button id="driverUpload" type="button" disabled onclick="uploadMappedDriver()" style="margin-top:10px">流式映射并创建 Driver 文件</button>
+<pre id="driverImportStatus" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:#f3f8ff;padding:10px;border-radius:8px" role="status" aria-live="polite">请先选择项目、模板及原始 CSV。</pre>
+<p>字段映射及 CSV 每行数值会检查，缺失数据将阻断；但 Driver 是否能够覆盖全部来源金额池，必须通过完整分摊运行验证。</p></div>
+<div class="card"><h2>高级文件更新 / Advanced CSV replacement</h2><p>少量更新某个已有项目的控制文件时使用；首次导入金额和自动识别科目请用上方向导。数据为 CSV，带 <code>account</code>（科目）、<code>amount</code>（金额）以及规则声明的维度。可直接选择小文件上传：</p><label>目标文件</label><select id="file"><option>amounts.csv</option><option>overrides.csv</option></select><label>本机 CSV 文件</label><input type="file" id="csvfile" accept=".csv,text/csv"><button style="margin-top:12px" onclick="upload()">导入并替换</button><p>这里仍只支持 5 MB 的小金额或覆盖配置文件替换；科目分派请使用右侧 Excel 导入，参考结果请使用下方专用上传；大金额文件请使用上方“创建新项目”流式向导。大规模 Driver 和参考结果可复制到下方项目目录，再执行体检。覆盖前请自行备份项目。</p><code id="path">请选择项目</code></div>
+<div class="card"><h2>Driver 索引缓存 / Driver cache</h2><p>项目级缓存复用可降低相同数据和相同生效规则的重复索引成本。首次运行仍需计算源 SHA-256；数据或规则变化会生成新索引。/ Reuses a validated index across runs. Source digest is still checked.</p><label><input id="persistCache" type="checkbox" style="width:auto"> 跨批次复用索引 / Reuse across runs</label> <label style="display:block;margin-top:12px"><input id="reuseWorkers" type="checkbox" style="width:auto"> 复用计算进程 / Reuse calculation workers</label> <button class="alt" onclick="saveCache()">保存缓存设置 / Save</button><small>仅在本机受信任的项目目录使用 / Trusted local projects only.</small></div><div class="card" id="flow-preflight"><h2>④ 运行前数据体检 / Preflight</h2>
 <p>一次检查所有科目规则映射和实际金额 CSV，每个不同 Driver 文件仅扫描一次。不生成分摊结果，不能代替金额守恒及参考系统对账。</p>
 <button class="alt" id="inspectBtn" onclick="inspectProject()">检查全部科目和因子 / Inspect</button>
-<div id="inspectResult" style="margin-top:12px;background:#f5f9ff;border:1px solid #dbe7f7;padding:12px;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px" role="status" aria-live="polite">未检查 / Not checked</div></div>
+<div class="coverage-action"><button type="button" class="alt" id="coverageBtn" onclick="inspectCoverage()">检查 Driver 是否匹配业务坐标</button><small>检查单阶段及多阶段的直接金额起始阶段；后续阶段仍显示“尚未验证”。</small></div>
+<section id="coverageResult" class="coverage-panel" hidden aria-label="来源池 Driver 匹配检查">
+<h3>Driver 坐标匹配检查</h3><p id="coverageSummary" role="status" aria-live="polite"></p>
+<p id="coverageScope" class="muted"></p><div id="coverageFindings"></div>
+<div class="row"><input id="coverageSearch" placeholder="搜索科目" oninput="renderCoverageAccounts()" aria-label="搜索科目"><select id="coverageFilter" onchange="renderCoverageAccounts()" aria-label="筛选 Driver 检查结果"><option value="">全部</option><option value="BLOCK">发现匹配问题</option><option value="REVIEW">需核对已批准的冲销</option><option value="ROOT_MATCHED">起始阶段已匹配，下游未验证</option><option value="UNVERIFIED">尚未验证</option><option value="SOURCE_MATCHED">已匹配（单阶段）</option></select><button class="alt" onclick="downloadCoverageAccounts()">导出完整检查结果</button></div>
+<p id="coverageCount" class="muted"></p><div class="tablebox"><table><thead><tr><th>科目</th><th>状态</th><th>来源池/因子核对数</th><th>问题数</th></tr></thead><tbody id="coverageRows"></tbody></table></div>
+</section>
+<div id="inspectResult" style="margin-top:12px;border:1px solid #d9e0e7;padding:12px;border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px" role="status" aria-live="polite">未检查 / Not checked</div>
+<section id="financeReadiness" class="finance-check" hidden aria-label="业务体检与处理建议">
+  <h3>业务体检与处理建议</h3><p id="financeReadinessSummary" aria-live="polite"></p>
+  <div id="financeReadinessFindings"></div>
+  <div id="financeDriverSummary"></div>
+  <div class="row"><input id="financeReadinessSearch" placeholder="搜索科目、规则、提示" oninput="showFinanceReadinessAccounts()" aria-label="筛选体检科目">
+  <select id="financeReadinessStatus" onchange="showFinanceReadinessAccounts()" aria-label="按体检状态筛选">
+    <option value="">全部科目</option><option value="CHECK_DRIVER">需核对因子</option><option value="NOT_CHECKED">扫描未完成</option><option value="BLOCK">缺少金额数据</option><option value="INPUT_OK">输入正常</option>
+  </select><button type="button" class="alt" onclick="downloadFinanceReadinessAccounts()">导出全部科目体检 CSV</button></div>
+  <p id="financeReadinessCount" class="muted"></p>
+  <div class="tablebox"><table><thead><tr><th>科目</th><th>规则模板</th><th>金额记录</th><th>输入状态</th><th>操作提示</th></tr></thead><tbody id="financeReadinessRows"></tbody></table></div>
+  <p id="financeReadinessScope" class="muted"></p>
+</section></div>
 <div class="card"><h2>④ 启动所有科目计算</h2><p>引擎按“相同有效规则”分组执行，规则不同则独立运行；每个科目仍有单独守恒检查。</p><button id="run" onclick="run()">一键执行全量分摊</button> <button id="cancel" class="alt" onclick="cancelRun()" disabled>取消本次任务</button><p id="hint"></p></div>
 </section><section>
-<div class="card"><h2>③ 指定每个科目的业务规则</h2><div class="row"><div class="stat" id="count">0</div><small>科目已指定规则</small></div><div class="row" style="margin-top:15px"><input id="search" placeholder="搜索科目..." oninput="renderTable()"><select style="width:200px" id="bulkrule"></select><button class="alt" onclick="bulkAll()">为筛选科目批量指定</button></div><p>下拉修改后点击“保存规则分派”。不同科目可以选择不同模板；更复杂的多阶段规则可复制 <code>templates</code> 中的 JSON 模板修改。权重、Driver 可以在 <code>overrides.csv</code> 逐科目覆盖。</p><div class="tablebox"><table><thead><tr><th>科目</th><th>规则模板</th><th>因子配置</th></tr></thead><tbody id="rows"></tbody></table></div><div id="factorEditor" style="display:none;background:#f5f9ff;border:1px solid #dbe7f7;padding:14px;margin-top:14px;border-radius:10px"><h2 id="factorTitle"></h2><p>编辑本账户各阶段的 Driver 数据集、字段和配比。请保证同阶段分摊比例之和为 1。</p><div id="factorRows"></div><button onclick="saveFactors()">保存该科目因子配置</button> <button class="alt" onclick="document.getElementById('factorEditor').style.display='none'">关闭</button></div><div class="row" style="margin-top:14px"><button onclick="save()">保存规则分派</button><small id="dirty">无未保存更改</small></div></div>
+<div class="card">
+<h2>③ 可视化设计规则 → 多科目模板</h2>
+<p>使用现有 <a href="/designer" target="_blank" rel="noopener">规则设计器（新窗口）</a> 编辑多阶段、分叉合并、维度目标与因子；完成保存后，在这里将规则作为一个<b>新的、独立的模板</b>导入当前项目。无需手工编辑 JSON。</p>
+<label>设计器场景 / Visual designer case</label><div class="row"><select id="designerCase" style="flex:1" onchange="clearDesignerPreview()"></select><button class="alt" onclick="loadDesignerCases()">刷新场景</button></div>
+<label>新模板文件名 / New template filename</label><input id="designerTemplateName" value="new_business_rule.json" placeholder="例如 overhead_by_hours.json" oninput="clearDesignerPreview()">
+<div class="row" style="margin-top:12px"><button class="alt" id="previewDesignerBtn" onclick="previewDesignerTemplate()">检查规则与 Driver 映射</button><button id="importDesignerBtn" disabled onclick="importDesignerTemplate()">创建新规则模板</button></div>
+<div id="designerDriverMapping" style="margin-top:9px"></div>
+<pre id="designerImportReport" style="white-space:pre-wrap;overflow-wrap:anywhere;background:#edf4ff;padding:12px;border-radius:9px;font-size:12px" role="status" aria-live="polite">先从设计器选择已保存的规则，检查是否匹配当前项目维度、精度和 Driver 字段。</pre>
+<p>这一步<b>只导入规则描述</b>，不会复制设计器里的金额、Driver 样例、覆盖规则或已发布结果；也不会自动改变任何科目分派。缺少的真实 Driver 放进当前项目的 <code>drivers</code> 目录，运行前必须体检。</p>
+</div>
+<div class="card" id="flow-rules"><h2>④ 指定每个科目的业务规则</h2><div class="row"><div class="stat" id="count">0</div><small>科目已指定规则</small></div><div class="row" style="margin-top:15px"><input id="search" placeholder="搜索科目..." oninput="renderTable()"><select style="width:200px" id="bulkrule"></select><button class="alt" onclick="bulkAll()">为筛选科目批量指定</button></div><p>下拉修改后点击“保存规则分派”。不同科目可以选择不同模板；更复杂的多阶段规则可复制 <code>templates</code> 中的 JSON 模板修改。权重、Driver 可以在 <code>overrides.csv</code> 逐科目覆盖。</p><div class="row" style="margin:12px 0"><button class="alt" type="button" onclick="exportAssignments()">导出全部规则分派 CSV（Excel 可编辑）</button><label style="margin:0"><span class="muted">导入规则分派 CSV</span><input type="file" id="assignmentFile" accept=".csv,text/csv" onchange="importAssignments()" style="max-width:220px"></label></div><p class="muted">导入需提供 account,template 两列，必须与当前项目所有科目一一对应，不允许新增、漏填或重复；导入只修改待保存的页面草稿，点击“保存规则分派”才会写入项目。</p><div class="tablebox"><table><thead><tr><th>科目</th><th>规则模板</th><th>因子配置</th></tr></thead><tbody id="rows"></tbody></table></div><div id="ruleExplainPanel" style="display:none;margin-top:14px;padding:16px;border:1px solid #c9dbf4;border-radius:12px;background:#f8fbff">
+<div class="row" style="justify-content:space-between"><h3 style="font-size:15px;margin:0">当前科目实际生效规则 / Effective rule</h3><button type="button" class="alt" onclick="resetRuleExplanation()">关闭</button></div>
+<p class="muted">这里读取运行器合成的最终规则（包括逐科目覆盖），而非模板原文。不执行分摊、不验证 Driver 覆盖率，也不代表业务验收完成。</p>
+<div id="ruleExplainContent" role="status" aria-live="polite"></div>
+<button type="button" class="alt" id="ruleExplainExport" onclick="exportRuleExplanation()" style="display:none;margin-top:12px">导出当前规则说明 CSV</button>
+</div>
+<div id="factorEditor" style="display:none" class="finance-factor-editor"><h2 id="factorTitle">独立因子配置</h2><p>直接输入百分比，例如 75 或 33.3333。每个计算阶段合计 <strong>100%</strong>；最多四位小数，不自动舍入。</p><div id="factorRows"></div><p id="factorValidation" role="status" aria-live="polite">请选择科目。</p><div class="row"><button id="factorSaveButton" onclick="saveFactors()" disabled>保存该科目因子配置</button><button class="alt" onclick="document.getElementById('factorEditor').style.display='none'">关闭</button></div><p class="muted">保存后必须重新体检、计算和与独立参考结果逐坐标对账。保存配置不等于业务验收。</p></div><div class="row" style="margin-top:14px"><button onclick="save()">保存规则分派</button><button class="alt" type="button" onclick="previewAssignmentChanges()">保存前检查变更</button><button class="alt" type="button" onclick="exportAssignmentChanges()">导出变更清单</button><small id="dirty">无未保存更改</small></div><pre id="assignmentDiffPreview" style="display:none;max-height:260px;overflow:auto;background:#f2f7ff;border:1px solid #dde9f6;border-radius:10px;padding:12px;white-space:pre-wrap" role="status" aria-live="polite"></pre></div>
 <div class="card"><h2>⑤ 运行状态 / 结果与历史</h2>
 <p>Studio 重启后会恢复任务历史。<b>INTERRUPTED</b> 表示运行中断，不能直接发布；需要重新执行以获取新快照。</p>
 <div class="row" style="margin-bottom:10px"><select id="jobHistory" style="flex:1" aria-label="历史任务"></select><button class="alt" onclick="loadJobHistory()">刷新历史</button><button class="alt" onclick="retryFromHistory()">按当前数据重新执行</button></div>
-<div id="message"></div><div id="job">尚未启动任务</div><a id="download" style="display:none" target="_blank" href="#">下载完整 results.csv</a><section style="margin-top:18px;border:1px solid #dbe7f7;border-radius:12px;padding:15px;background:#f6faff">
+<div id="message"></div><div id="job">尚未启动任务</div><section id="failureDiagnosis" class="failure-diagnosis" hidden role="status" aria-live="polite"></section><section id="accountReport" style="display:none;margin-top:15px;border:1px solid #dbe7f7;border-radius:12px;padding:14px"><h3 style="font-size:15px;margin-top:0">逐科目计算结果 / Account results</h3><div class="row"><input id="resultSearch" style="max-width:300px" placeholder="搜索科目、规则或状态..." oninput="renderAccountReport()"><select id="resultStatus" style="max-width:150px" onchange="renderAccountReport()"><option value="">全部状态</option><option value="PASS">PASS</option><option value="FAILED">FAILED</option></select></div><p id="accountReportCount" class="muted"></p><div class="tablebox"><table><thead><tr><th>科目</th><th>规则</th><th>分摊前</th><th>分摊后</th><th>输出行</th><th>状态</th></tr></thead><tbody id="accountReportRows"></tbody></table></div><button class="alt" onclick="exportAccountReport()" style="margin-top:12px">导出完整逐科目结果 CSV</button><p class="muted">分摊前后金额守恒不等于业务规则正确；仍需参考系统逐坐标验收。</p></section><section id="stageEvidence" class="stage-evidence" hidden aria-label="历史阶段证据">
+<h3>按科目查看实际分摊阶段 / Historical stage evidence</h3>
+<p class="muted">只读取成功任务保存的 Core Ledger。先选择科目，可选填期间；不同阶段的金额不能相加。</p>
+<div class="row"><label>科目 <select id="stageEvidenceAccount" onchange="invalidateStageEvidence()"></select></label><label>期间（可选） <input id="stageEvidencePeriod" placeholder="例如 2026-01" oninput="invalidateStageEvidence()"></label><button id="stageEvidenceBtn" class="alt" onclick="loadStageEvidence()">查看阶段与因子金额</button><a id="stageEvidenceDownload" hidden download="stage_evidence.csv">导出阶段证据 CSV</a></div>
+<p id="stageEvidenceNotice" role="status" class="muted"></p>
+<div class="tablebox"><table><thead><tr><th>阶段</th><th>分摊规则</th><th>Driver / 权重字段</th><th>已分摊金额</th><th>流水行数</th><th>来源池</th></tr></thead><tbody id="stageEvidenceRows"></tbody></table></div>
+</section><section id="runComparison" class="run-comparison" aria-label="历史两次分摊对比">
+<h3>比较两次历史分摊 / Run-to-run comparison</h3>
+<p class="muted">选择同一项目的两个已成功发布任务。对比已保存的输入文件与生效规则指纹，再用精确逐坐标比较定位结果变化。不声称单一文件或规则一定导致某个差异。</p>
+<div class="row"><label>旧任务<select id="runCompareBefore" onchange="clearRunComparison()"></select></label><label>新任务<select id="runCompareAfter" onchange="clearRunComparison()"></select></label><button id="runCompareBtn" class="alt" onclick="compareHistoricalRuns()">比较两个历史任务</button><a id="runCompareDownload" hidden download="run_differences.csv">下载完整坐标差异 CSV</a></div>
+<p id="runCompareStatus" class="muted" role="status" aria-live="polite">请选择两个历史成功任务。</p>
+<div class="row"><input id="runCompareSearch" placeholder="搜索科目" oninput="renderRunCompareAccounts()" aria-label="搜索历史对比科目"><select id="runCompareFilter" onchange="renderRunCompareAccounts()" aria-label="筛选历史对比状态"><option value="all">全部科目</option><option value="issues">仅有差异</option><option value="match">仅一致</option></select></div>
+<p id="runCompareCount" class="muted"></p><div class="tablebox"><table><thead><tr><th>科目</th><th>一致坐标</th><th>金额不同</th><th>新任务缺少</th><th>新任务新增</th><th>状态</th></tr></thead><tbody id="runCompareRows"></tbody></table></div>
+</section><a id="download" style="display:none" target="_blank" href="#">下载完整 results.csv</a><section id="flow-acceptance" style="margin-top:18px;border:1px solid #dbe7f7;border-radius:12px;padding:15px;background:#f6faff">
 <h3 style="margin:0 0 7px;font-size:15px">参考系统逐坐标验收 / Reference reconciliation</h3>
-<p>把参考结果保存为当前项目目录下的 <code>reference.csv</code>（小于 5 MB 可在左侧上传）。该文件只包含业务维度和 <code>amount</code> 或 <code>value</code>；维度名必须与结果一致。程序按完整坐标合并同坐标重复行，独立对比金额和缺失/多余坐标。当前演示数据无参考文件，不会自动判定为一致。</p>
+<p>直接上传参考系统导出的 CSV（不超过 256 MiB），不需要打开项目文件夹。只接受与项目相同的业务维度及 <code>amount</code> / <code>value</code> 金额字段；不做隐式维度填充或四舍五入。历史验收不会自动代表新数据。</p>
+<div class="row"><button class="alt" onclick="downloadReferenceHeader()">下载参考数据表头</button><button class="alt" onclick="loadReferenceStatus()">刷新参考文件状态</button></div>
+<label>独立参考结果 CSV（最大 256 MiB）</label><input id="referenceFile" type="file" accept=".csv,text/csv">
+<div class="row" style="margin:9px 0"><button id="referenceUploadBtn" class="alt" onclick="uploadBusinessReference()">上传并验证参考文件</button><small>替换已有文件时需确认其当前 SHA-256，冲突即拒绝覆盖。</small></div>
+<div id="referenceStatus" class="muted" style="white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f6fc;padding:11px;border-radius:9px" role="status" aria-live="polite">请选择项目以检查参考结果状态。</div>
 <div class="row"><label>金额小数位 / Precision<input id="refPrecision" type="number" min="0" max="6" value="2" style="width:85px"></label><label>允许差额 / Tolerance<input id="refTolerance" value="0" style="width:105px"></label><button class="alt" id="reconcileBtn" onclick="reconcileReference()">检查选中任务与参考结果 / Compare</button></div>
 <label style="margin-top:9px"><input type="checkbox" id="rejectDup" style="width:auto"> 严格拒绝重复的完整业务坐标 / Reject duplicate full coordinates</label>
 <pre id="reconcileResult" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:240px;overflow:auto" role="status" aria-live="polite">尚未检查参考结果 / Not compared</pre>
+<div class="row" style="margin-top:12px"><label style="flex:1">历史对账报告 / Saved acceptance<select id="acceptanceHistory" onchange="openAcceptanceReport()"></select></label><button class="alt" onclick="loadAcceptanceHistory()">刷新验收历史</button></div>
+<div id="acceptanceDashboard" style="display:none;background:#fff;border:1px solid #e2eaf6;border-radius:11px;padding:14px;margin-top:10px">
+<div id="acceptanceHeadline" class="acceptance-title" role="status" aria-live="polite"></div>
+<div id="acceptanceProvenance" class="muted" style="white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0"></div>
+<div class="row"><input id="acceptanceSearch" placeholder="搜索科目..." style="max-width:220px" oninput="renderAcceptanceAccounts()"><select id="acceptanceFilter" onchange="renderAcceptanceAccounts()" style="max-width:170px"><option value="all">所有科目</option><option value="issues">仅差异科目</option><option value="pass">仅一致科目</option></select></div>
+<div id="acceptanceCount" class="muted" style="margin:9px 0"></div>
+<div class="acceptance-table"><table><thead><tr><th>科目</th><th>一致</th><th>金额不符</th><th>引擎缺少</th><th>引擎多余</th><th>结论</th></tr></thead><tbody id="acceptanceRows"></tbody></table></div>
+<div class="row acceptance-actions" style="margin-top:12px"><button class="alt" onclick="exportAcceptanceAccounts()">导出全部科目验收 CSV</button><a id="acceptanceDiffs" href="#" style="display:none">下载全部坐标差异 differences.csv</a></div>
+<p class="muted">报告只证明当时两份快照按所选精度、容差及重复坐标策略的比对结果；上传新参考文件后必须重新执行对账。</p></div>
 </section><p>分摊成功后，请查看逐科目 <code>run_summary.json</code> 和各规则组完整血缘证据，再与参考系统逐坐标比对。</p></div>
 <div class="card"><h2>⑥ 业务版本库</h2>
 <p>1000 个科目的完整结果、有效规则、快照和证据作为一份不可拆分的业务版本归档。先登记，再发布；新旧版切换遵循 CAS 校验。</p>
@@ -43,13 +167,269 @@
 <p>发布不会覆盖或删除旧版本；恢复会新建一个独立目录。历史清理预览不删除任何数据，实际清理需通过命令行明确加 <code>--apply</code>。</p></div>
 </section></div></main>
 <script>
-let data=null,chosen={},active='',busyJob='',interval=null,factorContext=null;
+let data=null,chosen={},active='',busyJob='',interval=null,factorContext=null,accountReport=[],designerPlan=null,designerContext='',designerPreviewRequest=0,ruleExplanation=null,ruleExplainRequest=0;
+let driverNeedsState=null,driverHeader=[],driverNeedsRequest=0;
+let amountHeader=[],amountMappingFile=null,amountMappingTemplate='',amountMapRequest=0;
+let savedMappingProfiles=[];
+let referenceSnapshot=null,acceptanceReport=null,acceptanceSelectedJob="",acceptanceRequest=0;
+function setupTemplateSelect(id){
+ const picker=document.getElementById(id),old=picker.value;
+ picker.replaceChildren();
+ for(const name of (data?.templates||[]).filter(x=>data?.template_columns?.[x])){
+  const option=document.createElement('option');option.value=name;option.textContent=name;picker.appendChild(option);
+ }
+ if([...picker.options].some(o=>o.value===old))picker.value=old;
+}
+function refreshBusinessSetup(){
+ setupTemplateSelect('draftSourceTemplate');setupTemplateSelect('driverSourceTemplate');
+ driverNeedsState=null;driverHeader=[];
+ document.getElementById('driverSourceFile').value='';
+ refreshMappingProfileSelects();
+ document.getElementById('driverMappings').replaceChildren();
+ document.getElementById('driverUpload').disabled=true;
+ loadDriverRequirements();
+}
+async function createVisualDraft(){
+ const btn=document.getElementById('makeDraft'),box=document.getElementById('draftStatus');
+ const name=document.getElementById('draftName').value.trim();
+ const template=document.getElementById('draftSourceTemplate').value;
+ if(!active||!template||!/^[A-Za-z0-9_-]{1,48}$/.test(name)){
+  box.textContent='请选择项目与规则模板，输入1～48位英文数字、下划线或短横线名称。';return;
+ }
+ btn.disabled=true;box.textContent='正在生成独立规则草稿（不复制任何财务明细）...';
+ try{
+  const r=await api('/api/multi/visual-draft',{name:active,template,draft:name});
+  box.textContent='已创建：'+r.case+'\n'+r.stages+' 个分摊阶段 · '+r.dimensions.join('、')+'\n结构设计模式：不包含金额和 Driver 明细，设计后仍须导入新模板、体检、执行、对账。';
+  await loadDesignerCases();
+  const url='/designer?case='+encodeURIComponent(r.case);
+  const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener';link.textContent='打开刚创建的可视化规则草稿';
+  box.appendChild(document.createTextNode('\n'));box.appendChild(link);
+  window.open(url,'_blank','noopener');
+  message('结构草稿已创建，源项目没有被修改；请在 Designer 保存后作为新模板导回多科目项目',true);
+ }catch(e){box.textContent='草稿创建失败：'+e.message}finally{btn.disabled=false}
+}
+async function loadDriverRequirements(){
+ const id=++driverNeedsRequest,box=document.getElementById('driverImportStatus');
+ const project=active,template=document.getElementById('driverSourceTemplate').value;
+ driverNeedsState=null;driverHeader=[];
+ document.getElementById('driverSourceFile').value='';
+ refreshMappingProfileSelects();
+ document.getElementById('driverMappings').replaceChildren();
+ document.getElementById('driverUpload').disabled=true;
+ if(!project||!template){box.textContent='先选择多科目项目与规则模板。';return}
+ try{
+  const req=await api('/api/multi/driver-needs?name='+encodeURIComponent(project)+'&template='+encodeURIComponent(template));
+  if(id!==driverNeedsRequest||active!==project)return;
+  driverNeedsState=req;
+  const picker=document.getElementById('driverAlias'),old=picker.value;
+  picker.replaceChildren();
+  for(const dr of req.drivers.filter(x=>x.weight_fields.length)){
+   const option=document.createElement('option');option.value=dr.alias;option.textContent=dr.alias+'（'+dr.weight_fields.join(', ')+'）';picker.appendChild(option)
+  }
+  if([...picker.options].some(x=>x.value===old))picker.value=old;
+  box.textContent='当前规则维度：'+req.dimensions.join('、')+'。选择 Driver 和源 CSV，系统会显示字段映射。';
+  refreshMappingProfileSelects();
+ }catch(e){if(id===driverNeedsRequest)box.textContent='无法读取 Driver 契约：'+e.message}
+}
+function driverCurrentNeed(){return driverNeedsState?.drivers?.find(x=>x.alias===document.getElementById('driverAlias').value)}
+function browserCSVHeader(text){
+ text=text.replace(/^\ufeff/,'');let inQuote=false,end=-1;
+ for(let i=0;i<text.length;i++){
+  if(text[i]==='"'){
+   if(inQuote&&text[i+1]==='"'){i++;continue}
+   inQuote=!inQuote;
+  }else if(!inQuote&&(text[i]==='\n'||text[i]==='\r')){end=i;break}
+ }
+ if(end===-1)throw Error('CSV 表头超过 128 KiB 或没有完整行分隔符');
+ const row=parseBusinessCSV(text.slice(0,end)+'\n')[0]||[];
+ if(!row.length||new Set(row).size!==row.length||row.some(x=>!x))throw Error('CSV 表头有空列或重复列名');
+ return row;
+}
+async function inspectDriverFile(){
+ const file=document.getElementById('driverSourceFile').files[0];
+ driverHeader=[];
+ const box=document.getElementById('driverImportStatus');
+ if(!file){renderDriverColumnMappings();return}
+ if(!/\.csv$/i.test(file.name)||file.size>256*1024*1024){box.textContent='仅接受不超过 256 MiB 的 CSV 文件';return}
+ try{
+  driverHeader=browserCSVHeader(await file.slice(0,Math.min(file.size,128*1024)).text());
+  box.textContent='已识别源文件字段：'+driverHeader.join('、')+'。请明确各业务维度与权重字段的对应关系。';
+  renderDriverColumnMappings();
+  refreshMappingProfileSelects();
+ }catch(e){box.textContent='CSV 表头无法识别：'+e.message;renderDriverColumnMappings();refreshMappingProfileSelects()}
+}
+function renderDriverColumnMappings(){
+ const panel=document.getElementById('driverMappings');panel.replaceChildren();
+ const need=driverCurrentNeed(),req=driverNeedsState;
+ document.getElementById('driverUpload').disabled=!need||!driverHeader.length;
+ if(!need||!driverHeader.length)return;
+ const weight=new Set(need.weight_fields);
+ const fields=[...new Set([...req.dimensions,...need.weight_fields])];
+ for(const key of fields){
+  const label=document.createElement('label');label.textContent=(weight.has(key)?'必填权重：':'可选维度：')+key;
+  const select=document.createElement('select');select.dataset.canonical=key;
+  const empty=document.createElement('option');empty.value='';empty.textContent='— 不映射 —';select.appendChild(empty);
+  for(const name of driverHeader){const op=document.createElement('option');op.value=name;op.textContent=name;select.appendChild(op)}
+  const exact=driverHeader.find(x=>x===key)||driverHeader.find(x=>x.toLowerCase()===key.toLowerCase());
+  if(exact)select.value=exact;
+  label.appendChild(select);panel.appendChild(label);
+ }
+}
+async function uploadMappedDriver(){
+ const box=document.getElementById('driverImportStatus'),button=document.getElementById('driverUpload');
+ try{
+  const file=document.getElementById('driverSourceFile').files[0];
+  const dest=document.getElementById('driverNewFile').value.trim();
+  const need=driverCurrentNeed(),req=driverNeedsState;
+  if(!req||!need||!file||!driverHeader.length)throw Error('请先选择 Driver 并读取源 CSV 表头');
+  if(!/^[A-Za-z0-9_-]+\.csv$/.test(dest)||dest==='amounts.csv')throw Error('新 Driver 文件名必须为英文数字、下划线或短横线，并以 .csv 结束');
+  const mapping={};
+  for(const select of document.querySelectorAll('#driverMappings select[data-canonical]')){
+   if(select.value)mapping[select.dataset.canonical]=select.value;
+  }
+  if(!req.dimensions.some(k=>mapping[k]))throw Error('请至少映射一个业务维度');
+  for(const key of need.weight_fields)if(!mapping[key])throw Error('缺少权重字段映射：'+key);
+  if(new Set(Object.values(mapping)).size!==Object.values(mapping).length)throw Error('不能把同一个源字段映射到多个目标字段');
+  const body=new FormData();
+  for(const [key,value] of [['name',active],['template',req.template],['alias',need.alias],['file',dest],['base_sha256',req.sha256],['mapping',JSON.stringify(mapping)]])body.append(key,value);
+  body.append('csv',file,file.name);
+  button.disabled=true;box.textContent='正在流式导入、逐行检查维度与精确小数，不覆盖已有 Driver ...';
+  const response=await fetch('/api/multi/driver-import',{method:'POST',body});
+  let result;try{result=await response.json()}catch{throw Error('服务没有返回合法 JSON')}
+  if(!response.ok)throw Error(result.error||'HTTP '+response.status);
+  box.textContent='已创建 Driver：'+result.created+'\n行数：'+result.rows+' · 大小：'+(result.bytes/1048576).toFixed(2)+' MiB\n列：'+result.columns.join(', ')+'\nSHA-256：'+result.sha256+'\n接下来：在规则导入中映射到该文件、体检、运行并独立对账。';
+  message('Driver 数据已导入新文件，原有规则与结果没有改变',true);
+ }catch(e){box.textContent='Driver 导入未完成，已有文件不变：'+e.message}
+ finally{button.disabled=false}
+}
+
+// Mapping profiles contain only explicit source-column names and the canonical
+// schema. Financial CSV rows, paths, project IDs and credentials are never saved.
+function currentMappingContract(kind){
+ if(kind==='amount'){
+  const tpl=document.getElementById('onboardTemplate').value;
+  const fields=data?.template_columns?.[tpl]||[];
+  if(!fields.includes('account')||!fields.includes('amount'))throw Error('请选择包含 account 和 amount 的有效规则模板');
+  return {kind:'amount',dimensions:fields.filter(x=>x!=='amount'),precision:data.template_precisions?.[tpl]??0,weight_fields:[]};
+ }
+ const req=driverNeedsState,need=driverCurrentNeed();
+ if(!req||!need||!need.weight_fields?.length)throw Error('请先选择有效 Driver 数据集');
+ return {kind:'driver',dimensions:[...req.dimensions],precision:0,weight_fields:[...need.weight_fields]};
+}
+function profileMatchesContract(p,kind){
+ if(p.kind!==kind||p.schema!=='allocation-field-map/v1')return false;
+ let c;try{c=currentMappingContract(kind)}catch{return false}
+ const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+ if(!equal(p.dimensions,c.dimensions)||p.precision!==c.precision)return false;
+ if(kind==='driver'&&!equal([...(p.weight_fields||[])].sort(),[...c.weight_fields].sort()))return false;
+ return true;
+}
+function refreshMappingProfileSelects(){
+ for(const kind of ['amount','driver']){
+  const picker=document.getElementById(kind+'ProfileSelect');if(!picker)continue;
+  const previous=picker.value;picker.replaceChildren();
+  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='— 选择与当前规则兼容的配置 —';picker.appendChild(placeholder);
+  for(const p of savedMappingProfiles.filter(p=>profileMatchesContract(p,kind))){
+   const opt=document.createElement('option');opt.value=p.name;opt.textContent=p.name;picker.appendChild(opt);
+  }
+  if([...picker.options].some(o=>o.value===previous))picker.value=previous;
+ }
+}
+async function loadMappingProfiles(){
+ try{const r=await api('/api/multi/mapping-profiles');savedMappingProfiles=r.profiles||[];refreshMappingProfileSelects()}
+ catch(e){message('读取本地字段映射配置失败：'+e.message)}
+}
+function selectedMappingProfile(kind){
+ const name=document.getElementById(kind+'ProfileSelect').value;
+ const p=savedMappingProfiles.find(x=>x.name===name&&profileMatchesContract(x,kind));
+ if(!p)throw Error('请选择与当前规则维度、金额精度或 Driver 字段兼容的配置');
+ return p;
+}
+function explicitDriverMapping(){
+ const need=driverCurrentNeed(),req=driverNeedsState;
+ if(!req||!need||!driverHeader.length)throw Error('先选择 Driver 并读取源 CSV 表头');
+ const mapping={},seen=new Set();
+ for(const select of document.querySelectorAll('#driverMappings select[data-canonical]')){
+  const value=select.value;if(!value)continue;
+  if(seen.has(value))throw Error('同一源列不能映射多个字段：'+value);
+  seen.add(value);mapping[select.dataset.canonical]=value;
+ }
+ if(!req.dimensions.some(x=>mapping[x]))throw Error('至少指定一个业务维度');
+ for(const field of need.weight_fields)if(!mapping[field])throw Error('缺少 Driver 权重字段：'+field);
+ return mapping;
+}
+function currentProfileMapping(kind){
+ if(kind==='amount'){
+  const file=document.getElementById('onboardFile').files[0];
+  return amountMappingForUpload(file,document.getElementById('onboardTemplate').value);
+ }
+ return explicitDriverMapping();
+}
+async function saveCurrentMapping(kind){
+ try{
+  if(kind==='amount'&&!document.getElementById('onboardMapEnabled').checked)throw Error('请先启用金额字段映射并选择全部必填字段');
+  const name=document.getElementById(kind+'ProfileName').value.trim();
+  if(!/^[A-Za-z0-9_-]{1,48}$/.test(name))throw Error('配置名称只允许 1～48 位英文数字、下划线、短横线');
+  const c=currentMappingContract(kind),columns=currentProfileMapping(kind);
+  if(!columns)throw Error('尚未建立明确的字段映射');
+  const profile={schema:'allocation-field-map/v1',name,kind,dimensions:c.dimensions,precision:c.precision,weight_fields:c.weight_fields,columns};
+  await api('/api/multi/mapping-profiles',profile);
+  await loadMappingProfiles();document.getElementById(kind+'ProfileSelect').value=name;
+  message('映射配置已保存在本机独立配置库，可在其他兼容场景复用（没有保存任何金额或 Driver 明细）',true);
+ }catch(e){message('保存映射配置失败：'+e.message)}
+}
+function applySavedMapping(kind){
+ try{
+  const p=selectedMappingProfile(kind);
+  const header=kind==='amount'?amountHeader:driverHeader;
+  if(!header.length)throw Error('请先选择并读取当前源 CSV 的表头');
+  for(const [canonical,source] of Object.entries(p.columns)){
+   if(!header.includes(source))throw Error('当前 CSV 缺少源列：'+source+'（用于 '+canonical+'）');
+  }
+  if(kind==='amount'){
+   document.getElementById('onboardMapEnabled').checked=true;
+   renderAmountMapping();
+  }
+  const container=document.getElementById(kind==='amount'?'onboardMappings':'driverMappings');
+  const selections=[...container.querySelectorAll('select[data-canonical]')];
+  for(const [canonical] of Object.entries(p.columns)){
+   if(!selections.some(el=>el.dataset.canonical===canonical))throw Error('当前规则不存在目标字段：'+canonical);
+  }
+  // Check every source column/target first; apply only when the complete
+  // mapping can be represented. Never silently half-apply a saved profile.
+  for(const el of selections)el.value=p.columns[el.dataset.canonical]||'';
+  message('已应用映射配置 '+p.name+'。上传前仍会逐行校验全部 CSV 数据。',true);
+ }catch(e){message('不能应用此配置（原数据未修改）：'+e.message)}
+}
+function downloadMappingProfile(p){
+ const text=JSON.stringify(p,null,2)+'\n',url=URL.createObjectURL(new Blob([text],{type:'application/json;charset=utf-8'}));
+ const a=document.createElement('a');a.href=url;a.download=p.name+'.mapping.json';document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function exportSavedMapping(kind){
+ try{downloadMappingProfile(selectedMappingProfile(kind));message('已导出字段映射配置 JSON。可能包含企业字段名称，分享前请自行检查。',true)}
+ catch(e){message(e.message)}
+}
+async function importSavedMapping(kind){
+ const input=document.getElementById(kind+'ProfileImport'),file=input.files[0];
+ try{
+  if(!file)return;
+  if(file.size>16*1024||!/\.json$/i.test(file.name))throw Error('只支持小于 16 KiB 的配置 JSON');
+  const profile=JSON.parse(await file.text());
+  if(profile.kind!==kind)throw Error('导入配置类型与当前区域不一致');
+  if(!profileMatchesContract(profile,kind))throw Error('配置维度顺序、金额精度或必需因子字段与当前规则不兼容');
+  await api('/api/multi/mapping-profiles',profile);
+  await loadMappingProfiles();document.getElementById(kind+'ProfileSelect').value=profile.name;
+  message('配置已导入本机。选择“应用到当前字段”使用，不会自动导入任何业务数据。',true);
+ }catch(e){message('导入映射配置失败（已有配置不变）：'+e.message)}
+ finally{input.value=''}
+}
 async function api(path,body){const response=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:undefined);let v;try{v=await response.json()}catch{throw new Error('服务未返回合法 JSON')};if(!response.ok)throw new Error(v.error||'HTTP '+response.status);return v}
-function message(t,ok=false){const v=document.getElementById('message');v.style.display='block';v.style.color=ok?'#087657':'#b42f35';v.textContent=t}
+function message(t,ok=false){if(!ok&&typeof financeReadableError==='function'){const h=financeReadableError(t);if(h)t=h+'\n\n原始信息：'+t;}const v=document.getElementById('message');v.style.display='block';v.style.color=ok?'#087657':'#b42f35';v.textContent=t}
 async function list(){try{const v=await api('/api/multi/projects');const el=document.getElementById('project');let old=el.value;el.innerHTML=v.projects.map(x=>`<option>${x}</option>`).join('');if(v.projects.includes(old))el.value=old;if(el.value)await openProject()}catch(e){message(e.message)}}
 async function saveCache(){if(!data||!active){message('请先选择项目 / Choose project');return}try{await api('/api/multi/cache',{name:active,scope:document.getElementById('persistCache').checked?'project':'run',base_sha256:data.project_sha256,reuse_workers:document.getElementById('reuseWorkers').checked});message('缓存设置已保存 / Cache policy saved',true);await openProject()}catch(e){message(e.message)}}
 async function createProject(){try{let name=document.getElementById('newname').value.trim();if(!name)name='demo_'+Date.now();await api('/api/multi/create',{name});await list();document.getElementById('project').value=name;await openProject();message('项目建立成功，现在可以选择各科目规则',true)}catch(e){message(e.message)}}
-async function openProject(){active=document.getElementById('project').value;document.getElementById('inspectResult').textContent='数据或规则可能已变化，请重新体检。';try{data=await api('/api/multi/project?name='+encodeURIComponent(active));chosen=Object.fromEntries(data.assignments.map(x=>[x.account,x.template]));document.getElementById('persistCache').checked=data.driver_cache_scope==='project';document.getElementById('reuseWorkers').checked=!!data.reuse_workers;document.getElementById('count').textContent=data.count;document.getElementById('path').textContent=data.manualDataDir;document.getElementById('bulkrule').innerHTML=data.templates.map(x=>`<option value="${x}">${x}</option>`).join('');const templateSelect=document.getElementById('onboardTemplate');const previous=templateSelect.value;templateSelect.replaceChildren();for(const template of data.templates.filter(x=>data.template_columns?.[x])){const option=document.createElement('option');option.value=template;option.textContent=template;templateSelect.appendChild(option)}if([...templateSelect.options].some(x=>x.value===previous))templateSelect.value=previous;showOnboardColumns();renderTable()}catch(e){message(e.message)}}
+async function openProject(){document.getElementById('factorEditor').style.display='none';factorContext=null;active=document.getElementById('project').value;if(window.resetFinanceReadiness)resetFinanceReadiness();if(window.resetCoverage)resetCoverage();resetRuleExplanation();resetAcceptanceWorkspace();clearDesignerPreview();document.getElementById('dirty').textContent='无未保存更改';accountReport=[];document.getElementById('accountReport').style.display='none';document.getElementById('inspectResult').textContent='数据或规则可能已变化，请重新体检。';try{data=await api('/api/multi/project?name='+encodeURIComponent(active));chosen=Object.fromEntries(data.assignments.map(x=>[x.account,x.template]));document.getElementById('persistCache').checked=data.driver_cache_scope==='project';document.getElementById('reuseWorkers').checked=!!data.reuse_workers;document.getElementById('count').textContent=data.count;document.getElementById('path').textContent=data.manualDataDir;document.getElementById('bulkrule').innerHTML=data.templates.map(x=>`<option value="${x}">${x}</option>`).join('');const templateSelect=document.getElementById('onboardTemplate');const previous=templateSelect.value;templateSelect.replaceChildren();for(const template of data.templates.filter(x=>data.template_columns?.[x])){const option=document.createElement('option');option.value=template;option.textContent=template;templateSelect.appendChild(option)}if([...templateSelect.options].some(x=>x.value===previous))templateSelect.value=previous;showOnboardColumns();prepareAmountMapping();renderTable();if(window.quickGuideRefresh)window.quickGuideRefresh();refreshBusinessSetup();refreshMappingProfileSelects();loadReferenceStatus()}catch(e){message(e.message)}}
 function showOnboardColumns(){
  const box=document.getElementById('onboardColumns'),tpl=document.getElementById('onboardTemplate').value;
  const fields=data?.template_columns?.[tpl]||[];
@@ -63,6 +443,56 @@ function downloadOnboardTemplate(){
  const a=document.createElement('a'),url=URL.createObjectURL(b);
  a.href=url;a.download='amounts_header_template.csv';document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
 }
+async function prepareAmountMapping(){
+ const request=++amountMapRequest;
+ const box=document.getElementById('onboardMapStatus');
+ const file=document.getElementById('onboardFile').files[0];
+ const tpl=document.getElementById('onboardTemplate').value;
+ amountMappingFile=null;amountMappingTemplate='';amountHeader=[];
+ document.getElementById('onboardMappings').replaceChildren();
+ if(!file){box.textContent='请选择 CSV 文件；有中文或企业自定义表头时可直接映射。';renderAmountMapping();return}
+ if(!/\.csv$/i.test(file.name)||file.size>256*1024*1024){box.textContent='仅支持不超过 256 MiB 的 CSV 文件。';renderAmountMapping();return}
+ try{
+  const header=browserCSVHeader(await file.slice(0,Math.min(file.size,128*1024)).text());
+  if(request!==amountMapRequest || file!==document.getElementById('onboardFile').files[0] || tpl!==document.getElementById('onboardTemplate').value)return;
+  amountHeader=header;amountMappingFile=file;amountMappingTemplate=tpl;
+  const required=data?.template_columns?.[tpl]||[];
+  const different=required.some(key=>!header.includes(key));
+  document.getElementById('onboardMapEnabled').checked=different;
+  box.textContent=different?'源列名与模板不同，请逐项选择字段映射；所有必填维度和金额都必须有明确来源。':'表头已符合模板，可直接流式导入。也可手动启用映射以只保留指定列。';
+  renderAmountMapping();refreshMappingProfileSelects();
+ }catch(e){if(request===amountMapRequest){box.textContent='无法读取 CSV 表头：'+e.message;renderAmountMapping();refreshMappingProfileSelects()}}
+}
+function renderAmountMapping(){
+ const panel=document.getElementById('onboardMappings');panel.replaceChildren();
+ const enabled=document.getElementById('onboardMapEnabled').checked;
+ panel.style.display=enabled?'block':'none';
+ if(!enabled||!amountHeader.length)return;
+ const keys=data?.template_columns?.[document.getElementById('onboardTemplate').value]||[];
+ for(const key of [...keys,'row_id']){
+  const label=document.createElement('label');label.textContent=(key==='row_id'?'可选来源行标识：':'必填：')+key;
+  const select=document.createElement('select');select.dataset.canonical=key;
+  const none=document.createElement('option');none.value='';none.textContent=key==='row_id'?'— 不保留来源行号 —':'— 请选择来源字段 —';select.appendChild(none);
+  for(const h of amountHeader){const opt=document.createElement('option');opt.value=h;opt.textContent=h;select.appendChild(opt)}
+  if(amountHeader.includes(key))select.value=key;
+  label.appendChild(select);panel.appendChild(label);
+ }
+ const note=document.createElement('p');note.className='muted';note.textContent='只生成所选维度、amount 和可选 row_id；其余源列不会进入新项目。缺失、非法金额或重复映射都会拒绝导入。';panel.appendChild(note);
+}
+function amountMappingForUpload(file,template){
+ if(!document.getElementById('onboardMapEnabled').checked)return null;
+ if(!amountHeader.length||amountMappingFile!==file||amountMappingTemplate!==template)throw Error('字段映射尚未就绪，请重新选择源文件');
+ const required=data?.template_columns?.[template]||[];
+ const mapping={},used=new Set();
+ for(const select of document.querySelectorAll('#onboardMappings select[data-canonical]')){
+  const name=select.dataset.canonical,source=select.value;
+  if(!source){if(name!=='row_id')throw Error('必填字段尚未映射：'+name);continue}
+  if(used.has(source))throw Error('同一源字段不能映射给多个维度或金额：'+source);
+  used.add(source);mapping[name]=source;
+ }
+ for(const name of required)if(!mapping[name])throw Error('缺失字段映射：'+name);
+ return mapping;
+}
 async function onboardFromCSV(){
  const btn=document.getElementById('onboardBtn'),status=document.getElementById('onboardStatus');
  try{
@@ -74,62 +504,482 @@ async function onboardFromCSV(){
   if(!data.template_columns?.[template])throw new Error('请选择有效的规则模板');
   if(!file||!file.name.toLowerCase().endsWith('.csv'))throw new Error('请选择 CSV 文件');
   if(file.size>256*1024*1024)throw new Error('单次上传上限 256 MiB；更大的文件请放入本地项目文件夹');
-  const body=new FormData();body.append('name',name);body.append('source',active);body.append('template',template);body.append('csv',file,file.name);
+  const mapping=amountMappingForUpload(file,template);
+  const body=new FormData();body.append('name',name);body.append('source',active);body.append('template',template);
+  if(mapping)body.append('mapping',JSON.stringify(mapping));
+  body.append('csv',file,file.name);
   btn.disabled=true;status.textContent='正在流式读取金额、检查维度和精度、识别不同科目...';
   const response=await fetch('/api/multi/onboard',{method:'POST',body});
   let result;try{result=await response.json()}catch{throw new Error('服务未返回合法 JSON')}
   if(!response.ok)throw new Error(result.error||`HTTP ${response.status}`);
-  status.textContent=`创建成功：${result.project}\n不同科目 ${result.import.accounts} · 金额记录 ${result.import.amount_rows}\n输入金额 ${result.import.input_amount} · 文件 ${ (result.import.amounts_bytes/1048576).toFixed(2)} MiB\n\n下一步：选择各科目的规则 → 替换真实 Driver → 数据体检 → 执行 → 与参考结果逐坐标对账。`;
+  status.textContent=`创建成功：${result.project}\n不同科目 ${result.import.accounts} · 金额记录 ${result.import.amount_rows}\n输入金额 ${result.import.input_amount} · 标准金额文件 ${ (result.import.amounts_bytes/1048576).toFixed(2)} MiB\n${result.import.source_sha256?'原始数据 SHA-256 '+result.import.source_sha256+'\n':''}标准金额 SHA-256 ${result.import.amounts_sha256}\n\n下一步：确认不同科目的规则 → 使用真实 Driver → 数据体检 → 执行 → 与参考结果逐坐标对账。`;
   await list();document.getElementById('project').value=name;await openProject();
   message('已自动建立科目规则分派；请检查真实 Driver 和业务规则再执行',true);
  }catch(e){status.textContent='导入未完成，原项目未修改：'+e.message;message(e.message)}finally{btn.disabled=false}
 }
+function clearDesignerPreview(){
+ designerPreviewRequest++;
+ designerPlan=null;designerContext='';
+ document.getElementById('importDesignerBtn').disabled=true;
+ const box=document.getElementById('designerImportReport');
+ if(box)box.textContent='尚未检查，请点击“检查规则与 Driver 映射”。';
+}
+async function loadDesignerCases(){
+ const picker=document.getElementById('designerCase'),old=picker.value;
+ try{
+  const result=await api('/api/cases');
+  picker.replaceChildren();
+  for(const c of result.cases||[]){
+   const option=document.createElement('option');
+   option.value=c.id;option.textContent=(c.type==='custom'?'可编辑 · ':'示例 · ')+c.name+' / '+c.id;
+   picker.appendChild(option);
+  }
+  if([...picker.options].some(x=>x.value===old))picker.value=old;
+  clearDesignerPreview();
+  if(!picker.value)document.getElementById('designerImportReport').textContent='没有可用规则。先进入规则设计器创建并保存一个场景。';
+ }catch(e){document.getElementById('designerImportReport').textContent='获取设计器场景失败：'+e.message}
+}
+function designerMapping(){
+ const out={};
+ for(const picker of document.querySelectorAll('#designerDriverMapping select[data-alias]'))out[picker.dataset.alias]=picker.value;
+ return out;
+}
+async function previewDesignerTemplate(){
+ const box=document.getElementById('designerImportReport'),btn=document.getElementById('previewDesignerBtn');
+ const context=active+'|'+document.getElementById('designerCase').value+'|'+document.getElementById('designerTemplateName').value.trim();
+ const mapping=designerMapping();
+ const template=document.getElementById('designerTemplateName').value.trim();
+ clearDesignerPreview();
+ const requestId=designerPreviewRequest;
+ btn.disabled=true;box.textContent='正在检查设计器多阶段规则、项目维度、精度和 Driver 列头...';
+ try{
+  if(!active||!data)throw Error('请先选择多科目项目');
+  if(!/^[A-Za-z0-9_-]{1,48}\.json$/.test(template))throw Error('新模板文件名只能用英文数字、下划线、短横线和 .json');
+  if(data.templates.includes(template))throw Error('同名规则已存在，必须创建新模板，不会覆盖');
+  const response=await api('/api/multi/import-template',{name:active,case:document.getElementById('designerCase').value,template,preview:true,driver_mapping:mapping});
+  if(requestId!==designerPreviewRequest||context!==active+'|'+document.getElementById('designerCase').value+'|'+document.getElementById('designerTemplateName').value.trim())return;
+  designerContext=context;designerPlan=response;
+  const panel=document.getElementById('designerDriverMapping');
+  panel.replaceChildren();
+  for(const dr of response.drivers){
+   const label=document.createElement('label');label.textContent='Driver '+dr.alias+' · 需要字段 '+(dr.weight_fields||[]).join(', ');
+   const select=document.createElement('select');select.dataset.alias=dr.alias;
+   const names=new Set([dr.file,...response.available_drivers]);
+   for(const file of names){const opt=document.createElement('option');opt.value=file;opt.textContent=file;select.appendChild(opt)}
+   select.value=dr.file;select.onchange=()=>previewDesignerTemplate();label.appendChild(select);
+   const status=document.createElement('small');status.textContent=dr.ready?'字段已找到（尚未验证全部数据）':'待处理：'+dr.issue;
+   status.className=dr.ready?'good':'bad';label.appendChild(status);
+   panel.appendChild(label);
+  }
+  box.textContent=[
+   '规则：'+response.source_name+' · '+response.stages+' 个阶段',
+   '金额精度：'+response.precision+' 位小数',
+   '维度：'+response.dimensions.join(' / '),
+   'Driver 列头检查：'+(response.ready?'通过':'有待补全'),
+   '仅验证规则结构与 Driver 字段，不能代替运行前完整体检或业务对账。',
+   ...response.drivers.map(dr=>dr.alias+' → '+dr.file+(dr.issue?'：'+dr.issue:'：字段存在'))
+  ].join('\n');
+  document.getElementById('importDesignerBtn').disabled=false;
+ }catch(e){
+  if(requestId===designerPreviewRequest){
+   document.getElementById('designerDriverMapping').replaceChildren();
+   box.textContent='检查未通过：'+e.message;
+  }
+ }finally{if(requestId===designerPreviewRequest)btn.disabled=false}
+}
+async function importDesignerTemplate(){
+ const box=document.getElementById('designerImportReport'),button=document.getElementById('importDesignerBtn');
+ const template=document.getElementById('designerTemplateName').value.trim();
+ const context=active+'|'+document.getElementById('designerCase').value+'|'+template;
+ try{
+  if(!designerPlan||designerContext!==context)throw Error('请先重新检查当前设计器规则');
+  if(['未保存更改','导入待保存'].includes(document.getElementById('dirty').textContent))throw Error('已有未保存的科目分派，请先保存或刷新');
+  if(!designerPlan.ready&&!confirm('部分 Driver 文件或字段尚未就绪。允许先创建独立规则模板，但体检与计算会被阻断，直到真实 Driver 补齐。继续吗？'))return;
+  button.disabled=true;
+  const resp=await api('/api/multi/import-template',{name:active,case:document.getElementById('designerCase').value,template,preview:false,base_sha256:designerPlan.source_sha256,driver_mapping:designerMapping()});
+  const note=resp.import?.ready?'Driver 字段已找到，请执行完整体检。':'Driver 未全部就绪，先补充真实业务数据。';
+  await openProject();
+  box.textContent='新模板创建成功：'+template+'。\n未改变任何科目、数据或已发布结果。\n下一步：到下方科目表为所需科目选中该模板并保存；'+note;
+  message('新业务规则已导入；请明确分派科目，然后体检、运行、对账',true);
+ }catch(e){box.textContent='创建失败（未更改原项目规则分派）：'+e.message;message(e.message)}
+ finally{button.disabled=true;designerPlan=null;designerContext=''}
+}
+function csvCell(v){const s=String(v??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function exportCSV(filename,header,rows){
+ const csv='\ufeff'+[header,...rows].map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n';
+ const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function exportAssignments(){
+ if(!data)return message('请先选择项目');
+ exportCSV(active+'_assignments.csv',['account','template'],data.assignments.map(x=>[x.account,chosen[x.account]]));
+}
+// Excel-style CSV (including BOM, quoted commas, embedded quotes/newlines).
+// All rows are checked before touching the unsaved draft.
+function parseBusinessCSV(input){
+ const rows=[],row=[];let field='',quote=false,closed=false;
+ for(let i=0;i<input.length;i++){
+  const c=input[i];
+  if(quote){if(c==='"'){if(input[i+1]==='"'){field+='"';i++}else{quote=false;closed=true}}else{field+=c}continue}
+  if(c==='"'&&!field&&!closed){quote=true;continue}
+  if(c==='"'){throw Error('CSV 引号位置无效')}
+  if(c===','||c==='\n'||c==='\r'){
+   row.push(field);field='';closed=false;
+   if(c!==','){if(row.some(x=>x!=='')||rows.length){rows.push(row.slice())}row.length=0;if(c==='\r'&&input[i+1]==='\n')i++}
+  }else{if(closed)throw Error('CSV 闭合引号后存在非法字符');field+=c}
+ }
+ if(quote)throw Error('CSV 引号未闭合');
+ if(field!==''||row.length){row.push(field);rows.push(row.slice())}
+ return rows;
+}
+async function importAssignments(){
+ const el=document.getElementById('assignmentFile'),file=el.files[0];
+ try{
+  if(!data||!active)throw Error('请先选择项目');
+  if(!file)return;
+  if(file.size>2*1024*1024)throw Error('分派文件最多 2 MiB');
+  const rows=parseBusinessCSV((await file.text()).replace(/^\ufeff/,''));
+  if(!rows.length||rows[0].length!==2||rows[0][0]!=='account'||rows[0][1]!=='template')throw Error('表头必须是 account,template');
+  const known=new Set(data.assignments.map(x=>x.account)),templates=new Set(data.templates),next={};
+  for(const row of rows.slice(1)){
+   if(row.length!==2||!known.has(row[0]))throw Error('未知科目或列数不正确：'+row[0]);
+   if(Object.prototype.hasOwnProperty.call(next,row[0]))throw Error('重复科目：'+row[0]);
+   if(!templates.has(row[1]))throw Error('不存在的规则模板：'+row[1]);
+   next[row[0]]=row[1];
+  }
+  if(Object.keys(next).length!==known.size)throw Error('科目数量不一致：文件 '+Object.keys(next).length+' / 项目 '+known.size+'，不得漏填');
+  chosen=next;renderTable();
+  message('已校验并预览 '+known.size+' 个科目分派；点击保存后才生效',true);
+ }catch(e){message('导入失败，未修改原有配置：'+e.message)}finally{el.value=''}
+}
+function showAccountReport(summary){
+ accountReport=Array.isArray(summary?.details)?summary.details:[];
+ document.getElementById('accountReport').style.display=accountReport.length?'block':'none';
+ renderAccountReport();
+}
+function renderAccountReport(){
+ const body=document.getElementById('accountReportRows');body.replaceChildren();
+ const q=document.getElementById('resultSearch').value.trim().toLowerCase();
+ const status=document.getElementById('resultStatus').value;
+ const matching=accountReport.filter(x=>(!status||x.status===status)&&[x.account,x.template,x.status].some(v=>String(v??'').toLowerCase().includes(q)));
+ for(const row of matching.slice(0,500)){
+  const tr=document.createElement('tr');
+  for(const key of ['account','template','input_amount','output_amount','result_rows','status']){
+   const td=document.createElement('td');td.textContent=String(row[key]??'');
+   if(key==='status')td.className=row.status==='PASS'?'good':'bad';
+   tr.appendChild(td);
+  }
+  body.appendChild(tr);
+ }
+ document.getElementById('accountReportCount').textContent='显示 '+Math.min(500,matching.length)+' / '+matching.length+' 个筛选结果，完整 '+accountReport.length+' 个科目可导出 CSV';
+}
+function exportAccountReport(){
+ if(!accountReport.length)return message('请先选择有逐科目汇总的成功任务');
+ const keys=['account','template','input_amount','output_amount','result_rows','status'];
+ exportCSV(active+'_account_results.csv',keys,accountReport.map(x=>keys.map(k=>x[k]??'')));
+}
+
+function resetRuleExplanation(){
+ ruleExplainRequest++;ruleExplanation=null;
+ const panel=document.getElementById('ruleExplainPanel');if(panel)panel.style.display='none';
+ const btn=document.getElementById('ruleExplainExport');if(btn)btn.style.display='none';
+}
+function ruleNode(tag,value,cls){
+ const e=document.createElement(tag);
+ if(value!==undefined)e.textContent=String(value);
+ if(cls)e.className=cls;
+ return e;
+}
+function routeSummary(route){
+ let result=route.name+'：'+route.grouping+' → '+route.target_mode;
+ if(route.target_value)result+=' '+route.target_value;
+ if(route.include?.length)result+=' ['+route.include.join('、')+']';
+ if(route.exclude?.length)result+=' 排除['+route.exclude.join('、')+']';
+ if(route.conserved)result+=' · 守恒';
+ return result;
+}
+function filterSummary(filters){
+ const result=[];
+ for(const [dim,filter] of Object.entries(filters||{})){
+  const terms=[];
+  if(filter.include?.length)terms.push('包含 '+filter.include.join('、'));
+  if(filter.exclude?.length)terms.push('排除 '+filter.exclude.join('、'));
+  if(terms.length)result.push(dim+': '+terms.join(' / '));
+ }
+ return result.join('；');
+}
+async function showEffectiveRule(account){
+ const request=++ruleExplainRequest,project=active;
+ const panel=document.getElementById('ruleExplainPanel');
+ const target=document.getElementById('ruleExplainContent');
+ panel.style.display='block';
+ target.replaceChildren(ruleNode('p','正在读取 '+account+' 的实际生效规则...','muted'));
+ document.getElementById('ruleExplainExport').style.display='none';
+ ruleExplanation=null;
+ try{
+  if(!project||!data)throw Error('请先选择项目');
+  const view=await api('/api/multi/account-plan?name='+encodeURIComponent(project)+'&account='+encodeURIComponent(account));
+  if(request!==ruleExplainRequest||project!==active)return;
+  ruleExplanation=view;target.replaceChildren();
+  target.appendChild(ruleNode('h3',view.account+' · '+view.template));
+  target.appendChild(ruleNode('p','有效规则组 '+view.effective_group_id+' · '+view.stages.length+' 个阶段 · 金额精度 '+view.precision+' 位','muted'));
+  target.appendChild(ruleNode('p','当前规则 SHA-256：'+view.rule_sha256,'muted'));
+  const saved=data.assignments.find(x=>x.account===account)?.template;
+  if(chosen[account]!==saved)target.appendChild(ruleNode('p','页面尚有未保存的科目分派，此处展示已保存的生效规则。','bad'));
+  target.appendChild(ruleNode('p','尾差政策：'+(view.rounding_policy||'LARGEST_REMAINDER_IDENTITY')+'（同余数按稳定目标标识排序）','muted'));
+  target.appendChild(ruleNode('p','不可变维度：'+(view.immutable_dimensions||[]).join('、'),'muted'));
+  for(const [index,stage] of view.stages.entries()){
+   const section=document.createElement('details');section.open=index===0;
+   section.style.padding='10px 0';section.style.borderTop='1px solid #dae6f5';
+   const title=ruleNode('summary',(index+1)+'. '+stage.id+' · '+stage.operation+(stage.enabled?'':' · 停用'));
+   title.style.cursor='pointer';title.style.fontWeight='700';section.appendChild(title);
+   section.appendChild(ruleNode('p','金额来源：'+(stage.inputs||[]).map(x=>x.from+'（份额 '+(x.share||'1')+'）').join(' + '),'muted'));
+   section.appendChild(ruleNode('p','守恒边界：'+(stage.conservation_keys||[]).join('、'),'muted'));
+   const filters=filterSummary(stage.source_filters);
+   if(filters)section.appendChild(ruleNode('p','来源筛选：'+filters,'muted'));
+   section.appendChild(ruleNode('strong','分摊因子与实际比例'));
+   if(!(stage.drivers||[]).length){
+    section.appendChild(ruleNode('p','本阶段没有分摊因子，请结合操作类型理解。','muted'));
+   }else{
+    const table=document.createElement('table'),thead=document.createElement('thead'),head=document.createElement('tr');
+    for(const label of ['分摊路径','Driver 文件 / 字段','比例','状态'])head.appendChild(ruleNode('th',label));
+    thead.appendChild(head);table.appendChild(thead);
+    const tbody=document.createElement('tbody');
+    for(const driver of stage.drivers){
+     const tr=document.createElement('tr');
+     for(const val of [driver.allocation,driver.dataset+' / '+driver.file+' / '+driver.weight_field,driver.share,driver.enabled?'启用':'停用'])tr.appendChild(ruleNode('td',val));
+     tbody.appendChild(tr);
+     if(driver.negative_policy==='ALLOW_SIGNED'){
+      const risk=document.createElement('tr'),cell=ruleNode('td','负权重特例：'+(driver.signed_driver_reason||'未提供业务原因')+'。可能产生负金额或超出来源金额的目标结果。','bad');
+      cell.colSpan=4;risk.appendChild(cell);tbody.appendChild(risk);
+     }
+     const detail=filterSummary(driver.filters);
+     if(detail){
+      const row=document.createElement('tr'),td=ruleNode('td','Driver 筛选：'+detail,'muted');
+      td.colSpan=4;row.appendChild(td);tbody.appendChild(row);
+     }
+    }
+    table.appendChild(tbody);section.appendChild(table);
+   }
+   section.appendChild(ruleNode('strong','维度流向（汇总粒度 → 目标粒度）'));
+   const list=document.createElement('ul');list.style.paddingLeft='20px';
+   for(const route of stage.dimensions||[])list.appendChild(ruleNode('li',routeSummary(route)));
+   section.appendChild(list);target.appendChild(section);
+  }
+  target.appendChild(ruleNode('p','规则说明仅针对当前配置。运行前须 Inspect，运行后须独立参考结果逐坐标对账。','muted'));
+  document.getElementById('ruleExplainExport').style.display='inline-block';
+  panel.scrollIntoView({block:'nearest',behavior:'smooth'});
+ }catch(e){
+  if(request===ruleExplainRequest)target.replaceChildren(ruleNode('p','无法读取实际生效规则：'+e.message,'bad'));
+ }
+}
+function exportRuleExplanation(){
+ if(!ruleExplanation)return message('请先选择一个已保存的科目规则');
+ const p=ruleExplanation,rows=[];
+ for(const [index,stage] of p.stages.entries()){
+  const drivers=stage.drivers?.length?stage.drivers:[null];
+  for(const driver of drivers){
+   rows.push([p.account,p.template,p.rule_sha256,index+1,stage.id,stage.operation,
+    (stage.inputs||[]).map(x=>x.from+':'+(x.share||'1')).join(' | '),
+    (stage.conservation_keys||[]).join(' | '),
+    (stage.dimensions||[]).map(routeSummary).join(' | '),
+    driver?.allocation||'',driver?.dataset||'',driver?.file||'',driver?.weight_field||'',driver?.share||'',driver?.negative_policy||'REJECT',driver?.signed_driver_reason||'',driver?.enabled===false?'停用':'启用']);
+  }
+ }
+ exportCSV('effective_rule_'+p.account.replace(/[^A-Za-z0-9_-]/g,'_')+'.csv',
+ ['account','template','rule_sha256','stage_order','stage','operation','inputs','conservation_keys','dimensions','allocation','driver_dataset','driver_file','weight_field','share','negative_policy','signed_driver_reason','status'],rows);
+}
+
 function filtered(){if(!data)return [];let q=document.getElementById('search').value.toLowerCase();return data.assignments.filter(x=>x.account.toLowerCase().includes(q))}
-function renderTable(){const v=document.getElementById('rows');if(!data)return;let matches=filtered();v.replaceChildren();for(const item of matches.slice(0,250)){let tr=document.createElement('tr'),td=document.createElement('td'),pick=document.createElement('td'),select=document.createElement('select');td.textContent=item.account;for(const tpl of data.templates){const option=document.createElement('option');option.value=tpl;option.textContent=tpl;select.appendChild(option)}select.value=chosen[item.account];select.onchange=()=>{chosen[item.account]=select.value;document.getElementById('dirty').textContent='未保存更改'};pick.appendChild(select);let action=document.createElement('td'),btn=document.createElement('button');btn.className='alt';btn.textContent='配置因子';btn.onclick=()=>editFactors(item.account);action.appendChild(btn);tr.append(td,pick,action);v.appendChild(tr)}document.getElementById('hint').textContent=`显示 ${Math.min(matches.length,250)} / ${matches.length} 科目；当前批量操作覆盖全部筛选结果。`;}
-function bulkAll(){const rule=document.getElementById('bulkrule').value;for(const x of filtered())chosen[x.account]=rule;renderTable();document.getElementById('dirty').textContent='未保存更改'}
-async function save(){try{await api('/api/multi/assign',{name:active,updates:data.assignments.map(x=>({account:x.account,template:chosen[x.account]}))});document.getElementById('dirty').textContent='已保存';message('所有科目映射已写入 assignments.csv',true);await openProject()}catch(e){message(e.message)}}
-async function editFactors(account){try{const v=await api('/api/multi/factor?name='+encodeURIComponent(active)+'&account='+encodeURIComponent(account));factorContext=v;const box=document.getElementById('factorEditor');box.style.display='block';document.getElementById('factorTitle').textContent='独立因子配置：'+account;const target=document.getElementById('factorRows');target.replaceChildren();const dr=Object.keys(v.rule.datasets.drivers);for(const st of v.rule.stages||[]){const title=document.createElement('h3');title.textContent=st.id;title.style.fontSize='14px';target.appendChild(title);for(const a of st.allocations||[]){const old=v.overrides.find(x=>x.stage===st.id&&x.allocation===a.id)||{};const wrapper=document.createElement('div');wrapper.className='row';wrapper.style.marginBottom='10px';wrapper.dataset.stage=st.id;wrapper.dataset.allocation=a.id;const label=document.createElement('strong');label.textContent=a.id;label.style.width='95px';const sel=document.createElement('select');sel.style.width='150px';sel.dataset.key='driver_dataset';for(const d of dr){const op=document.createElement('option');op.value=d;op.textContent=d;sel.appendChild(op)}sel.value=old.driver_dataset||a.driver_dataset;const field=document.createElement('input');field.style.width='135px';field.dataset.key='weight_field';field.value=old.weight_field||a.weight_field;field.placeholder='权重字段';const share=document.createElement('input');share.style.width='90px';share.dataset.key='share';share.value=old.share||a.share||'1';share.placeholder='比例 0-1';wrapper.append(label,sel,field,share);target.appendChild(wrapper)}}box.scrollIntoView({behavior:'smooth',block:'nearest'})}catch(e){message(e.message)}}
-async function saveFactors(){try{const v=factorContext;if(!v)return;const rows=[];for(const div of document.querySelectorAll('#factorRows .row')){const get=k=>div.querySelector('[data-key="'+k+'"]').value;rows.push({account:v.account,stage:div.dataset.stage,allocation:div.dataset.allocation,driver_dataset:get('driver_dataset'),weight_field:get('weight_field'),share:get('share')})};await api('/api/multi/factor',{name:active,account:v.account,rows});message('已保存 '+v.account+' 的因子覆盖，请运行后检查每个科目金额分布',true)}catch(e){message(e.message)}}
+function renderTable(){const v=document.getElementById('rows');if(!data)return;let matches=filtered();v.replaceChildren();for(const item of matches.slice(0,250)){let tr=document.createElement('tr'),td=document.createElement('td'),pick=document.createElement('td'),select=document.createElement('select');td.textContent=item.account;for(const tpl of data.templates){const option=document.createElement('option');option.value=tpl;option.textContent=tpl;select.appendChild(option)}select.value=chosen[item.account];select.onchange=()=>{chosen[item.account]=select.value;refreshAssignmentChangeCount()};pick.appendChild(select);let action=document.createElement('td'),btn=document.createElement('button');btn.className='alt';btn.textContent='配置因子';btn.onclick=()=>editFactors(item.account);action.appendChild(btn);const explain=document.createElement('button');explain.className='alt';explain.style.marginLeft='6px';explain.textContent='查看生效规则';explain.onclick=()=>showEffectiveRule(item.account);action.appendChild(explain);tr.append(td,pick,action);v.appendChild(tr)}document.getElementById('hint').textContent=`显示 ${Math.min(matches.length,250)} / ${matches.length} 科目；当前批量操作覆盖全部筛选结果。`;refreshAssignmentChangeCount();}
+function assignmentChanges(){
+ if(!data)return [];
+ return data.assignments.filter(x=>chosen[x.account]!==x.template).map(x=>({account:x.account,before:x.template,after:chosen[x.account]||''}));
+}
+function refreshAssignmentChangeCount(){
+ const count=assignmentChanges().length,el=document.getElementById('dirty');
+ if(el)el.textContent=count?'待保存 '+count+' 项':'无未保存更改';
+ const report=document.getElementById('assignmentDiffPreview');
+ if(report)report.style.display='none';
+}
+function previewAssignmentChanges(){
+ const delta=assignmentChanges(),box=document.getElementById('assignmentDiffPreview');
+ box.style.display='block';
+ box.textContent=delta.length?'共 '+delta.length+' 个科目规则将改变：\n'+delta.slice(0,100).map(x=>x.account+'：'+x.before+' → '+x.after).join('\n')+(delta.length>100?'\n其余变更请导出完整清单。':''):'当前没有未保存的科目规则变更。';
+}
+function exportAssignmentChanges(){
+ const delta=assignmentChanges();
+ if(!delta.length)return message('当前没有未保存的规则变更');
+ exportCSV(active+'_assignment_changes.csv',['account','previous_template','new_template'],delta.map(x=>[x.account,x.before,x.after]));
+}
+function bulkAll(){const rule=document.getElementById('bulkrule').value;for(const x of filtered())chosen[x.account]=rule;renderTable()}
+async function save(){try{const delta=assignmentChanges();if(!delta.length){message('没有需要保存的分派变更',true);return false}if(delta.length>=20&&!confirm('将修改 '+delta.length+' 个科目的分摊规则。请确认已核对变更清单，是否继续保存？'))return false;await api('/api/multi/assign',{name:active,base_sha256:data.assignments_sha256,updates:data.assignments.map(x=>({account:x.account,template:chosen[x.account]}))});document.getElementById('dirty').textContent='已保存';message('所有科目映射已写入 assignments.csv',true);await openProject();return true}catch(e){message(e.message);return false}}
+async function editFactors(account){return financeFactorOpen(account)}
+async function saveFactors(){return financeFactorSave()}
 async function upload(){try{const f=document.getElementById('csvfile').files[0];if(!f)throw new Error('请先选择 CSV 文件');if(f.size>5*1024*1024)throw new Error('超出5MB，使用文件管理器复制到项目目录');const content=await f.text();await api('/api/multi/upload',{name:active,file:document.getElementById('file').value,content});message('CSV 导入成功',true);await openProject()}catch(e){message(e.message)}}
 async function inspectProject(){
  const box=document.getElementById('inspectResult');const btn=document.getElementById('inspectBtn');
+ const project=active;const requestId=++financeReadinessRequest;
  if(!active){message('请先创建并选择项目');return}
  btn.disabled=true;box.textContent='正在流式检查金额、科目分派与不同 Driver 文件...';
  try {
-   const r=await api('/api/multi/preflight',{name:active});
+   const r=await api('/api/multi/preflight',{name:project});
+   if(project!==active || requestId!==financeReadinessRequest)return;
+   renderFinanceReadiness(r);
    const lines=[`输入体检：${r.status==='PASS'?'PASS（输入格式通过）':'BLOCK（发现输入问题）'}`,
     `科目 ${r.accounts} · 有效规则组 ${r.rule_groups} · 金额记录 ${r.amount_rows}`,
     `待分摊金额 ${r.input_amount} · Driver 文件 ${r.unique_driver_files} · 规则引用 ${r.driver_references}`,
     `体检耗时 ${r.elapsed_ms} ms`,
-    ...r.drivers.map(x=>`因子 ${x.name}：${x.rows} 行 · ${x.referenced_by_rule_groups} 组规则引用 · 字段 ${x.weight_fields.join(', ')}${x.error?' · ERROR '+x.error:''}`),
     ...r.problems.map(x=>'错误：'+x),
     '注意：体检不验证实际分摊比例、金额守恒或原系统结果；需执行分摊后另行对账。'];
    box.style.borderColor=r.status==='PASS'?'#88cfb4':'#eca0a0';box.textContent=lines.join('\n');
  }catch(e){box.style.borderColor='#eca0a0';box.textContent='检查失败：'+e.message}
  finally{btn.disabled=false}
 }
+function resetAcceptanceWorkspace(){
+ acceptanceRequest++;referenceSnapshot=null;acceptanceReport=null;acceptanceSelectedJob='';
+ const history=document.getElementById('acceptanceHistory');history.replaceChildren();
+ document.getElementById('acceptanceDashboard').style.display='none';
+ document.getElementById('acceptanceDiffs').style.display='none';
+ document.getElementById('reconcileResult').textContent='尚未检查独立参考结果 / Not compared';
+ document.getElementById('referenceStatus').textContent='请选择当前项目并检查参考结果状态。';
+}
+function downloadReferenceHeader(){
+ if(!data||!data.assignments?.length)return message('请先选择包含科目规则的项目');
+ const template=data.assignments[0].template;
+ const columns=data.template_columns?.[template];
+ if(!columns?.length)return message('当前项目模板缺少有效维度定义');
+ exportCSV(active+'_reference_header.csv',[...columns.filter(c=>c!=='amount'),'value'],[]);
+}
+async function loadReferenceStatus(){
+ const project=active,box=document.getElementById('referenceStatus');
+ if(!project){referenceSnapshot=null;box.textContent='未选择项目';return}
+ box.textContent='正在检查当前项目的参考文件版本...';
+ try{
+  const s=await api('/api/multi/reference?name='+encodeURIComponent(project));
+  if(project!==active)return;
+  referenceSnapshot=s;
+  box.textContent=s.exists?('当前存在 reference.csv · '+(s.bytes/1048576).toFixed(2)+' MiB\nSHA-256：'+s.sha256+'\n可上传新版，需确认覆盖；历史对账仍保留。'):'没有参考文件。先上传来自独立系统的 CSV，再选择成功任务进行对账。';
+ }catch(e){if(project===active){referenceSnapshot=null;box.textContent='无法读取参考文件状态：'+e.message}}
+}
+async function uploadBusinessReference(){
+ const project=active,box=document.getElementById('referenceStatus'),btn=document.getElementById('referenceUploadBtn');
+ try{
+  const file=document.getElementById('referenceFile').files[0];
+  if(!project||!data)throw Error('请先选择项目');
+  if(!file||!/\.csv$/i.test(file.name))throw Error('请选择 .csv 参考文件');
+  if(file.size>256*1024*1024)throw Error('单次上传最大 256 MiB，大文件可通过项目目录操作');
+  if(!referenceSnapshot)throw Error('请先刷新参考文件状态');
+  const prior=referenceSnapshot.sha256||'';
+  const replace=!!referenceSnapshot.exists;
+  if(replace&&!confirm('当前项目已存在 reference.csv。\n确认使用新文件替换旧参考文件？\n历史验收报告不会删除，但不能代表新参考文件。\n旧参考 SHA-256：'+prior))return;
+  const form=new FormData();
+  for(const [k,v] of [['name',project],['replace',String(replace)],['base_sha256',prior]])form.append(k,v);
+  form.append('csv',file,file.name);
+  btn.disabled=true;box.textContent='正在流式读取并验证全部参考坐标、金额精度与字段...';
+  const response=await fetch('/api/multi/reference-upload',{method:'POST',body:form});
+  let result;try{result=await response.json()}catch{throw Error('服务器未返回合法 JSON')}
+  if(!response.ok)throw Error(result.error||'HTTP '+response.status);
+  if(project!==active)return;
+  referenceSnapshot={exists:true,bytes:result.bytes,sha256:result.sha256};
+  box.textContent='参考文件验证并保存成功：'+result.rows+' 行 · 金额合计 '+result.total+'\n金额精度 '+result.precision+' 位 · SHA-256：'+result.sha256+'\n注意：必须对选择的成功计算任务重新执行对账，之前的 MATCH 只是历史记录。';
+  message('独立参考文件已更新。下一步请选择成功任务并点击逐坐标对账。',true);
+ }catch(e){if(project===active)box.textContent='导入失败，原参考文件保持不变：'+e.message}
+ finally{btn.disabled=false}
+}
+function showAcceptanceDashboard(report,reportName='',historical=true){
+ acceptanceReport=report;
+ const panel=document.getElementById('acceptanceDashboard');panel.style.display='block';
+ const issues=(report.different||0)+(report.missing||0)+(report.extra||0);
+ const headline=document.getElementById('acceptanceHeadline');
+ headline.textContent=(report.status==='MATCH'?'MATCH · 逐坐标一致':'DIFFERENCES · 发现不一致')+' · '+(report.accounts?.length||0)+' 个科目 · '+issues+' 个问题坐标';
+ headline.style.color=report.status==='MATCH'?'#087657':'#b42f35';
+ const provenance=document.getElementById('acceptanceProvenance');
+ provenance.textContent=(historical?'历史快照验收记录：':'刚完成的对账：')+(reportName||'当前报告')+'\n参考数据 SHA-256：'+report.reference_sha256+'\n引擎输出 SHA-256：'+report.actual_sha256+'\n精度 '+report.precision+' 位 · 容差 '+report.tolerance+' · 重复坐标策略 '+report.duplicate_policy;
+ renderAcceptanceAccounts();
+ const link=document.getElementById('acceptanceDiffs'),job=document.getElementById('jobHistory').value||busyJob;
+ if(job&&reportName){
+  link.href='/api/multi/acceptance?name='+encodeURIComponent(active)+'&job='+encodeURIComponent(job)+'&report='+encodeURIComponent(reportName)+'&download=differences';
+  link.style.display='inline';link.download='differences.csv';
+ }else{link.style.display='none'}
+}
+function renderAcceptanceAccounts(){
+ const tbody=document.getElementById('acceptanceRows');tbody.replaceChildren();
+ const accounts=acceptanceReport?.accounts||[];
+ const q=document.getElementById('acceptanceSearch').value.trim().toLowerCase(),mode=document.getElementById('acceptanceFilter').value;
+ const shown=accounts.filter(r=>{
+  const has=(r.different||0)+(r.missing||0)+(r.extra||0)>0;
+  return r.account.toLowerCase().includes(q) && (mode==='all'||(mode==='issues'&&has)||(mode==='pass'&&!has));
+ });
+ for(const acc of shown.slice(0,500)){
+  const row=document.createElement('tr');
+  const has=(acc.different||0)+(acc.missing||0)+(acc.extra||0)>0;
+  for(const v of [acc.account,acc.matched,acc.different,acc.missing,acc.extra,has?'差异':'一致']){
+   const cell=document.createElement('td');cell.textContent=String(v??'');row.appendChild(cell);
+  }
+  row.lastElementChild.className=has?'bad':'good';tbody.appendChild(row);
+ }
+ document.getElementById('acceptanceCount').textContent='显示 '+Math.min(shown.length,500)+' / '+shown.length+' 个筛选科目，报告包含 '+accounts.length+' 个科目；可完整导出 CSV。';
+}
+function exportAcceptanceAccounts(){
+ if(!acceptanceReport)return message('请先选择验收报告');
+ const header=['account','matched','different','missing','extra','status'];
+ const rows=(acceptanceReport.accounts||[]).map(a=>[a.account,a.matched,a.different,a.missing,a.extra,(a.different+a.missing+a.extra)>0?'DIFFERENCES':'MATCH']);
+ exportCSV(active+'_acceptance_by_account.csv',header,rows);
+}
+async function loadAcceptanceHistory(preferred=''){
+ const request=++acceptanceRequest,project=active,job=document.getElementById('jobHistory').value||busyJob;
+ const select=document.getElementById('acceptanceHistory');select.replaceChildren();
+ document.getElementById('acceptanceDashboard').style.display='none';
+ acceptanceReport=null;
+ if(!project||!job)return;
+ acceptanceSelectedJob=job;
+ try{
+  const result=await api('/api/multi/acceptance?name='+encodeURIComponent(project)+'&job='+encodeURIComponent(job));
+  if(request!==acceptanceRequest||active!==project||acceptanceSelectedJob!==job)return;
+  for(const rep of result.reports||[]){
+   const opt=document.createElement('option');opt.value=rep.name;
+   opt.textContent=rep.name.slice(11,26)+' · '+rep.status+' · '+(rep.different+rep.missing+rep.extra)+' 差异坐标';select.appendChild(opt);
+  }
+  if(preferred&&[...select.options].some(o=>o.value===preferred))select.value=preferred;
+  if(select.value)await openAcceptanceReport();
+  else document.getElementById('reconcileResult').textContent='当前任务尚无参考结果对账记录。';
+ }catch(e){if(request===acceptanceRequest)document.getElementById('reconcileResult').textContent='读取验收历史失败：'+e.message}
+}
+async function openAcceptanceReport(){
+ const job=document.getElementById('jobHistory').value||busyJob,report=document.getElementById('acceptanceHistory').value;
+ const project=active,request=acceptanceRequest;
+ if(!project||!job||!report)return;
+ try{
+  const data=await api('/api/multi/acceptance?name='+encodeURIComponent(project)+'&job='+encodeURIComponent(job)+'&report='+encodeURIComponent(report));
+  if(request!==acceptanceRequest||project!==active||acceptanceSelectedJob!==job||document.getElementById('acceptanceHistory').value!==report)return;
+  showAcceptanceDashboard(data.report,report,true);
+  document.getElementById('reconcileResult').textContent='已载入历史对账：'+data.report.status+'\n一致 '+data.report.matched+' · 金额不符 '+data.report.different+' · 引擎缺少 '+data.report.missing+' · 引擎多余 '+data.report.extra+'\n请查看下方逐科目表及下载完整差异。';
+ }catch(e){if(project===active)document.getElementById('reconcileResult').textContent='读取验收报告失败：'+e.message}
+}
 async function reconcileReference(){
  const box=document.getElementById('reconcileResult'),btn=document.getElementById('reconcileBtn');
- const id=document.getElementById('jobHistory').value||busyJob;
- if(!active||!id){box.textContent='请先选择一个成功完成的项目任务。';return}
- btn.disabled=true;box.textContent='正在逐坐标对齐和校验；大文件会在本机建立临时分区...';
+ const id=document.getElementById('jobHistory').value||busyJob,project=active;
+ if(!project||!id){box.textContent='请先选择一个成功完成的项目任务。';return}
+ btn.disabled=true;box.textContent='正在逐坐标对齐两份独立数据快照，并核对各科目...';
  try{
-  const r=(await api('/api/multi/reconcile',{name:active,job:id,precision:Number(document.getElementById('refPrecision').value),tolerance:document.getElementById('refTolerance').value.trim(),reject_duplicates:document.getElementById('rejectDup').checked})).report;
-  const lines=[`验收结论：${r.status==='MATCH'?'MATCH / 逐坐标一致':'DIFFERENCES / 发现差异'}`,
-   `已比对坐标：一致 ${r.matched} · 金额不符 ${r.different} · 缺少 ${r.missing} · 多余 ${r.extra}`,
-   `参考总金额 ${r.reference_total} · 本引擎总金额 ${r.actual_total}（只作辅助诊断）`,
-   `参考行数 ${r.reference_rows} · 引擎行数 ${r.actual_rows} · 耗时 ${r.elapsed_ms} ms`,
-   `重复坐标（额外行）: 参考 ${r.reference_duplicate_rows||0} · 引擎 ${r.actual_duplicate_rows||0} · 策略 ${r.duplicate_policy||'AGGREGATE'}`,
-   `验收科目：${r.accounts.length}，下面展示差异最大的 10 个坐标：`,
-   ...(r.top_differences||[]).slice(0,10).map(d=>`${d.kind}: ${d.coordinate} | 参考 ${d.reference_amount} / 引擎 ${d.actual_amount} / 差额 ${d.difference}`),
-   `完整报告保存在任务本地结果目录的 acceptance-* 文件夹中（summary.json / differences.csv）`,
-   `注意：仅证明两份快照按指定精度和容差进行逐坐标比较，不自动证明参考规则正确。`];
+  const response=await api('/api/multi/reconcile',{name:project,job:id,precision:Number(document.getElementById('refPrecision').value),tolerance:document.getElementById('refTolerance').value.trim(),reject_duplicates:document.getElementById('rejectDup').checked});
+  if(project!==active)return;
+  const r=response.report;
+  const lines=['验收结论：'+r.status,'一致 '+r.matched+' · 金额不符 '+r.different+' · 引擎缺少 '+r.missing+' · 引擎多余 '+r.extra,
+   '参考总额 '+r.reference_total+' · 引擎总额 '+r.actual_total+'（不能代替逐坐标核验）',
+   '对账耗时 '+r.elapsed_ms+' ms · 独立参考 '+r.reference_rows+' 行 · 引擎结果 '+r.actual_rows+' 行',
+   '已生成不可覆盖的验收记录；下方可按科目筛选和下载全部坐标差异。'];
   box.style.color=r.status==='MATCH'?'#087657':'#b42f35';box.textContent=lines.join('\n');
- }catch(e){box.style.color='#b42f35';box.textContent='验收失败：'+e.message}finally{btn.disabled=false}
+  await loadAcceptanceHistory(response.report_id||'');
+ }catch(e){if(project===active){box.style.color='#b42f35';box.textContent='验收失败：'+e.message}}
+ finally{btn.disabled=false}
 }
-async function run(){try{const v=await api('/api/multi/run',{name:active});busyJob=v.id;document.getElementById('run').disabled=true;document.getElementById('cancel').disabled=false;document.getElementById('job').textContent='任务提交：'+busyJob;document.getElementById('download').style.display='none';if(interval)clearInterval(interval);interval=setInterval(poll,1200);await poll()}catch(e){message(e.message)}}
+async function run(){try{const v=await api('/api/multi/run',{name:active});busyJob=v.id;resetStageEvidence();renderFailureDiagnosis({status:'QUEUED'});document.getElementById('run').disabled=true;document.getElementById('cancel').disabled=false;document.getElementById('job').textContent='任务提交：'+busyJob;document.getElementById('download').style.display='none';if(interval)clearInterval(interval);interval=setInterval(poll,1200);await poll()}catch(e){message(e.message)}}
 async function cancelRun(){if(!busyJob)return;try{await api('/api/multi/jobs/'+busyJob+'/cancel',{});document.getElementById('cancel').disabled=true;message('已请求取消；当前引擎将停止执行并清理未发布的数据')}catch(e){message(e.message)}}
-async function poll(){try{const v=await api('/api/multi/jobs/'+busyJob);const j=v.job,summary=v.summary;document.getElementById('job').textContent=summary?
+async function poll(){try{const v=await api('/api/multi/jobs/'+busyJob);const j=v.job,summary=v.summary;renderFailureDiagnosis(j);if(summary){showAccountReport(summary);if(j.status==='PASS'&&stageEvidenceJob!==busyJob)setStageEvidenceJob(busyJob,summary)}document.getElementById('job').textContent=summary?
   [`任务结果：${j.status} / ${summary.status||'待核对'}`,
    `科目：${summary.accounts} ｜ 有效规则组：${summary.groups} ｜ 明细：${summary.result_rows}`,
    `分摊前：${summary.input_amount}  →  分摊后：${summary.output_amount}`,
@@ -152,6 +1002,7 @@ async function batchRestore(){try{const id=document.getElementById('batchRecord'
 async function batchPrune(){try{batchLog(await api('/api/multi/batch/prune-preview'))}catch(e){batchLog('清理预览失败：'+e.message)}}
 async function loadJobHistory(){try{
  const v=await api('/api/multi/jobs');
+ refreshRunCompareJobs(v.jobs);
  const select=document.getElementById('jobHistory'),old=select.value;
  select.replaceChildren();
  for(const j of v.jobs.filter(x=>x.case===active)){
@@ -161,14 +1012,16 @@ async function loadJobHistory(){try{
  }
  if([...select.options].some(o=>o.value===old))select.value=old;
  if(select.value && !busyJob) await showHistoryJob();
+ else if(!select.value){acceptanceRequest++;acceptanceReport=null;document.getElementById('acceptanceHistory').replaceChildren();document.getElementById('acceptanceDashboard').style.display='none'}
 }catch(e){message('获取运行历史失败：'+e.message)}}
 async function showHistoryJob(){
  const id=document.getElementById('jobHistory').value;if(!id)return;
- const r=await api('/api/multi/jobs/'+id),j=r.job;
- document.getElementById('job').textContent=JSON.stringify(r,null,2);
+ resetStageEvidence();const r=await api('/api/multi/jobs/'+id),j=r.job;renderFailureDiagnosis(j);
+ if(document.getElementById('jobHistory').value!==id)return;
+ document.getElementById('job').textContent=JSON.stringify(r,null,2);showAccountReport(r.summary);if(j.status==='PASS')setStageEvidenceJob(id,r.summary);
  const a=document.getElementById('download');
- if(j.status==='PASS'){busyJob=id;a.href='/api/multi/jobs/'+id+'?download=results';a.style.display='inline-block'}
- else {a.style.display='none';if(j.status==='INTERRUPTED')message('历史任务在 Studio 重启时中断。不可直接发布；可以点击“按当前数据重新执行”。')}
+ if(j.status==='PASS'){busyJob=id;a.href='/api/multi/jobs/'+id+'?download=results';a.style.display='inline-block';await loadAcceptanceHistory()}
+ else {acceptanceRequest++;acceptanceReport=null;document.getElementById('acceptanceHistory').replaceChildren();document.getElementById('acceptanceDashboard').style.display='none';a.style.display='none';if(j.status==='INTERRUPTED')message('历史任务在 Studio 重启时中断。不可直接发布；可以点击“按当前数据重新执行”。')}
 }
 async function retryFromHistory(){
  const id=document.getElementById('jobHistory').value;
@@ -177,7 +1030,7 @@ async function retryFromHistory(){
  await run();
 }
 document.getElementById('jobHistory').addEventListener('change',()=>showHistoryJob().catch(e=>message(e.message)));
-document.getElementById('project').onchange=async()=>{await openProject();busyJob='';await loadJobHistory()};
-list().then(loadJobHistory);
+document.getElementById('project').onchange=async()=>{clearRunComparison();resetStageEvidence();renderFailureDiagnosis(null);await openProject();busyJob='';await loadJobHistory()};
+list().then(loadJobHistory);loadDesignerCases();loadMappingProfiles();
 
-</script></body></html>
+</script><script src="/assets/run_compare.js"></script><script src="/assets/stage_evidence.js"></script><script src="/assets/quickstart.js"></script><script src="/assets/factor_editor.js"></script><script src="/assets/preflight.js"></script><script src="/assets/failure_diagnosis.js"></script><script src="/assets/coverage.js"></script></body></html>
