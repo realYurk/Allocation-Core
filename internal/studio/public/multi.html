@@ -175,7 +175,7 @@ async function importDesignerTemplate(){
   box.textContent='新模板创建成功：'+template+'。\n未改变任何科目、数据或已发布结果。\n下一步：到下方科目表为所需科目选中该模板并保存；'+note;
   message('新业务规则已导入；请明确分派科目，然后体检、运行、对账',true);
  }catch(e){box.textContent='创建失败（未更改原项目规则分派）：'+e.message;message(e.message)}
- finally{button.disabled=false;clearDesignerPreview()}
+ finally{button.disabled=true;designerPlan=null;designerContext=''}
 }
 function csvCell(v){const s=String(v??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 function exportCSV(filename,header,rows){
