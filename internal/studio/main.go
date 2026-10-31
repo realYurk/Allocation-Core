@@ -5,6 +5,7 @@ package studio
 
 import (
 	"allocationcore/internal/demo"
+	"allocationcore/internal/multi"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -52,6 +53,7 @@ type Job struct {
 	Error  string `json:"error,omitempty"`
 	Output string `json:"-"`
 	Log    string `json:"log,omitempty"`
+	Diagnosis *multi.FailureDiagnosis `json:"diagnosis,omitempty"`
 }
 type GenericRule struct {
 	Name       string   `json:"name"`

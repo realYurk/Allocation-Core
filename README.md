@@ -76,6 +76,10 @@ The same workspace also exports/imports all account-to-rule mappings as Excel-co
 
 **CI evidence:** [Windows + Go + MySQL + TLS, all PASS (2026-10-31)](https://github.com/realYurk/Allocation-Core/actions/runs/41157325587). This covers synthetic integration tests only; enterprise rules and production data still require business acceptance. / 全部 CI 已通过，但企业真实数据与业务规则仍需单独验收。
 
+## Finance runtime failure guidance / 财务运行失败定位
+
+When a multi-account run fails inside Core, Studio saves **run-time evidence** beside the FAILED job journal: failing rule group, affected account candidates, rule stage/allocation, actual Driver dataset/weight field and original Driver filename. If Core reports a complete source-pool coordinate, the period/department/account is shown as **EXACT_POOL**; otherwise the UI explicitly displays **RULE_GROUP** without inventing exact coordinates. Common failure types have finance-friendly advice (no matched Driver, nonpositive factor denominator, rejected negative weight and missing weight field). Historical diagnoses are generated from the original failed run, not the project's later edits. Failed runs never publish financial outputs; re-run and independently reconcile after fixing inputs. / 失败任务保留当次规则、科目与 Driver 排查证据；只有真实来源池坐标才表示精确定位。历史任务不以当前已修改规则解释旧错误；修复后仍须重新运行并独立对账。
+
 ## Clean V10: Skewed coordinate coalescing & verified CI readiness / V10 偏斜坐标合并及 CI 就绪校验
 
 **What changed / 本轮改进**

@@ -194,6 +194,7 @@ func CLI() {
 	}
 	result, err := RunContext(ctx, *projectDir, *output, exe)
 	if err != nil {
+		EmitFailureDiagnosis(err)
 		fmt.Fprintln(os.Stderr, "BLOCK:", err)
 		os.Exit(1)
 	}
@@ -1316,7 +1317,7 @@ func RunContext(ctx context.Context, dir, out, engine string) (Result, error) {
 		return result, e
 	}
 	if e = p.execute(ctx); e != nil {
-		return result, e
+		return result, p.explainExecutionFailure(e)
 	}
 	result, e = p.finish(start)
 	if e != nil {

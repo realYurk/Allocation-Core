@@ -696,6 +696,9 @@ func (x *MultiApp) complete(j *Job, status, reason, stdout string) {
 	j.Status = status
 	j.Error = reason
 	j.Log = stdout
+	if status == "FAILED" {
+		j.Diagnosis, j.Log = extractMultiFailure([]byte(stdout))
+	}
 	j.End = time.Now().Format(time.RFC3339)
 	delete(x.busy, j.Case)
 	delete(x.cancels, j.ID)
