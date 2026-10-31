@@ -66,7 +66,7 @@ func sortedSamples(set map[string]bool, limit int) ([]string,int) {
 }
 // addBusinessDiagnostics runs on every exit, including early BLOCK failures.
 // CHECK is an input signal, not an assertion that an allocation will fail.
-func addBusinessDiagnostics(report *PreflightReport, p *project, inputCounts map[string]int64) {
+func addBusinessDiagnostics(report *PreflightReport, p *project, inputCounts map[string]int64, amountsComplete bool) {
     report.Findings=make([]BusinessFinding,0)
     report.AccountDetails=make([]AccountReadiness,0)
     report.DataMatchVerified=false
@@ -108,7 +108,10 @@ func addBusinessDiagnostics(report *PreflightReport, p *project, inputCounts map
             notes:=accountWarnings[account]
             status:="INPUT_OK"
             if len(notes)>0 {status="CHECK_DRIVER";report.ReviewAccounts++}
-            if inputCounts!=nil && inputCounts[account]==0 {
+            if !amountsComplete {
+                status="NOT_CHECKED"
+                notes=append(notes,"金额文件未完整扫描，不能判断该科目是否有数据")
+            } else if inputCounts[account]==0 {
                 status="BLOCK"
                 notes=append(notes,"未找到该科目的金额数据")
             }
