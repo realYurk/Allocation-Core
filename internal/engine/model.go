@@ -12,12 +12,16 @@ import (
 )
 
 const Schema = "allocation-ir/2.0"
+// Existing rules without rounding_policy retain established result bytes.
+const RoundingLargestRemainderIdentity = "LARGEST_REMAINDER_IDENTITY"
+const maxDecimalTextBytes = 128
 const poolMember = "__POOL__"
 const unit int64 = 1000000
 
 type Spec struct {
-	Schema      string                         `json:"schema"`
-	Name        string                         `json:"name"`
+	Schema         string                         `json:"schema"`
+	RoundingPolicy string                         `json:"rounding_policy,omitempty"`
+	Name           string                         `json:"name"`
 	Precision   int                            `json:"precision"`
 	Dimensions  []string                       `json:"dimensions"`
 	Immutable   []string                       `json:"immutable_dimensions"`
@@ -54,6 +58,8 @@ type Allocation struct {
 	WeightField    string            `json:"weight_field"`
 	DriverFilters  map[string]Filter `json:"driver_filters"`
 	NegativePolicy string            `json:"negative_driver_policy"`
+	// Signed driver values are a business exception, never inferred.
+	SignedDriverReason string `json:"signed_driver_reason,omitempty"`
 }
 type Stage struct {
 	Operation        string            `json:"operation"` // ALLOCATE(default), MERGE, PASS
@@ -100,7 +106,13 @@ func ParseSpec(b []byte) (Spec, error) {
 }
 func fail(f string, args ...interface{}) error { return fmt.Errorf(f, args...) }
 func ParseScaled(s string, scale int) (int64, error) {
+	if scale < 0 || scale > 6 {
+		return 0, fail("decimal precision must be 0..6: %d", scale)
+	}
 	s = strings.TrimSpace(s)
+	if len(s) > maxDecimalTextBytes {
+		return 0, fail("decimal input exceeds %d bytes", maxDecimalTextBytes)
+	}
 	if len(s) == 0 {
 		return 0, fail("empty decimal")
 	}

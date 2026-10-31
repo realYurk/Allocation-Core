@@ -28,7 +28,7 @@ func TestExactApportion(t *testing.T) {
 		sum := int64(0)
 		for i, x := range got {
 			sum += x
-			if x != tc.want[i] && tc.n != -101 {
+			if x != tc.want[i] {
 				t.Fatalf("got %v expected %v", got, tc.want)
 			}
 		}

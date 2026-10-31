@@ -7,6 +7,14 @@ This repository contains **no company data or proprietary allocation rules**. In
 
 > **MySQL 注意 / IMPORTANT**：本 ZIP 内附的离线 Windows EXE 保留全部已有功能，但**不包含官方 MySQL 驱动**。需要使用在线构建的 MySQL-enabled EXE（GitHub Actions）或 `go mod download && go build -tags mysql` 才能执行 `data mysql` / `mysql-bundle`。源码已实现，模拟事务测试通过；**目标企业 MySQL 实库联调仍待执行**。
 
+## Financial semantics and adversarial verification / 财务语义与对抗验证
+
+- **Rounding policy / 尾差政策:** Optional `"rounding_policy":"LARGEST_REMAINDER_IDENTITY"`. Omitting it preserves the historical integer allocation and output bytes; ties follow stable target identity, not CSV order. Other policies are rejected until independently validated. / 缺省维持旧算法，不会默默重算历史结果。
+- **Signed drivers / 负因子准入:** Default remains REJECT. `"negative_driver_policy":"ALLOW_SIGNED"` now requires an explicit `"signed_driver_reason":"<specific finance purpose>"` per allocation (8..256 characters, one line), recorded in rule SHA-256 and displayed in Multi effective rule explanations. Signed weights may produce negative or above-source target amounts. **Migration:** existing custom ALLOW_SIGNED rules without a reason must be updated to run. This is a business-intent record, **not an approval or identity-control system**. / 负权重需要明确业务用途，旧配置须补字段，不冒充真正审批。
+- **Exact decimal input / 数值契约:** Allowed scale 0..6; maximum 128 text bytes after trimming surrounding spaces, no silent rounding or truncation. Existing accepted syntax (`1.`, `+1.23`, outer spaces) is preserved. Signed int64 limits and malformed inputs have boundary tests and a Go native fuzz target. / 固定精度且拒绝超长输入，保持既有格式兼容。
+- **Multi-stage independent oracle / 多阶段独立对账:** Tests cover +101/-101 minimum money units, three non-divisible stages and 27 leaf coordinates, including a strict per-coordinate drift bound **only for the tested nonnegative single-path graph**, and memory/disk parity. This is not a universal bound for merged or signed DAGs; enterprise reference acceptance is still required. / 三阶段测试不能替代企业真实业务对账。
+- **Late-skew disk guard / 延迟重复坐标:** Intermediate shards >=16 MiB use streaming coalescing rather than relying on the first 256-row sample. Smaller shards retain the prior heuristic. Streaming memory still depends on coordinate cardinality; **not fixed RAM**. Test checks exact output/lineage parity. / 大分区规避首段采样误判，但没有宣称恒定内存。
+
 ## Business onboarding: a visible product improvement / 新版：从金额 CSV 自动创建业务项目
 
 **This iteration intentionally stops chasing microbenchmarks.** It makes the existing multi-account engine easier for non-developers to use without modifying its financial formulas. / **这一轮停止追逐局部微基准**，优先完成业务人员能实际使用的数据接入流程。

@@ -306,6 +306,12 @@ func shouldStreamCoalesceSpool(path string, dims []string) (bool, error) {
 	if info.Size() < 2<<20 {
 		return false, nil
 	}
+	// A repeated-coordinate tail may be invisible in the first 256 rows.
+	// For large partitions avoid buffering the entire []Row based on the
+	// leading sample. Memory is still O(unique coordinates), not fixed.
+	if info.Size() >= 16<<20 {
+		return true, nil
+	}
 	seen := make(map[string]bool, 256)
 	duplicates := 0
 	const sample = 256

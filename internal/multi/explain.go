@@ -27,6 +27,7 @@ type ExplainedDriver struct{
  WeightField string `json:"weight_field"`
  Share string `json:"share"`
  NegativePolicy string `json:"negative_policy"`
+ SignedDriverReason string `json:"signed_driver_reason,omitempty"`
  Enabled bool `json:"enabled"`
  Filters map[string]engine.Filter `json:"filters,omitempty"`
 }
@@ -47,6 +48,7 @@ type AccountExplanation struct{
  RuleSHA256 string `json:"rule_sha256"`
  GroupID string `json:"effective_group_id"`
  Precision int `json:"precision"`
+ RoundingPolicy string `json:"rounding_policy"`
  Dimensions []string `json:"dimensions"`
  ImmutableDimensions []string `json:"immutable_dimensions"`
  Stages []ExplainedStage `json:"stages"`
@@ -73,11 +75,12 @@ func ExplainAccount(projectDir, account string)(AccountExplanation,error){
   out=AccountExplanation{
    Account:account,Template:p.assign[account],RuleName:spec.Name,
    RuleSHA256:hex.EncodeToString(hash[:]),GroupID:groupID,
-   Precision:spec.Precision,Dimensions:append([]string{},spec.Dimensions...),
+   Precision:spec.Precision,RoundingPolicy:spec.RoundingPolicy,Dimensions:append([]string{},spec.Dimensions...),
    ImmutableDimensions:append([]string{},spec.Immutable...),
    Stages:make([]ExplainedStage,0,len(plan.Ordered)),
    Note:"Current saved effective rule including account overrides. Not a completed allocation, driver coverage check, or reference-system acceptance.",
   }
+  if out.RoundingPolicy==""{out.RoundingPolicy=engine.RoundingLargestRemainderIdentity}
   for _,stage:=range plan.Ordered{
    operation:=stage.Operation
    if operation==""{operation="ALLOCATE"}
@@ -106,7 +109,7 @@ func ExplainAccount(projectDir, account string)(AccountExplanation,error){
     item.Drivers=append(item.Drivers,ExplainedDriver{
      Allocation:allocation.ID,Dataset:allocation.DriverDataset,
      File:filepath.Base(spec.Datasets.Drivers[allocation.DriverDataset]),
-     WeightField:allocation.WeightField,Share:share,NegativePolicy:policy,
+     WeightField:allocation.WeightField,Share:share,NegativePolicy:policy,SignedDriverReason:allocation.SignedDriverReason,
      Enabled:onOrDefault(allocation.Enabled),Filters:allocation.DriverFilters,
     })
    }

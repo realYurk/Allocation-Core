@@ -668,6 +668,7 @@ async function showEffectiveRule(account){
   target.appendChild(ruleNode('p','当前规则 SHA-256：'+view.rule_sha256,'muted'));
   const saved=data.assignments.find(x=>x.account===account)?.template;
   if(chosen[account]!==saved)target.appendChild(ruleNode('p','页面尚有未保存的科目分派，此处展示已保存的生效规则。','bad'));
+  target.appendChild(ruleNode('p','尾差政策：'+(view.rounding_policy||'LARGEST_REMAINDER_IDENTITY')+'（同余数按稳定目标标识排序）','muted'));
   target.appendChild(ruleNode('p','不可变维度：'+(view.immutable_dimensions||[]).join('、'),'muted'));
   for(const [index,stage] of view.stages.entries()){
    const section=document.createElement('details');section.open=index===0;
@@ -690,6 +691,10 @@ async function showEffectiveRule(account){
      const tr=document.createElement('tr');
      for(const val of [driver.allocation,driver.dataset+' / '+driver.file+' / '+driver.weight_field,driver.share,driver.enabled?'启用':'停用'])tr.appendChild(ruleNode('td',val));
      tbody.appendChild(tr);
+     if(driver.negative_policy==='ALLOW_SIGNED'){
+      const risk=document.createElement('tr'),cell=ruleNode('td','负权重特例：'+(driver.signed_driver_reason||'未提供业务原因')+'。可能产生负金额或超出来源金额的目标结果。','bad');
+      cell.colSpan=4;risk.appendChild(cell);tbody.appendChild(risk);
+     }
      const detail=filterSummary(driver.filters);
      if(detail){
       const row=document.createElement('tr'),td=ruleNode('td','Driver 筛选：'+detail,'muted');
@@ -720,11 +725,11 @@ function exportRuleExplanation(){
     (stage.inputs||[]).map(x=>x.from+':'+(x.share||'1')).join(' | '),
     (stage.conservation_keys||[]).join(' | '),
     (stage.dimensions||[]).map(routeSummary).join(' | '),
-    driver?.allocation||'',driver?.dataset||'',driver?.file||'',driver?.weight_field||'',driver?.share||'',driver?.enabled===false?'停用':'启用']);
+    driver?.allocation||'',driver?.dataset||'',driver?.file||'',driver?.weight_field||'',driver?.share||'',driver?.negative_policy||'REJECT',driver?.signed_driver_reason||'',driver?.enabled===false?'停用':'启用']);
   }
  }
  exportCSV('effective_rule_'+p.account.replace(/[^A-Za-z0-9_-]/g,'_')+'.csv',
- ['account','template','rule_sha256','stage_order','stage','operation','inputs','conservation_keys','dimensions','allocation','driver_dataset','driver_file','weight_field','share','status'],rows);
+ ['account','template','rule_sha256','stage_order','stage','operation','inputs','conservation_keys','dimensions','allocation','driver_dataset','driver_file','weight_field','share','negative_policy','signed_driver_reason','status'],rows);
 }
 
 function filtered(){if(!data)return [];let q=document.getElementById('search').value.toLowerCase();return data.assignments.filter(x=>x.account.toLowerCase().includes(q))}
