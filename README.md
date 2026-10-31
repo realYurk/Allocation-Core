@@ -21,6 +21,20 @@ This repository contains **no company data or proprietary allocation rules**. In
 
 **Boundaries:** This onboarding is for CSV input, not Excel `.xlsx`, automatic business-rule inference, a live MySQL connection, or a guarantee of correct financial allocations. Import PASS only verifies input format; business validation still requires real Drivers, eligibility checks, and independent reference reconciliation. For data larger than 256 MiB, use the local project folder. / 注意：此向导不自动识别企业分摊政策，不支持直接上传 XLSX，也不等于业务结果正确；超大文件可放入本地项目目录。
 
+## Unified visual business-rule workflow / 可视化规则直接进入多科目分摊
+
+No new editor, executable, or documentation tree is needed. / 不新增设计器、不新增 EXE、不扩张文档体系。
+
+1. Double-click **AllocationCore.exe**. From **/designer**, clone or open a saved rule and visually configure one or more stages, inputs, driver shares, target dimensions and conservation keys. For multi-account use, **account must be an immutable dimension, AS_IS/SOURCE and a conservation key in every stage**. / 在规则设计器中配置多阶段、因子、目标维度；多科目规则必须始终保持 account 不变并守恒。
+2. Open **/multi** and choose an existing business project. Under **可视化设计规则 → 多科目模板**, refresh designer cases and choose the saved rule. Enter a new template filename. / 进入多科目工作台，选中当前项目，选择设计器保存的规则，输入新模板文件名。
+3. Click **检查规则与 Driver 映射**. The server checks the existing project's dimension order/precision and the rule's full graph. Map driver dataset aliases to project-local `drivers/*.csv`. Missing files or columns are shown, **not** invented or copied from the designer. / 预览检查维度、精度、守恒、阶段依赖与 Driver 列头，缺失的真实 Driver 需自行补齐。
+4. Click **创建新规则模板**, then explicitly choose the new template for the required accounts and save. Imports never replace an existing template, amount CSV, assignment or published run. / 导入仅创建独立新规则，不会自动改任何科目。
+5. **Inspect → Run → Compare to independent reference**. Preflight PASS or driver-header readiness is not a valid financial acceptance by itself. / 完成完整体检、执行与独立参考结果逐坐标验收。
+
+The same workspace also exports/imports all account-to-rule mappings as Excel-compatible CSV drafts and shows searchable, downloadable per-account run summaries. / 科目规则分派可通过 Excel 兼容 CSV 批量调整；逐科目运行结果可搜索、筛选、导出。
+
+**CI evidence:** [Windows + Go + MySQL + TLS, all PASS (2026-10-31)](https://github.com/realYurk/Allocation-Core/actions/runs/41157325587). This covers synthetic integration tests only; enterprise rules and production data still require business acceptance. / 全部 CI 已通过，但企业真实数据与业务规则仍需单独验收。
+
 ## Clean V10: Skewed coordinate coalescing & verified CI readiness / V10 偏斜坐标合并及 CI 就绪校验
 
 **What changed / 本轮改进**
@@ -28,7 +42,7 @@ This repository contains **no company data or proprietary allocation rules**. In
 - **Low-cardinality disk merge / 低基数磁盘合并**: MERGE stages keep just one aggregate row per complete business coordinate instead of buffering an entire input shard in `[]Row`. Large nonterminal-stage shards use the same streaming approach **only** when they exceed 2 MiB and the 256-row sample shows >=32 repeated coordinates. Mostly-unique rows keep the existing single-pass fast path. / MERGE 阶段只保存每个完整业务坐标的一条累计记录；大型且坐标高度重复的非终结阶段合并也采用流式算法，稀疏高基数场景维持旧路径。
 - **Lineage stays exact / 血缘证据不变**: For coalesced rows the target identity is always the first source row's ID. We can therefore write `COALESCE` edges in original input order while streaming, without buffering every source row. Negative amounts and signed overflow checks are unchanged. / 在首次出现完整坐标时锁定合并后的目标行 ID，按原始顺序输出血缘；金额精度、负数及溢出保护不变。
 - **Cross-version replay / 旧版检查点恢复**: A V9 disk checkpoint was resumed with V10, and the five published financial CSV and compressed evidence files were byte identical. / V9 检查点由 V10 恢复，财务结果与压缩证据逐字节一致。
-- **MySQL TLS CI readiness / TLS 集成测试就绪门槛**: V9's latest online run showed successful Linux/Windows/normal MySQL jobs, but the TLS job failed **before import**, at container initialization, because `mysqladmin ping` did not guarantee authenticated readiness. V10 waits until a real authenticated `SELECT 1` succeeds. **This fix is not yet verified by an online CI rerun.** / V9 TLS CI 败于容器尚未完成管理员认证，V10 用真实认证 SQL 作为就绪条件，仍待 GitHub 新运行确认。
+- **MySQL TLS CI readiness / TLS 集成测试就绪门槛**: V9's latest online run showed successful Linux/Windows/normal MySQL jobs, but the TLS job failed **before import**, at container initialization, because `mysqladmin ping` did not guarantee authenticated readiness. V10 waits until a real authenticated `SELECT 1` succeeds. **Historical note:** the initial V10 readiness change alone did not resolve MySQL 8.4's removed `have_ssl` variable; the current CI verifies a certificate-checked TCP/TLS handshake and passes. / 历史记录：V10 的就绪检查尚不足以修复 MySQL 8.4 的旧变量问题；当前 CI 已通过真实 TLS 握手验证。
 
 **Performance evidence / 性能边界**: In a synthetic 30,000-row/100-coordinate coalesce microbenchmark, cumulative allocations fell from about 28 MB to 21 MB. However, a 250,000-row PASS→MERGE end-to-end case showed similar elapsed time and process RSS to V9; **do not claim overall throughput or peak-RSS improvement**. The optimization bounds retained rows by distinct coordinate count, not by a fixed memory quota. / 局部减分配已验证，完整计算未证明显著提速，也不能保证高基数时内存固定。
 
@@ -37,7 +51,7 @@ This repository contains **no company data or proprietary allocation rules**. In
 ## Clean V9: CI reliability and bounded disk sharding / V9 CI 修复与分区内存优化
 
 - **Fix GitHub Linux CI / 修复 Linux CI**: Create `output/` before redirecting benchmark output. Prior GitHub test results showed the financial/race tests had passed; the job only failed at the benchmark redirect (`No such file or directory`). / 在写 `output/ci-benchmark.txt` 前创建目录，防止 CI 假失败。
-- **MySQL TLS read-only integration / 严格 TLS 只读验收**: The isolated MySQL test database and `REQUIRE SSL` SELECT-only account are now provisioned through the container-local administrative socket. The Go integration test verifies **the real production TLS connector**, a non-empty server-side TLS cipher, a rejected `UPDATE`, exact DECIMAL import and wrong-SAN rejection. The job checks `have_ssl=YES` and `require_secure_transport=ON`, and prints container logs if the test fails. **CI must be run after updating GitHub; it has not been demonstrated as passing yet.** / 隔离 MySQL 管理员仅负责准备数据；正式验证改由 TLS 校验的只读账号完成，并在失败时输出诊断。尚需更新仓库后运行 CI。
+- **MySQL TLS read-only integration / 严格 TLS 只读验收**: The isolated MySQL test database and `REQUIRE SSL` SELECT-only account are now provisioned through the container-local administrative socket. The Go integration test verifies **the real production TLS connector**, a non-empty server-side TLS cipher, a rejected `UPDATE`, exact DECIMAL import and wrong-SAN rejection. The current CI requires secure transport and confirms a real SELECT-only TCP session with verified CA/identity and a negotiated TLS cipher; the job passed on GitHub. / CI 已验证强制 TLS、只读账号、证书身份与加密协商，相关 GitHub 测试通过。
 - **Bounded partition buffers / 有界分区缓冲**: Up to 64 temporary JSONL shards use a **2 MiB aggregate user-space buffer budget**, instead of the previous 16 MiB eager allocation. Shard files are opened lazily; empty shard files are preserved for existing readers. / 分区写入器按需创建，64 分区缓冲预算从 16 MiB 降到 2 MiB；旧文件名与 JSONL 格式完全兼容。
 - **No change to financial arithmetic or checkpoints / 金额及检查点不变**: Decimal arithmetic, rule evaluation, ledger, lineage, deterministic output and checkpoint record format are unchanged. An actual V8 checkpoint was resumed by V9 with all five outputs identical. / 本次不修改分摊公式、尾差、计算规则、审计或检查点格式；已用 V8 检查点在 V9 续算并核对五份结果。
 
@@ -58,7 +72,7 @@ AllocationCore.exe run examples/manufacturing/rule.json output/v9-verify --worke
 - **Import integrity / 输入文件指纹**: every normalized CSV report now contains exact output `SHA-256` and byte size. MySQL bundle manifest records these for all exported files. / 输出记录哈希与字节数，便于后续验证。
 - **Strict duplicate-coordinate option / 严格重复坐标验收**: `reconcile --reject-duplicates` rejects repeated full business coordinates on either side, rather than silently aggregating. The legacy aggregation mode remains available and now reports duplicate counts. The Studio page offers a checkbox. / 同坐标重复金额既可按旧方式显式聚合并报告数量，也可严格拒绝。
 
-**What is NOT proven / 尚未完成的验收**: official-driver TLS/SAN client-to-server test with a purpose-issued certificate; real enterprise MySQL credentials/permissions, concurrent DDL fault injection, multi-million-row representative business references and Windows target-device UAT. Current bundled offline EXE does not link the external MySQL driver; build with `-tags mysql` in a networked environment or use the corresponding GitHub CI artifact. / 官方驱动 TLS 全链路、目标企业生产前 UAT、复杂业务大规模基准仍需独立验证；离线 EXE 不含外部 MySQL 驱动。
+**What is NOT proven / 尚未完成的验收**: enterprise-specific MySQL credentials and permissions, representative million-row business-reference reconciliation and Windows target-device UAT. The isolated official-driver TLS/SAN and concurrent DDL CI gates have passed, but they are not a substitute for enterprise acceptance. Offline EXE builds without `-tags mysql` do not include the native driver. / 已通过隔离 TLS/SAN 和并发 DDL 集成测试；仍需目标企业真实数据、权限与现场 Windows 验收。
 
 Quick verification / 快速检查：
 
@@ -97,7 +111,7 @@ Build once, run the same executable for all modes. / 只编译一个程序，所
 
 - **Temporary JSONL spool passthrough / 临时中间文件透传**: intermediate disk-shard routing decodes each JSONL row once, uses its original raw record bytes in the destination shard, and avoids the second JSON serialization. The durable checkpoint format and public financial CSV outputs are **unchanged**. Oversized records, truncated records and exact-byte preservation have new regression tests. / 中间磁盘分区减少重复 JSON 编码；检查点格式和正式结果不变，新增超长行及损坏文件的失败关闭测试。
 - **Independent TLS policy tests / 独立 TLS 证书测试**: ephemeral CA + signed server cert are tested without any database dependency; valid chain/SAN succeeds, wrong SAN or untrusted CA fails, with TLS 1.2 minimum. / 本地无需数据库即可验证 CA、SAN、服务器名称和最小 TLS 版本。
-- **Live MySQL fault gates / 实库故障门槛**: CI now defines an **additional** ephemeral TLS-required MySQL 8.4 job with a temporary CA/SAN certificate and a negative wrong-hostname test; its standard MySQL job also tests blocking a concurrent DDL until the read-only snapshot is released. These jobs are **not validated locally** and must actually pass on GitHub after updating the repository. / 新增隔离实库 TLS 和并发 DDL 检验，必须在 GitHub CI 真正运行通过后才能声明已验收。
+- **Live MySQL fault gates / 实库故障门槛**: CI now defines an **additional** ephemeral TLS-required MySQL 8.4 job with a temporary CA/SAN certificate and a negative wrong-hostname test; its standard MySQL job also tests blocking a concurrent DDL until the read-only snapshot is released. These isolated jobs have passed on GitHub; real enterprise connectivity remains unverified. / 隔离集成测试已在 GitHub 通过，目标企业实库连接仍未验收。
 - **No new executables / 不增加入口**: one Go Module, one Windows EXE, no CMD or BAT. This package's offline Windows EXE has no linked native MySQL driver; to build a MySQL-enabled EXE, use `go mod download && go build -tags mysql -o AllocationCore.exe .` online (or the CI Windows artifact). / 交付仍只有一个用户程序；离线 EXE 不包含官方 MySQL 驱动。
 
 ## Clean V5 baseline / V5 已有基础
