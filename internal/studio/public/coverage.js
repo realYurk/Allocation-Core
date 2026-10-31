@@ -20,7 +20,7 @@ async function inspectCoverage(){
      const item=document.createElement('div');item.className='coverage-finding';
      item.appendChild(coverageCell('strong',coverageStatus(f.level)+(f.account?' · '+f.account:'')+(f.stage?' / '+f.stage:'')));
      item.appendChild(coverageCell('p',f.reason));
-     if(f.pool && Object.keys(f.pool).length){item.appendChild(coverageCell('p','来源池：'+Object.entries(f.pool).map(([k,v])=>k+'='+v).join(' · '))}
+     if(f.pool && Object.keys(f.pool).length){item.appendChild(coverageCell('p','来源池：'+Object.entries(f.pool).map(([k,v])=>k+'='+v).join(' · ')))}
      if(f.driver)item.appendChild(coverageCell('p','检查 '+f.driver+(f.field?' / '+f.field:'')));
      if(f.advice)item.appendChild(coverageCell('p','建议：'+f.advice));
      dest.appendChild(item);
