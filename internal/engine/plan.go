@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 func Compile(s Spec) (Planned, error) {
@@ -126,7 +127,7 @@ func Compile(s Spec) (Planned, error) {
 				}
 				if a.NegativePolicy == "ALLOW_SIGNED" {
 					reason := strings.TrimSpace(a.SignedDriverReason)
-					if len(reason) < 8 || len(reason) > 256 || strings.ContainsAny(reason, "\r\n") {
+					if !utf8.ValidString(reason) || utf8.RuneCountInString(reason) < 8 || utf8.RuneCountInString(reason) > 256 || strings.ContainsAny(reason, "\r\n") {
 						return p, fail("stage %s allocation %s: ALLOW_SIGNED requires a business reason (8..256 chars, one line)", st.ID, a.ID)
 					}
 				} else if a.SignedDriverReason != "" {
