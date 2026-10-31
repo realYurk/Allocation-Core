@@ -156,19 +156,27 @@ jobs:
             --ssl-key=/etc/mysql/certs/server-key.pem \
             --require_secure_transport=ON \
             --tls-certificates-enforced-validation=ON
+          # mysqladmin ping can report "alive" even when authentication is
+          # denied during image initialization. Test authenticated SQL itself.
           for n in $(seq 1 70); do
-            if docker exec allocation-ci-mysql-tls mysqladmin ping -uroot -pisolated_root_ci_only --silent 2>/dev/null; then exit 0; fi
+            if docker exec -e MYSQL_PWD=isolated_root_ci_only allocation-ci-mysql-tls \
+                mysql -uroot -Nse 'SELECT 1' 2>/dev/null | grep -qx 1; then
+              echo 'Authenticated MySQL SQL connection is ready'
+              break
+            fi
+            if [ "$n" -eq 70 ]; then
+              docker logs allocation-ci-mysql-tls --tail 120
+              exit 1
+            fi
             sleep 2
           done
-          docker logs allocation-ci-mysql-tls
-          exit 1
       - name: Seed ephemeral database through container-local administrative socket
         shell: bash
         run: |
           set -euo pipefail
           # Admin is used ONLY inside the ephemeral container. The application
           # integration test uses a separately provisioned SELECT-only TLS user.
-          docker exec -i allocation-ci-mysql-tls mysql -uroot -pisolated_root_ci_only allocation_ci <<'SQL'
+          docker exec -i -e MYSQL_PWD=isolated_root_ci_only allocation-ci-mysql-tls mysql -uroot allocation_ci <<'SQL'
           CREATE TABLE clean_connector_tls_v7 (
             id BIGINT PRIMARY KEY,
             period VARCHAR(20) NOT NULL,
@@ -181,11 +189,11 @@ jobs:
           SQL
           # An inside-container socket ping is not evidence of TCP/TLS readiness:
           # verify the server reports TLS enabled and secure transport required.
-          docker exec allocation-ci-mysql-tls mysql -uroot -pisolated_root_ci_only \
+          docker exec -e MYSQL_PWD=isolated_root_ci_only allocation-ci-mysql-tls mysql -uroot \
             -e "SHOW VARIABLES WHERE Variable_name IN ('have_ssl','require_secure_transport');"
-          docker exec allocation-ci-mysql-tls mysql -uroot -pisolated_root_ci_only \
+          docker exec -e MYSQL_PWD=isolated_root_ci_only allocation-ci-mysql-tls mysql -uroot \
             -Nse "SHOW VARIABLES LIKE 'have_ssl';" | grep -Eq 'have_ssl[[:space:]]+YES'
-          docker exec allocation-ci-mysql-tls mysql -uroot -pisolated_root_ci_only \
+          docker exec -e MYSQL_PWD=isolated_root_ci_only allocation-ci-mysql-tls mysql -uroot \
             -Nse "SHOW VARIABLES LIKE 'require_secure_transport';" | grep -Eq 'require_secure_transport[[:space:]]+ON' 
       - name: Official driver, real CA/SAN TLS import and fail-closed negative test
         env:

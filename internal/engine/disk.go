@@ -217,6 +217,119 @@ func partitionSpool(infile, prefix string, n int, shardKey func(Row) string) ([]
 	return paths, nil
 }
 
+// diskCoordinateAccumulator keeps only one row per full business coordinate.
+// In a skewed MERGE or stage-output partition a million input records may
+// collapse to a handful of coordinates. Retaining the entire []Row before
+// mergeRows causes avoidable proportional heap growth. The first row's IDs
+// and original coordinate map are retained to preserve row identity exactly.
+type diskCoordinateAccumulator struct {
+	dimensions []string
+	groups     map[string]Row
+}
+
+func newDiskCoordinateAccumulator(dimensions []string) *diskCoordinateAccumulator {
+	return &diskCoordinateAccumulator{dimensions: dimensions, groups: make(map[string]Row)}
+}
+
+func (a *diskCoordinateAccumulator) addWithChild(row Row) (string, error) {
+	k := key(row.Coord, a.dimensions)
+	existing, ok := a.groups[k]
+	if ok {
+		amount, e := checkedAdd(existing.Amount, row.Amount)
+		if e != nil {
+			return "", e
+		}
+		existing.Amount = amount
+		a.groups[k] = existing
+	} else {
+		existing = row
+		a.groups[k] = row
+	}
+	if len(existing.IDs) == 0 {
+		return "", nil
+	}
+	return existing.IDs[0], nil
+}
+
+func (a *diskCoordinateAccumulator) add(row Row) error {
+	_, e := a.addWithChild(row)
+	return e
+}
+
+func (a *diskCoordinateAccumulator) sorted() []Row {
+	keys := make([]string, 0, len(a.groups))
+	for k := range a.groups {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	rows := make([]Row, 0, len(keys))
+	for _, k := range keys {
+		rows = append(rows, a.groups[k])
+	}
+	return rows
+}
+
+// streamCoalescedSpool performs the merge and produces COALESCE links in a
+// SINGLE forward scan. The final merged row ID is always the first row's ID
+// per coordinate, so lineage can be emitted immediately in original order.
+// A million repeated records therefore need only one row per distinct
+// coordinate in RAM. Published record order and checkpoints remain unchanged.
+func streamCoalescedSpool(path string, dims []string, stage string, precision int, write func([]string) error) ([]Row, error) {
+	agg := newDiskCoordinateAccumulator(dims)
+	e := scanSpool(path, func(row Row) error {
+		child, err := agg.addWithChild(row)
+		if err != nil {
+			return err
+		}
+		for _, parent := range row.IDs {
+			if err := lineageLink(write, stage, "COALESCE", parent, child, row.Amount, precision); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if e != nil {
+		return nil, e
+	}
+	return agg.sorted(), nil
+}
+
+// Streaming coalescing is deliberately limited to large candidate partitions.
+// Most sparse partitions are already small and benefit from the old one-pass
+// vector fast path. Sampling 256 rows keeps high-cardinality partitions on the
+// old path while detecting the repeated-coordinate workloads that inflate RAM.
+func shouldStreamCoalesceSpool(path string, dims []string) (bool, error) {
+	info, e := os.Stat(path)
+	if e != nil {
+		return false, e
+	}
+	if info.Size() < 2<<20 {
+		return false, nil
+	}
+	seen := make(map[string]bool, 256)
+	duplicates := 0
+	const sample = 256
+	stop := fmt.Errorf("finished coordinate repetition sampling")
+	count := 0
+	e = scanSpool(path, func(row Row) error {
+		k := key(row.Coord, dims)
+		if seen[k] {
+			duplicates++
+		} else {
+			seen[k] = true
+		}
+		count++
+		if count >= sample {
+			return stop
+		}
+		return nil
+	})
+	if e != nil && e != stop {
+		return false, e
+	}
+	return count == sample && duplicates >= 32, nil
+}
+
 // RunDiskWithOptions streams source input and stage-to-stage inboxes to disk.
 // Each intermediate output is aggregated by full coordinates before routing,
 // matching the single-core engine's DAG semantics even for fractional edges.
@@ -552,7 +665,7 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 				// PASS and disabled stages stream directly, while MERGE only
 				// needs to hold one full-coordinate shard in memory.
 				if st.Operation == "MERGE" {
-					shardRows := []Row{}
+					merged := newDiskCoordinateAccumulator(spec.Dimensions)
 					er = scanSpool(shardPath, func(row Row) error {
 						if e := addInput(row); e != nil {
 							return e
@@ -569,16 +682,12 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 								return e
 							}
 						}
-						shardRows = append(shardRows, row)
-						return nil
+						return merged.add(row)
 					})
 					if er != nil {
 						return summary, er
 					}
-					shardRows, er = mergeRows(shardRows, spec.Dimensions)
-					if er != nil {
-						return summary, er
-					}
+					shardRows := merged.sorted()
 					for i := range shardRows {
 						shardRows[i].IDs = []string{rowID(st.ID, "MERGED", "", key(shardRows[i].Coord, spec.Dimensions))}
 						if e := emit(shardRows[i]); e != nil {
@@ -685,20 +794,33 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 			}
 			_ = os.Remove(stageOutPath)
 			for _, path := range groupPaths {
-				groupRows := []Row{}
-				if e = scanSpool(path, func(row Row) error { groupRows = append(groupRows, row); return nil }); e != nil {
-					return summary, e
+				useStreaming, err := shouldStreamCoalesceSpool(path, spec.Dimensions)
+				if err != nil {
+					return summary, err
 				}
-				mergedRows, mergeErr := mergeRows(groupRows, spec.Dimensions)
-				if mergeErr != nil {
-					return summary, mergeErr
+				var groupRows []Row
+				if useStreaming {
+					groupRows, err = streamCoalescedSpool(path, spec.Dimensions, st.ID, spec.Precision, func(fields []string) error {
+						return writeBoth("lineage_links.csv", lineage, fields)
+					})
+					if err != nil {
+						return summary, err
+					}
+				} else {
+					if err = scanSpool(path, func(row Row) error { groupRows = append(groupRows, row); return nil }); err != nil {
+						return summary, err
+					}
+					mergedRows, mergeErr := mergeRows(groupRows, spec.Dimensions)
+					if mergeErr != nil {
+						return summary, mergeErr
+					}
+					if mergeErr := linkCoalesced(groupRows, mergedRows, spec.Dimensions, st.ID, spec.Precision, func(fields []string) error {
+						return writeBoth("lineage_links.csv", lineage, fields)
+					}); mergeErr != nil {
+						return summary, mergeErr
+					}
+					groupRows = mergedRows
 				}
-				if mergeErr := linkCoalesced(groupRows, mergedRows, spec.Dimensions, st.ID, spec.Precision, func(fields []string) error {
-					return writeBoth("lineage_links.csv", lineage, fields)
-				}); mergeErr != nil {
-					return summary, mergeErr
-				}
-				groupRows = mergedRows
 				for _, row := range groupRows {
 					if e = stageRecord.nextRow(row); e != nil {
 						return summary, e

@@ -1,4 +1,4 @@
-# Allocation Core Clean V9 / 通用分摊引擎
+# Allocation Core Clean V10 / 通用分摊引擎
 
 **One Go module · One Windows executable · One workspace.**
 **一个 Go 模块、一个 Windows 程序、一个业务工作台。**
@@ -6,6 +6,19 @@
 This repository contains **no company data or proprietary allocation rules**. Inputs, outputs, mappings and runtime records stay outside version control. / 本仓库不包含企业真实数据和私有规则；输入、输出、映射与运行状态默认不纳入 Git。
 
 > **MySQL 注意 / IMPORTANT**：本 ZIP 内附的离线 Windows EXE 保留全部已有功能，但**不包含官方 MySQL 驱动**。需要使用在线构建的 MySQL-enabled EXE（GitHub Actions）或 `go mod download && go build -tags mysql` 才能执行 `data mysql` / `mysql-bundle`。源码已实现，模拟事务测试通过；**目标企业 MySQL 实库联调仍待执行**。
+
+## Clean V10: Skewed coordinate coalescing & verified CI readiness / V10 偏斜坐标合并及 CI 就绪校验
+
+**What changed / 本轮改进**
+
+- **Low-cardinality disk merge / 低基数磁盘合并**: MERGE stages keep just one aggregate row per complete business coordinate instead of buffering an entire input shard in `[]Row`. Large nonterminal-stage shards use the same streaming approach **only** when they exceed 2 MiB and the 256-row sample shows >=32 repeated coordinates. Mostly-unique rows keep the existing single-pass fast path. / MERGE 阶段只保存每个完整业务坐标的一条累计记录；大型且坐标高度重复的非终结阶段合并也采用流式算法，稀疏高基数场景维持旧路径。
+- **Lineage stays exact / 血缘证据不变**: For coalesced rows the target identity is always the first source row's ID. We can therefore write `COALESCE` edges in original input order while streaming, without buffering every source row. Negative amounts and signed overflow checks are unchanged. / 在首次出现完整坐标时锁定合并后的目标行 ID，按原始顺序输出血缘；金额精度、负数及溢出保护不变。
+- **Cross-version replay / 旧版检查点恢复**: A V9 disk checkpoint was resumed with V10, and the five published financial CSV and compressed evidence files were byte identical. / V9 检查点由 V10 恢复，财务结果与压缩证据逐字节一致。
+- **MySQL TLS CI readiness / TLS 集成测试就绪门槛**: V9's latest online run showed successful Linux/Windows/normal MySQL jobs, but the TLS job failed **before import**, at container initialization, because `mysqladmin ping` did not guarantee authenticated readiness. V10 waits until a real authenticated `SELECT 1` succeeds. **This fix is not yet verified by an online CI rerun.** / V9 TLS CI 败于容器尚未完成管理员认证，V10 用真实认证 SQL 作为就绪条件，仍待 GitHub 新运行确认。
+
+**Performance evidence / 性能边界**: In a synthetic 30,000-row/100-coordinate coalesce microbenchmark, cumulative allocations fell from about 28 MB to 21 MB. However, a 250,000-row PASS→MERGE end-to-end case showed similar elapsed time and process RSS to V9; **do not claim overall throughput or peak-RSS improvement**. The optimization bounds retained rows by distinct coordinate count, not by a fixed memory quota. / 局部减分配已验证，完整计算未证明显著提速，也不能保证高基数时内存固定。
+
+**Use / 使用**: the existing `AllocationCore.exe` entrypoint and `--disk-partitions` option work unchanged. No new program, configuration key or business rule is required. / 使用方式不变，不新增程序或配置。
 
 ## Clean V9: CI reliability and bounded disk sharding / V9 CI 修复与分区内存优化
 

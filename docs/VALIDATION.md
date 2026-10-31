@@ -226,3 +226,15 @@ go test ./internal/engine -run '^$' -bench '^BenchmarkV8PartitionSpool$' -benchm
 - **1000 accounts / 千科目：** 1000 effective rule groups, 4000 result rows, `results.csv` and `account_reconciliation.csv` identical SHA-256 for V8 vs V9. Single-run timings ~4.56 s vs ~4.02 s, **not** a controlled speedup claim. / 千科目业务输出完全一致，单次耗时差异仅作观察。
 - **CI shell reproduction / GitHub CI 脚本复现：** `mkdir -p output` resolves benchmark redirection. The multi-sample self-comparison is now run with aggregation-compatible defaults because legitimate duplicate full coordinates are present, while strict rejection remains independently tested. The full Linux CI command sequence was executed locally through both the multi-sample and 1000-account stages. / 两个 Linux CI 脚本问题均在本地复现和修复；真实在线 CI 仍待更新 GitHub 后执行。
 - **Clean-package verification / 全新解压：** one Windows x64 PE executable, one Go module, 4 bilingual Markdown files, no shipped business CSV/Excel or generated 1000-account JSON; source recompilation, `go test ./...`, `go vet ./...`, and local HTTP (`/api/health`, `/workspace`, `/multi`, `/explorer/api/meta`, `/rules`) all passed. **Actual Windows native execution and official MySQL driver linking were not performed here.** / Windows 实机及官方 MySQL 驱动联网编译仍需单独完成。
+
+
+## V10 targeted validation / V10 针对性验收
+
+- `go test ./...`, `go vet ./...`, `go test -race` on critical packages and Windows x64 cross-compilation are mandatory. / 完整测试、静态分析、重点竞态测试、Windows 交叉编译。
+- `TestV10StreamingCoalesceExactOrderAndTrace`: 20,000 synthetic input rows across 16 coordinates; legacy and streaming aggregate rows **and COALESCE lineage edges** match exactly in original order. / 原算法和流式算法金额及血缘逐行一致。
+- `TestV10SparseCoalesceUsesLegacyFastPath`: unique-coordinate sample does not activate streaming. / 高基数回退旧实现。
+- `TestV10SkewOverflowAndCorruptionFailClosed`: signed int64 overflow and damaged JSONL cause an error rather than successful output. / 溢出与损坏记录阻断。
+- `BenchmarkV10SkewCoalescing`: synthetic 30,000 rows, 100 coordinates, same lineage callbacks, Linux AMD EPYC. Two-run samples: legacy approximately 73–79 ms and 28.0 MB allocated; streaming approximately 75–77 ms and 20.9 MB allocated. **Microbenchmark only**. / 合并微基准，不能外推为整机加速。
+- Synthetic 250,000-row PASS→MERGE disk run (64 partitions, 4 workers, gzip evidence): V9 ~4.82s, RSS ~24.2MiB; V10 ~4.93s, RSS ~24.6MiB. **All five published financial/evidence files SHA-256 identical. No demonstrated end-to-end speed or RSS improvement.** / 完整执行略有波动，不能宣称性能已提升。
+- A V9-generated durable checkpoint (same 250,000-row synthetic rule) was resumed by V10. All five files (`results.csv`, `reconciliation.csv`, `ledger.csv.gz`, `source_to_pool.csv.gz`, `lineage_links.csv.gz`) were byte identical. / V9 检查点续算结果一致。
+- Most recent V9 GitHub run (SHA `bf4ce8d668b0dba074d821da096c05808c4c4fed`): `test`, `windows`, `mysql-integration` passed; `mysql-tls-integration` failed while seeding before TLS import (`ERROR 1045 Access denied for root`). V10 replaces the unreliable `mysqladmin ping` readiness test with authenticated `SELECT 1`. **The V10 online TLS job is NOT yet verified.** / V9 真实 CI 故障已有日志，V10 修复待在线运行。

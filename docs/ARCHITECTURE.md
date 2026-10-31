@@ -137,3 +137,12 @@ MySQL least-privilege SELECT account / MySQL 最小权限账号
 **中文：** V9 只调整临时分区的写入缓冲和文件打开时机，保留全部 JSONL 原始内容与检查点结构。64 分区写入器最多占用 2 MiB 的用户态缓冲，不再预先为全部 64 个分区打开 256 KiB 缓冲。对没有记录的分区，仍生成兼容的空文件。**这不是整个 Go 进程的内存上限**，偏斜的 Pool、Driver 索引、操作系统缓存和临时磁盘占用仍需独立验收。
 
 **CI caution / CI 边界：** V8's GitHub CI failed in two jobs: a missing benchmark output directory and `invalid connection` during the TLS test's administrative setup. V9 eliminates the latter test dependency by provisioning via the ephemeral container socket, then tests the actual read-only TLS connector with `have_ssl` and hostname verification checks. Updating GitHub and observing successful CI runs is necessary before declaring the issue fixed in live CI. / 此次属于针对已观察到的失败进行修复，不能把未经重新执行的 CI 标为通过。
+
+
+## V10 skew-aware disk merge / 偏斜数据流式合并
+
+In disk mode, MERGE stages now reduce records immediately into a map keyed by the **full ordered business coordinate**. It retains the original first member map and first row ID, accumulates amounts via `checkedAdd`, and emits rows in the legacy sorted order. On nonterminal stages the same one-pass `streamCoalescedSpool` path is chosen when partition size >=2 MiB and a sample of 256 rows contains >=32 duplicate coordinate keys; the old `mergeRows` and `linkCoalesced` path stays for smaller/sparse partitions. COALESCE edges are written in source-row order as the accumulator already knows the first row ID; no second scan or new checkpoint serialization is required. / 全坐标聚合、首条来源 ID、严格整数加法和证据顺序与旧版相同；无需引入新的检查点格式。
+
+**Boundary / 边界**: retained state scales with the number of **distinct coordinates**, not the number of input records. Extremely high distinct-key cardinality can still consume significant memory. This is *not* a hard RAM cap, spill-to-disk aggregator, or guarantee of speed improvement. / 高基数数据仍可能占用较多内存，不应宣称已实现严格固定内存上限。
+
+MySQL TLS CI now waits for authenticated `SELECT 1` on the temporary server before creating test fixtures. Passing `mysqladmin ping` alone was insufficient because startup could still reject administrator authentication. / TLS CI 改用实际认证 SQL 校验服务完成初始化。
