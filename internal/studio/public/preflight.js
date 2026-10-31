@@ -33,6 +33,26 @@ function renderFinanceReadiness(report){
  }
  if(!(report.findings||[]).length)
   container.appendChild(financeText('p','文件结构和数值格式未发现问题，可以进入真实计算验证。'));
+ const drivers=fr('financeDriverSummary');drivers.replaceChildren();
+ const table=document.createElement('table');
+ const head=document.createElement('thead'),headers=document.createElement('tr');
+ for(const h of ['Driver 文件','字段','正数行','零值行','负数行','关联科目'])headers.appendChild(financeText('th',h));
+ head.appendChild(headers);table.appendChild(head);
+ const body=document.createElement('tbody');
+ let fieldCount=0;
+ for(const d of report.drivers||[]){
+  for(const sig of d.weight_signals||[]){
+   if(fieldCount++>=100)break;
+   const tr=document.createElement('tr');
+   for(const val of [d.name,sig.field,sig.positive_rows,sig.zero_rows,sig.negative_rows,sig.affected_accounts])
+    tr.appendChild(financeText('td',val));
+   body.appendChild(tr);
+  }
+ }
+ if(fieldCount>0){
+  drivers.appendChild(financeText('p','Driver 字段整体分布（非目标坐标匹配结果）','finance-check-subhead'));
+  table.appendChild(body);drivers.appendChild(table);
+ }
  fr('financeReadinessScope').textContent='本次只检查原始金额、科目规则及 Driver 文件整体数值分布。'+
   '“输入正常”不等于 Driver 按期间/工厂/车型匹配成功，也不等于分摊结果或参考系统一致。请运行后逐坐标对账。';
  showFinanceReadinessAccounts();
