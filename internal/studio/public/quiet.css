@@ -57,3 +57,8 @@ input,select{border-color:#cbd5df;border-radius:5px}
 .finance-check .row select{max-width:170px}
 .finance-check .tablebox{max-height:350px;overflow:auto}
 .finance-check td{font-size:12px;white-space:normal;overflow-wrap:anywhere}
+
+.finance-check #financeDriverSummary{max-height:230px;overflow:auto;margin:12px 0}
+.finance-check #financeDriverSummary table{width:100%;border-collapse:collapse}
+.finance-check #financeDriverSummary th,.finance-check #financeDriverSummary td{padding:6px 8px;border-bottom:1px solid #e5e9ed;font-size:12px;text-align:left}
+.finance-check-subhead{font-size:12px;font-weight:600;margin:7px 0}
