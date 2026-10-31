@@ -1,4 +1,4 @@
-# Allocation Core Clean V8 / 通用分摊引擎
+# Allocation Core Clean V9 / 通用分摊引擎
 
 **One Go module · One Windows executable · One workspace.**
 **一个 Go 模块、一个 Windows 程序、一个业务工作台。**
@@ -6,6 +6,20 @@
 This repository contains **no company data or proprietary allocation rules**. Inputs, outputs, mappings and runtime records stay outside version control. / 本仓库不包含企业真实数据和私有规则；输入、输出、映射与运行状态默认不纳入 Git。
 
 > **MySQL 注意 / IMPORTANT**：本 ZIP 内附的离线 Windows EXE 保留全部已有功能，但**不包含官方 MySQL 驱动**。需要使用在线构建的 MySQL-enabled EXE（GitHub Actions）或 `go mod download && go build -tags mysql` 才能执行 `data mysql` / `mysql-bundle`。源码已实现，模拟事务测试通过；**目标企业 MySQL 实库联调仍待执行**。
+
+## Clean V9: CI reliability and bounded disk sharding / V9 CI 修复与分区内存优化
+
+- **Fix GitHub Linux CI / 修复 Linux CI**: Create `output/` before redirecting benchmark output. Prior GitHub test results showed the financial/race tests had passed; the job only failed at the benchmark redirect (`No such file or directory`). / 在写 `output/ci-benchmark.txt` 前创建目录，防止 CI 假失败。
+- **MySQL TLS read-only integration / 严格 TLS 只读验收**: The isolated MySQL test database and `REQUIRE SSL` SELECT-only account are now provisioned through the container-local administrative socket. The Go integration test verifies **the real production TLS connector**, a non-empty server-side TLS cipher, a rejected `UPDATE`, exact DECIMAL import and wrong-SAN rejection. The job checks `have_ssl=YES` and `require_secure_transport=ON`, and prints container logs if the test fails. **CI must be run after updating GitHub; it has not been demonstrated as passing yet.** / 隔离 MySQL 管理员仅负责准备数据；正式验证改由 TLS 校验的只读账号完成，并在失败时输出诊断。尚需更新仓库后运行 CI。
+- **Bounded partition buffers / 有界分区缓冲**: Up to 64 temporary JSONL shards use a **2 MiB aggregate user-space buffer budget**, instead of the previous 16 MiB eager allocation. Shard files are opened lazily; empty shard files are preserved for existing readers. / 分区写入器按需创建，64 分区缓冲预算从 16 MiB 降到 2 MiB；旧文件名与 JSONL 格式完全兼容。
+- **No change to financial arithmetic or checkpoints / 金额及检查点不变**: Decimal arithmetic, rule evaluation, ledger, lineage, deterministic output and checkpoint record format are unchanged. An actual V8 checkpoint was resumed by V9 with all five outputs identical. / 本次不修改分摊公式、尾差、计算规则、审计或检查点格式；已用 V8 检查点在 V9 续算并核对五份结果。
+
+Quick checks / 快速验证：
+
+```text
+AllocationCore.exe demo .
+AllocationCore.exe run examples/manufacturing/rule.json output/v9-verify --workers 4 --disk-partitions 64 --evidence-gzip
+```
 
 ## New in V7: Financial Correctness & Production Hardening / V7 财务正确性与生产加固
 

@@ -26,13 +26,40 @@ type spoolWriter struct {
 	e *json.Encoder
 }
 
+const defaultSpoolBufferBytes = 256 << 10
+
 func openSpool(path string) (*spoolWriter, error) {
+	return openSpoolBuffered(path, defaultSpoolBufferBytes)
+}
+
+// openSpoolBuffered is used for the short-lived partition files only. Durable
+// checkpoint and audit records keep the original buffering and byte format.
+func openSpoolBuffered(path string, size int) (*spoolWriter, error) {
 	f, err := os.Create(path)
 	if err != nil {
 		return nil, err
 	}
-	b := bufio.NewWriterSize(f, 256*1024)
+	b := bufio.NewWriterSize(f, size)
 	return &spoolWriter{f: f, b: b, e: json.NewEncoder(b)}, nil
+}
+
+// shardBufferBytes keeps the *total* user-space buffers bounded as the number
+// of disk partitions rises. Previously 64 shards held 64*256KiB = 16MiB even
+// when the source had only a handful of rows. At 64 shards this is now 2MiB.
+// The file format, record order and checkpoint contract are unchanged.
+func shardBufferBytes(shards int) int {
+	budget := 2 << 20 // per partition operation, not per shard
+	if shards <= 0 {
+		return defaultSpoolBufferBytes
+	}
+	bytes := budget / shards
+	if bytes < 16<<10 {
+		bytes = 16 << 10
+	}
+	if bytes > defaultSpoolBufferBytes {
+		bytes = defaultSpoolBufferBytes
+	}
+	return bytes
 }
 func (s *spoolWriter) put(row Row) error { return s.e.Encode(row) }
 func (s *spoolWriter) close() error {
@@ -138,37 +165,54 @@ func scanSpoolRecord(path string, emit func(Row, []byte) error) error {
 // partitionSpool reopens the one-file inbox and creates N buckets in a single
 // sequential scan, then closes all handles before consuming any bucket.
 func partitionSpool(infile, prefix string, n int, shardKey func(Row) string) ([]string, error) {
+	if n < 1 {
+		return nil, fmt.Errorf("partition count must be positive")
+	}
 	paths := make([]string, n)
 	writers := make([]*spoolWriter, n)
-	cleanup := func() {
-		for _, w := range writers {
-			if w != nil {
-				_ = w.close()
-			}
-		}
-	}
-	for i := 0; i < n; i++ {
+	for i := range paths {
 		paths[i] = fmt.Sprintf("%s_%03d.jsonl", prefix, i)
-		w, err := openSpool(paths[i])
-		if err != nil {
-			cleanup()
-			return nil, err
-		}
-		writers[i] = w
 	}
-	// The source is an internal JSONL spool. Forward the exact serialized row,
-	// avoiding a second JSON encoder traversal/map allocation for every shard.
+	// Initialize a writer only when a record actually belongs to its shard.
+	// This avoids eagerly opening 64 files/buffers for a one-pool workload.
+	// Empty shard files are still published below so existing readers and
+	// checkpoint recovery see the exact same paths as previous versions.
 	err := scanSpoolRecord(infile, func(row Row, raw []byte) error {
-		_, e := writers[hashShard(shardKey(row), n)].b.Write(raw)
+		index := hashShard(shardKey(row), n)
+		w := writers[index]
+		if w == nil {
+			var e error
+			w, e = openSpoolBuffered(paths[index], shardBufferBytes(n))
+			if e != nil {
+				return e
+			}
+			writers[index] = w
+		}
+		_, e := w.b.Write(raw)
 		return e
 	})
+	// Always close every opened file. On a failure, the caller's private
+	// working directory is discarded and none of these shards are published.
 	for _, w := range writers {
-		if e := w.close(); err == nil {
-			err = e
+		if w != nil {
+			if e := w.close(); err == nil {
+				err = e
+			}
 		}
 	}
 	if err != nil {
 		return nil, err
+	}
+	for i, w := range writers {
+		if w == nil {
+			f, e := os.Create(paths[i])
+			if e != nil {
+				return nil, e
+			}
+			if e = f.Close(); e != nil {
+				return nil, e
+			}
+		}
 	}
 	return paths, nil
 }

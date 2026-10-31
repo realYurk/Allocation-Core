@@ -12,8 +12,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	mysql "github.com/go-sql-driver/mysql"
 )
 
 // TestLiveMySQLSnapshot uses an actual ephemeral InnoDB server. This test is
@@ -153,56 +151,18 @@ func TestLiveMySQLNativeTLSImport(t *testing.T) {
 	}
 	ca := os.Getenv("ALLOCATION_TEST_MYSQL_TLS_CA_FILE")
 	serverName := os.Getenv("ALLOCATION_TEST_MYSQL_TLS_SERVER_NAME")
-	if ca == "" || serverName == "" {
-		t.Skip("requires SAN-verified ephemeral server certificate")
+	address := os.Getenv("ALLOCATION_TEST_MYSQL_TLS_ADDRESS")
+	if ca == "" || serverName == "" || !strings.HasPrefix(address, "127.0.0.1:") {
+		t.Skip("requires isolated localhost TLS server and SAN-verified test CA")
 	}
-	rootDSN := os.Getenv("ALLOCATION_TEST_MYSQL_DSN")
-	if !strings.Contains(rootDSN, "@tcp(127.0.0.1:") {
-		t.Skip("must be isolated localhost test")
-	}
-	// Even the test administrator uses a verified SAN/CA TLS connection.
-	// A REQUIRE_SECURE_TRANSPORT test server rejects plain-text fallback.
-	admin, e := mysql.ParseDSN(rootDSN)
-	if e != nil {
-		t.Fatal(e)
-	}
-	caPEM, e := os.ReadFile(ca)
-	if e != nil {
-		t.Fatal(e)
-	}
-	strictTLS, e := verifiedMySQLTLS(serverName, caPEM)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if e = mysql.RegisterTLSConfig("allocation-ci-native-tls-admin", strictTLS); e != nil {
-		t.Fatal(e)
-	}
-	admin.TLSConfig = "allocation-ci-native-tls-admin"
-	db, e := sql.Open("mysql", admin.FormatDSN())
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer db.Close()
+	// Test administrators provision the table and SELECT-only account via the
+	// container's local Unix socket, outside this test. No root credentials and
+	// no administrative write queries are exercised over TCP by the connector.
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	for _, statement := range []string{
-		"CREATE TABLE clean_connector_tls_v7 (id BIGINT PRIMARY KEY, period VARCHAR(20) NOT NULL, amount DECIMAL(20,2) NOT NULL) ENGINE=InnoDB",
-		"INSERT INTO clean_connector_tls_v7 VALUES (1,'2026-01',12.34),(2,'2026-01',56.78)",
-		"CREATE USER IF NOT EXISTS 'allocation_tls_ci'@'%' IDENTIFIED BY 'isolated-test-password'",
-		"GRANT SELECT ON allocation_ci.clean_connector_tls_v7 TO 'allocation_tls_ci'@'%'",
-	} {
-		if _, e = db.ExecContext(ctx, statement); e != nil {
-			t.Fatal(e)
-		}
-	}
-	defer db.ExecContext(context.Background(), "DROP TABLE clean_connector_tls_v7")
 	t.Setenv("ALLOCATION_CI_TLS_USER", "allocation_tls_ci")
 	t.Setenv("ALLOCATION_CI_TLS_PASSWORD", "isolated-test-password")
 	// No password is serialized. The reader can only SELECT this test table.
-	address := "127.0.0.1:3306"
-	if v := os.Getenv("ALLOCATION_TEST_MYSQL_TLS_ADDRESS"); v != "" {
-		address = v
-	}
 	cfg := MySQLFileConfig{}
 	cfg.Source.Type = "mysql"
 	cfg.Source.MySQLConnection = MySQLConnection{Address: address, Database: "allocation_ci", UserEnv: "ALLOCATION_CI_TLS_USER", PasswordEnv: "ALLOCATION_CI_TLS_PASSWORD", TLSCAFile: ca, TLSServerName: serverName}
@@ -216,6 +176,25 @@ func TestLiveMySQLNativeTLSImport(t *testing.T) {
 	if e = os.WriteFile(config, bytes, 0600); e != nil {
 		t.Fatal(e)
 	}
+	// Exercise the *production* TLS construction path rather than a test-only
+	// admin DSN. This also catches a TLS configuration which silently downgrades.
+	conn, sessionCtx, stop, e := openMySQL(ctx, cfg.Source.MySQLConnection)
+	if e != nil {
+		t.Fatalf("native read-only TLS handshake: %v", e)
+	}
+	var tlsName, cipher string
+	if e := conn.QueryRowContext(sessionCtx, "SHOW SESSION STATUS LIKE 'Ssl_cipher'").Scan(&tlsName, &cipher); e != nil || cipher == "" {
+		conn.Close()
+		stop()
+		t.Fatalf("MySQL connection is not encrypted: cipher=%q error=%v", cipher, e)
+	}
+	if _, e := conn.ExecContext(sessionCtx, "UPDATE clean_connector_tls_v7 SET amount=0 WHERE id=1"); e == nil {
+		conn.Close()
+		stop()
+		t.Fatal("SELECT-only test account unexpectedly allowed UPDATE")
+	}
+	conn.Close()
+	stop()
 	dest := filepath.Join(t.TempDir(), "strictly-read-only.csv")
 	rep, e := ImportMySQLConfig(ctx, config, dest)
 	if e != nil || rep.Rows != 2 || rep.SHA256 == "" {

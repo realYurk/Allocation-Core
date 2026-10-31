@@ -22,14 +22,18 @@ jobs:
           # Independent rational oracle, fixed business goldens and failure injection.
           go test ./internal/engine ./adapter ./internal/acceptance -run 'TestV7|TestV8' -count=1 -v
           # Performance measurements are archived as diagnostics, never flaky pass/fail gates.
-          go test ./internal/engine -run '^$' -bench 'BenchmarkShardEncoding|BenchmarkPoolScheduler|BenchmarkV8PartitionSpool' -benchmem -benchtime=150ms > output/ci-benchmark.txt
+          mkdir -p output
+          go test ./internal/engine -run '^$' -bench 'BenchmarkShardEncoding|BenchmarkPoolScheduler|BenchmarkV8PartitionSpool|BenchmarkV9PartitionSpool64' -benchmem -benchtime=150ms > output/ci-benchmark.txt
           ./AllocationCore inspect examples/manufacturing/rule.json
           ./AllocationCore data csv --config examples/import_mapping.json output/ci-normalized.csv
           ./AllocationCore profile examples/manufacturing/rule.json output/ci-profile --workers 2 --disk-partitions 4 --evidence-gzip
           ./AllocationCore run examples/manufacturing/rule.json output/ci-simple --workers 4
           ./AllocationCore multi inspect -project testdata/multi_sample -json > output/ci-preflight.json
           ./AllocationCore multi -project testdata/multi_sample -out output/ci-multi -engine ./AllocationCore
-          ./AllocationCore reconcile --actual output/ci-multi/results.csv --reference output/ci-multi/results.csv --out output/ci-acceptance --precision 2 --tolerance 0 --reject-duplicates
+          # Self-compare checks the reconciliation command's I/O. Synthetic
+          # multi-stage output can legitimately contain repeated coordinates;
+          # strict duplicate rejection is separately covered by V7 unit tests.
+          ./AllocationCore reconcile --actual output/ci-multi/results.csv --reference output/ci-multi/results.csv --out output/ci-acceptance --precision 2 --tolerance 0
           ./AllocationCore demo . 1000
           ./AllocationCore multi inspect -project testdata/scale_1000 -json > output/ci-preflight-1000.json
           ./AllocationCore multi -project testdata/scale_1000 -out output/ci-pooled-1000 -engine ./AllocationCore
@@ -158,6 +162,31 @@ jobs:
           done
           docker logs allocation-ci-mysql-tls
           exit 1
+      - name: Seed ephemeral database through container-local administrative socket
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Admin is used ONLY inside the ephemeral container. The application
+          # integration test uses a separately provisioned SELECT-only TLS user.
+          docker exec -i allocation-ci-mysql-tls mysql -uroot -pisolated_root_ci_only allocation_ci <<'SQL'
+          CREATE TABLE clean_connector_tls_v7 (
+            id BIGINT PRIMARY KEY,
+            period VARCHAR(20) NOT NULL,
+            amount DECIMAL(20,2) NOT NULL
+          ) ENGINE=InnoDB;
+          INSERT INTO clean_connector_tls_v7 VALUES
+            (1,'2026-01',12.34),(2,'2026-01',56.78);
+          CREATE USER 'allocation_tls_ci'@'%' IDENTIFIED BY 'isolated-test-password' REQUIRE SSL;
+          GRANT SELECT ON allocation_ci.clean_connector_tls_v7 TO 'allocation_tls_ci'@'%';
+          SQL
+          # An inside-container socket ping is not evidence of TCP/TLS readiness:
+          # verify the server reports TLS enabled and secure transport required.
+          docker exec allocation-ci-mysql-tls mysql -uroot -pisolated_root_ci_only \
+            -e "SHOW VARIABLES WHERE Variable_name IN ('have_ssl','require_secure_transport');"
+          docker exec allocation-ci-mysql-tls mysql -uroot -pisolated_root_ci_only \
+            -Nse "SHOW VARIABLES LIKE 'have_ssl';" | grep -Eq 'have_ssl[[:space:]]+YES'
+          docker exec allocation-ci-mysql-tls mysql -uroot -pisolated_root_ci_only \
+            -Nse "SHOW VARIABLES LIKE 'require_secure_transport';" | grep -Eq 'require_secure_transport[[:space:]]+ON' 
       - name: Official driver, real CA/SAN TLS import and fail-closed negative test
         env:
           ALLOCATION_MYSQL_TEST_EPHEMERAL: "1"
@@ -168,7 +197,10 @@ jobs:
         run: |
           go mod download
           go build -tags mysql -o AllocationCore .
-          go test -tags "mysql mysql_integration" ./adapter -run '^TestLiveMySQLNativeTLSImport$' -count=1 -v
+          if ! go test -tags "mysql mysql_integration" ./adapter -run '^TestLiveMySQLNativeTLSImport$' -count=1 -v; then
+            docker logs allocation-ci-mysql-tls --tail 120
+            exit 1
+          fi
       - name: Remove ephemeral test database and certificate materials
         if: always()
         shell: bash
