@@ -248,16 +248,28 @@ func (x *MultiApp) project(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(405)
 		return
 	}
+	// Snapshot both the visible assignments and their edit token under
+	// the same lock as rule writes. A second Studio tab must not silently
+	// overwrite a newer assignment decision.
+	x.mu.Lock()
+	defer x.mu.Unlock()
 	dir, e := x.projectDir(r.URL.Query().Get("name"))
 	if e != nil {
 		fail(w, 404, e)
 		return
 	}
-	assigned, e := readAssignments(filepath.Join(dir, "assignments.csv"))
+	assignmentPath := filepath.Join(dir, "assignments.csv")
+	assigned, e := readAssignments(assignmentPath)
 	if e != nil {
 		fail(w, 422, e)
 		return
 	}
+	assignmentBytes, e := os.ReadFile(assignmentPath)
+	if e != nil {
+		fail(w, 500, e)
+		return
+	}
+	assignmentHash := sha256.Sum256(assignmentBytes)
 	ents, e := os.ReadDir(filepath.Join(dir, "templates"))
 	if e != nil {
 		fail(w, 422, e)
@@ -302,7 +314,7 @@ func (x *MultiApp) project(w http.ResponseWriter, r *http.Request) {
 		sum := sha256.Sum256(cfgBytes)
 		cfgHash = hex.EncodeToString(sum[:])
 	}
-	jsonOut(w, 200, map[string]any{"reuse_workers": reuseWorkers, "driver_cache_scope": cfgScope, "project_sha256": cfgHash, "name": r.URL.Query().Get("name"), "assignments": assigned, "templates": options, "template_columns": templateColumns, "template_precisions": templatePrecisions, "files": files, "count": len(assigned), "manualDataDir": dir})
+	jsonOut(w, 200, map[string]any{"reuse_workers": reuseWorkers, "driver_cache_scope": cfgScope, "project_sha256": cfgHash, "assignments_sha256": hex.EncodeToString(assignmentHash[:]), "name": r.URL.Query().Get("name"), "assignments": assigned, "templates": options, "template_columns": templateColumns, "template_precisions": templatePrecisions, "files": files, "count": len(assigned), "manualDataDir": dir})
 }
 
 // cacheScope changes only generic execution settings, never financial rules.
@@ -386,8 +398,9 @@ func (x *MultiApp) assign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Name    string `json:"name"`
-		Updates []struct {
+		Name       string `json:"name"`
+		BaseSHA256 string `json:"base_sha256"`
+		Updates    []struct {
 			Account  string `json:"account"`
 			Template string `json:"template"`
 		} `json:"updates"`
@@ -411,9 +424,20 @@ func (x *MultiApp) assign(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, e)
 		return
 	}
-	data, e := readAssignments(filepath.Join(dir, "assignments.csv"))
+	assignmentPath := filepath.Join(dir, "assignments.csv")
+	data, e := readAssignments(assignmentPath)
 	if e != nil {
 		fail(w, 422, e)
+		return
+	}
+	previous, e := os.ReadFile(assignmentPath)
+	if e != nil {
+		fail(w, 500, e)
+		return
+	}
+	currentHash := sha256.Sum256(previous)
+	if req.BaseSHA256 == "" || req.BaseSHA256 != hex.EncodeToString(currentHash[:]) {
+		fail(w, 409, errors.New("科目规则分派已被其他操作修改；请刷新项目并重新核对更改 / assignments changed, reload before saving"))
 		return
 	}
 	positions := map[string]int{}
