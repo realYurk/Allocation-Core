@@ -59,6 +59,7 @@ jobs:
           .\AllocationCore.exe run examples/manufacturing/rule.json output\ci-simple --workers 2
           $bin = (Resolve-Path .\AllocationCore.exe).Path
           .\AllocationCore.exe multi inspect -project testdata\multi_sample -json
+          go test ./internal/studio -run 'TestDesignerBridge' -count=1
           .\AllocationCore.exe multi -project testdata\multi_sample -out output\ci-multi -engine $bin
           .\AllocationCore.exe reconcile --actual output\ci-multi\results.csv --reference output\ci-multi\results.csv --out output\ci-acceptance --precision 2 --tolerance 0
       - name: Archive one-folder product
