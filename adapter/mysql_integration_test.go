@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	mysql "github.com/go-sql-driver/mysql"
 )
 
 // TestLiveMySQLSnapshot uses an actual ephemeral InnoDB server. This test is
@@ -160,7 +160,25 @@ func TestLiveMySQLNativeTLSImport(t *testing.T) {
 	if !strings.Contains(rootDSN, "@tcp(127.0.0.1:") {
 		t.Skip("must be isolated localhost test")
 	}
-	db, e := sql.Open("mysql", rootDSN)
+	// Even the test administrator uses a verified SAN/CA TLS connection.
+	// A REQUIRE_SECURE_TRANSPORT test server rejects plain-text fallback.
+	admin, e := mysql.ParseDSN(rootDSN)
+	if e != nil {
+		t.Fatal(e)
+	}
+	caPEM, e := os.ReadFile(ca)
+	if e != nil {
+		t.Fatal(e)
+	}
+	strictTLS, e := verifiedMySQLTLS(serverName, caPEM)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = mysql.RegisterTLSConfig("allocation-ci-native-tls-admin", strictTLS); e != nil {
+		t.Fatal(e)
+	}
+	admin.TLSConfig = "allocation-ci-native-tls-admin"
+	db, e := sql.Open("mysql", admin.FormatDSN())
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -209,5 +227,23 @@ func TestLiveMySQLNativeTLSImport(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), "12.34") || !strings.Contains(string(raw), "56.78") {
 		t.Fatalf("wrong DECIMAL output: %s", raw)
+	}
+	// The actual MySQL connection must NOT silently fall back if the SAN
+	// does not match, and a rejected connection must not publish any CSV.
+	cfg.Source.TLSServerName = "wrong.mysql.test.internal"
+	invalidBytes, e := json.Marshal(cfg)
+	if e != nil {
+		t.Fatal(e)
+	}
+	invalidCfg := filepath.Join(t.TempDir(), "invalid-san.json")
+	if e = os.WriteFile(invalidCfg, invalidBytes, 0600); e != nil {
+		t.Fatal(e)
+	}
+	invalidOutput := filepath.Join(t.TempDir(), "should-not-exist.csv")
+	if _, e = ImportMySQLConfig(ctx, invalidCfg, invalidOutput); e == nil {
+		t.Fatal("wrong SAN was accepted by native driver")
+	}
+	if _, e = os.Stat(invalidOutput); !os.IsNotExist(e) {
+		t.Fatal("failed TLS verification published output")
 	}
 }

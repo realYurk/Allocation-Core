@@ -120,3 +120,12 @@ MySQL least-privilege SELECT account / MySQL 最小权限账号
 **Duplicate coordinates / 重复坐标**: legacy reconciliation intentionally aggregates duplicate coordinates but now counts them separately; `--reject-duplicates` opts into fail-closed acceptance. / 为兼容历史默认汇总，严格模式可立即阻断重复导入。
 
 **Source scope / 来源范围**: MySQL's transaction guarantees only data from that MySQL database/session; a separate Cube system must carry explicit source version and freshness evidence. / MySQL 一致性不能自动推导 Cube 具备相同时间点的数据快照。
+
+
+## V8 internal spool and MySQL TLS boundary / V8 中间文件与 TLS 边界
+
+**Disk partitioning / 磁盘分区：** `partitionSpool` reads the private JSONL record once to derive the exact existing shard key, then writes the original record bytes verbatim. Large lines use a safe buffer fallback; truncated or invalid JSONL records fail closed. Only temporary partition records use this path. `scanSpool`, stage checkpoints, lineage, financial CSV and public JSON formats remain unchanged. / 仅临时分区减少重复编码，不变更检查点和公开文件格式。
+
+**MySQL TLS / MySQL 证书：** `verifiedMySQLTLS` constructs the same TLS configuration used by the optional native MySQL driver. The server name must be explicit; CA roots must parse; minimum TLS version is 1.2; hostname verification cannot be disabled. Unit tests create an ephemeral CA and exercise an actual local TLS socket for correct/wrong SAN and CA. The CI job `mysql-tls-integration` provisions a separate MySQL 8.4 server that requires TLS; verify CI success before declaring native MySQL TLS end-to-end accepted. / 标准 TLS 握手测试在离线环境运行；原生 MySQL TLS 必须由隔离 CI 实测。
+
+**DDL concurrency / 并发结构变化：** `TestV8LiveConcurrentDDLIsBlockedUntilSnapshotReleased` ensures metadata lock protection during a read-only REPEATABLE READ transaction. The test performs a concurrent `ALTER TABLE` against *ephemeral CI data only*, checks it waits, then releases the snapshot and checks DDL completes. It must never run against production. / 并发 DDL 测试仅使用短生命周期隔离数据库，不能连接生产环境。

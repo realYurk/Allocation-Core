@@ -90,6 +90,51 @@ func stageShardKey(row Row, st Stage, dims []string) string {
 	return string(encoded)
 }
 
+// scanSpoolRecord is deliberately limited to temporary, internally generated
+// JSON-lines spools. It decodes a row once to find its partition, and passes
+// through the ORIGINAL validated bytes without re-encoding them. Durable
+// checkpoint files and public financial CSV formats remain unchanged.
+// A partially written final line is rejected rather than silently published.
+func scanSpoolRecord(path string, emit func(Row, []byte) error) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	reader := bufio.NewReaderSize(file, 256*1024)
+	for {
+		// ReadSlice borrows the reader buffer: the shard writer copies bytes
+		// before the next read. Unusually large JSON records fall back to a
+		// separately allocated buffer; no arbitrary row-length cutoff.
+		raw, e := reader.ReadSlice('\n')
+		if e == bufio.ErrBufferFull {
+			oversized := append([]byte(nil), raw...)
+			for e == bufio.ErrBufferFull {
+				var chunk []byte
+				chunk, e = reader.ReadSlice('\n')
+				oversized = append(oversized, chunk...)
+			}
+			raw = oversized
+		}
+		if e == io.EOF && len(raw) == 0 {
+			return nil
+		}
+		if e != nil && e != io.EOF {
+			return fmt.Errorf("spool %s: %w", path, e)
+		}
+		if e == io.EOF {
+			return fmt.Errorf("spool %s: incomplete final JSONL record", path)
+		}
+		var row Row
+		if er := json.Unmarshal(raw, &row); er != nil {
+			return fmt.Errorf("spool %s: invalid JSONL record: %w", path, er)
+		}
+		if er := emit(row, raw); er != nil {
+			return er
+		}
+	}
+}
+
 // partitionSpool reopens the one-file inbox and creates N buckets in a single
 // sequential scan, then closes all handles before consuming any bucket.
 func partitionSpool(infile, prefix string, n int, shardKey func(Row) string) ([]string, error) {
@@ -111,7 +156,12 @@ func partitionSpool(infile, prefix string, n int, shardKey func(Row) string) ([]
 		}
 		writers[i] = w
 	}
-	err := scanSpool(infile, func(row Row) error { return writers[hashShard(shardKey(row), n)].put(row) })
+	// The source is an internal JSONL spool. Forward the exact serialized row,
+	// avoiding a second JSON encoder traversal/map allocation for every shard.
+	err := scanSpoolRecord(infile, func(row Row, raw []byte) error {
+		_, e := writers[hashShard(shardKey(row), n)].b.Write(raw)
+		return e
+	})
 	for _, w := range writers {
 		if e := w.close(); err == nil {
 			err = e

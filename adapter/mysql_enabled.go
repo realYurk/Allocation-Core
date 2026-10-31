@@ -5,8 +5,6 @@ package adapter
 import (
 	"context"
 	"crypto/sha256"
-	"crypto/tls"
-	"crypto/x509"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
@@ -35,15 +33,15 @@ func openMySQL(ctx context.Context, c MySQLConnection) (*sql.DB, context.Context
 	if e != nil {
 		return nil, nil, nil, fmt.Errorf("could not read TLS certificate authority: %w", e)
 	}
-	roots := x509.NewCertPool()
-	if !roots.AppendCertsFromPEM(ca) {
-		return nil, nil, nil, fmt.Errorf("no valid PEM root CAs")
+	tlsConfig, e := verifiedMySQLTLS(c.TLSServerName, ca)
+	if e != nil {
+		return nil, nil, nil, e
 	}
 	h := sha256.Sum256(append(append([]byte(c.TLSServerName+"\x00"), ca...), 0))
 	tlsName := "allocation-verified-" + hex.EncodeToString(h[:])
 	mysqlTLSRegistry.Lock()
 	if !mysqlTLSSeen[tlsName] {
-		e = mysql.RegisterTLSConfig(tlsName, &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots, ServerName: c.TLSServerName})
+		e = mysql.RegisterTLSConfig(tlsName, tlsConfig)
 		if e == nil {
 			mysqlTLSSeen[tlsName] = true
 		}

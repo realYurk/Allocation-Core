@@ -179,3 +179,32 @@ All five V6/V7 financial and gzip evidence files match byte-for-byte. / 5 份财
 | Results and account reconciliation SHA-256 / 结果与逐科目对账哈希 | **Identical / 一致** | **Identical / 一致** |
 
 **Do not claim a performance speedup from V7 / V7 不宣传速度提升**: this release primarily strengthens correctness, fail-closed publication and type validation. / 本轮主要是正确性、异常阻断与数值类型安全的工程加固。
+
+
+## V8 validation / V8 验收记录
+
+**Baseline / 基线：** Clean V7 source from the previous signed-off release; `go run . demo .` generates only synthetic fixtures before tests. / V7 作为结果基线，先生成合成数据再运行完整测试。
+
+**Local tested / 本地实际执行：**
+
+```bash
+go run . demo .
+go test ./... -count=1
+go vet ./...
+go test -race ./internal/engine ./adapter ./internal/multi ./internal/studio ./internal/acceptance -count=1
+go test ./internal/engine -run '^TestV8Spool' -count=1 -v
+go test ./adapter -run '^TestV8MySQLTLS' -count=1 -v
+go test ./internal/engine -run '^$' -bench '^BenchmarkV8PartitionSpool$' -benchmem -benchtime=300ms -count=3
+```
+
+- Temporary spool regression verifies exact original JSONL bytes, Unicode/escaped strings, oversized rows >256 KiB, corrupt and incomplete records. / 验证临时分区记录逐字节保持，含中文、超大坐标及破损文件拒绝。
+- Offline TLS tests use ephemeral certificates and a real local TLS handshake. They are **not** a MySQL protocol test. / 离线 TLS 证书测试不是完整 MySQL 协议验收。
+- 5,000 synthetic JSONL records (8 shards), same Linux VM: legacy medians around **15.3 ms/op**, V8 passthrough around **11.2 ms/op**, with ~115k vs ~100k allocations/op. These are local *partition-only* benchmarks, not overall allocation speed guarantees. / 局部分区微基准减少重复序列化；不可将比例外推为总体性能。
+- Two-stage disk calculation on identical 50k synthetic source input, `--workers 4 --disk-partitions 8 --evidence-gzip`: V7 ~0.81 s, V8 ~0.76 s (single cold runs). `results.csv`, `reconciliation.csv`, `ledger.csv.gz`, `source_to_pool.csv.gz`, and `lineage_links.csv.gz` all have identical bytes. Timestamp-derived `run_summary.json` and the evidence manifest naturally differ. / 5 万行旧版与新版的五份财务输出和证据文件逐字节一致。
+- 1,000 synthetic accounts and 1,000 effective rule groups: 4000 terminal rows; V7/V8 `results.csv` and `account_reconciliation.csv` are SHA-256-identical. One-run elapsed: ~4.84s vs ~4.50s on this host; NOT a controlled repeated throughput claim. / 千科目结果逐字节一致，单次耗时不构成稳定提速承诺。
+
+**Still pending until GitHub Actions actually runs / 必须等待 CI 实际执行：**
+
+- `mysql-integration`: official MySQL driver, SELECT-only reader, concurrent `ALTER TABLE` blocked until snapshot release. / 实库并发 DDL 元数据锁保护。
+- `mysql-tls-integration`: CA-signed SAN server cert, enforced encrypted transport, official-driver import through a least-privilege user, rejection of incorrect server name and no output publication. / 真正 MySQL TLS/SAN 正反用例。
+- Enterprise UAT: actual enterprise certificates, DBA permissions, 1M–10M+ row data, long-running snapshot undo pressure, power loss and disk full. / 企业实库、百万到千万行、undo 负载及断电/写满测试仍需专项验收。

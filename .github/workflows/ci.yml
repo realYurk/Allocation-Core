@@ -20,9 +20,9 @@ jobs:
           go vet ./...
           go test -race ./internal/multi ./internal/studio ./internal/engine ./adapter ./internal/acceptance ./internal/profiling
           # Independent rational oracle, fixed business goldens and failure injection.
-          go test ./internal/engine ./adapter ./internal/acceptance -run 'TestV7' -count=1 -v
+          go test ./internal/engine ./adapter ./internal/acceptance -run 'TestV7|TestV8' -count=1 -v
           # Performance measurements are archived as diagnostics, never flaky pass/fail gates.
-          go test ./internal/engine -run '^$' -bench 'BenchmarkShardEncoding|BenchmarkPoolScheduler' -benchmem -benchtime=150ms > output/ci-benchmark.txt
+          go test ./internal/engine -run '^$' -bench 'BenchmarkShardEncoding|BenchmarkPoolScheduler|BenchmarkV8PartitionSpool' -benchmem -benchtime=150ms > output/ci-benchmark.txt
           ./AllocationCore inspect examples/manufacturing/rule.json
           ./AllocationCore data csv --config examples/import_mapping.json output/ci-normalized.csv
           ./AllocationCore profile examples/manufacturing/rule.json output/ci-profile --workers 2 --disk-partitions 4 --evidence-gzip
@@ -99,7 +99,79 @@ jobs:
         run: |
           go build -tags mysql -o AllocationCore .
           # The real MySQL test now exports via a SELECT-only account, not root.
-          go test -tags "mysql mysql_integration" ./adapter -run TestLiveMySQLSnapshot -count=1 -v
-          # Native TLS/SAN integration is separately opt-in when test CA is provisioned.
+          go test -tags "mysql mysql_integration" ./adapter -run 'TestLiveMySQLSnapshot|TestV8LiveConcurrentDDLIsBlockedUntilSnapshotReleased' -count=1 -v
+          # TLS/SAN full integration runs in the separate ephemeral PKI job below.
           go test -tags mysql ./adapter -count=1
           go vet -tags mysql ./adapter
+
+  mysql-tls-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Generate purpose-issued short-lived CA and SAN certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIR="$RUNNER_TEMP/allocation-ci-tls"
+          mkdir -p "$DIR"
+          openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 2 \
+            -keyout "$DIR/ca-key.pem" -out "$DIR/ca.pem" \
+            -subj '/CN=Allocation-Core-Temporary-Test-CA'
+          openssl req -newkey rsa:2048 -nodes -sha256 \
+            -keyout "$DIR/server-key.pem" -out "$DIR/server.csr" \
+            -subj '/CN=mysql.test.internal'
+          cat > "$DIR/server.ext" <<'CERTS'
+          basicConstraints=CA:FALSE
+          keyUsage=digitalSignature,keyEncipherment
+          extendedKeyUsage=serverAuth
+          subjectAltName=DNS:mysql.test.internal,DNS:localhost,IP:127.0.0.1
+          CERTS
+          openssl x509 -req -in "$DIR/server.csr" -CA "$DIR/ca.pem" \
+            -CAkey "$DIR/ca-key.pem" -CAcreateserial -out "$DIR/server-cert.pem" \
+            -days 2 -sha256 -extfile "$DIR/server.ext"
+          openssl verify -CAfile "$DIR/ca.pem" "$DIR/server-cert.pem"
+          # Container's mysql group (GID 999) may read the key, not other users.
+          sudo chgrp 999 "$DIR/server-key.pem"
+          chmod 640 "$DIR/server-key.pem"
+          chmod 755 "$DIR"
+      - name: Start isolated MySQL 8.4 requiring TLS
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name allocation-ci-mysql-tls \
+            -e MYSQL_ROOT_PASSWORD=isolated_root_ci_only \
+            -e MYSQL_DATABASE=allocation_ci \
+            -p 127.0.0.1:3307:3306 \
+            --mount "type=bind,src=$RUNNER_TEMP/allocation-ci-tls,dst=/etc/mysql/certs,readonly" \
+            mysql:8.4 \
+            --ssl-ca=/etc/mysql/certs/ca.pem \
+            --ssl-cert=/etc/mysql/certs/server-cert.pem \
+            --ssl-key=/etc/mysql/certs/server-key.pem \
+            --require_secure_transport=ON \
+            --tls-certificates-enforced-validation=ON
+          for n in $(seq 1 70); do
+            if docker exec allocation-ci-mysql-tls mysqladmin ping -uroot -pisolated_root_ci_only --silent 2>/dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker logs allocation-ci-mysql-tls
+          exit 1
+      - name: Official driver, real CA/SAN TLS import and fail-closed negative test
+        env:
+          ALLOCATION_MYSQL_TEST_EPHEMERAL: "1"
+          ALLOCATION_TEST_MYSQL_DSN: "root:isolated_root_ci_only@tcp(127.0.0.1:3307)/allocation_ci"
+          ALLOCATION_TEST_MYSQL_TLS_CA_FILE: ${{ runner.temp }}/allocation-ci-tls/ca.pem
+          ALLOCATION_TEST_MYSQL_TLS_SERVER_NAME: mysql.test.internal
+          ALLOCATION_TEST_MYSQL_TLS_ADDRESS: "127.0.0.1:3307"
+        run: |
+          go mod download
+          go build -tags mysql -o AllocationCore .
+          go test -tags "mysql mysql_integration" ./adapter -run '^TestLiveMySQLNativeTLSImport$' -count=1 -v
+      - name: Remove ephemeral test database and certificate materials
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f allocation-ci-mysql-tls 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/allocation-ci-tls"

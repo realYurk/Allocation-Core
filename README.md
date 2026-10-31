@@ -1,4 +1,4 @@
-# Allocation Core Clean V7 / 通用分摊引擎
+# Allocation Core Clean V8 / 通用分摊引擎
 
 **One Go module · One Windows executable · One workspace.**
 **一个 Go 模块、一个 Windows 程序、一个业务工作台。**
@@ -50,6 +50,14 @@ go build -trimpath -ldflags="-s -w" -o AllocationCore.exe .
 ```
 
 Build once, run the same executable for all modes. / 只编译一个程序，所有功能共用它。
+
+
+## Clean V8: Verified I/O & TLS guardrails / 经过验证的 I/O 与 TLS 加固
+
+- **Temporary JSONL spool passthrough / 临时中间文件透传**: intermediate disk-shard routing decodes each JSONL row once, uses its original raw record bytes in the destination shard, and avoids the second JSON serialization. The durable checkpoint format and public financial CSV outputs are **unchanged**. Oversized records, truncated records and exact-byte preservation have new regression tests. / 中间磁盘分区减少重复 JSON 编码；检查点格式和正式结果不变，新增超长行及损坏文件的失败关闭测试。
+- **Independent TLS policy tests / 独立 TLS 证书测试**: ephemeral CA + signed server cert are tested without any database dependency; valid chain/SAN succeeds, wrong SAN or untrusted CA fails, with TLS 1.2 minimum. / 本地无需数据库即可验证 CA、SAN、服务器名称和最小 TLS 版本。
+- **Live MySQL fault gates / 实库故障门槛**: CI now defines an **additional** ephemeral TLS-required MySQL 8.4 job with a temporary CA/SAN certificate and a negative wrong-hostname test; its standard MySQL job also tests blocking a concurrent DDL until the read-only snapshot is released. These jobs are **not validated locally** and must actually pass on GitHub after updating the repository. / 新增隔离实库 TLS 和并发 DDL 检验，必须在 GitHub CI 真正运行通过后才能声明已验收。
+- **No new executables / 不增加入口**: one Go Module, one Windows EXE, no CMD or BAT. This package's offline Windows EXE has no linked native MySQL driver; to build a MySQL-enabled EXE, use `go mod download && go build -tags mysql -o AllocationCore.exe .` online (or the CI Windows artifact). / 交付仍只有一个用户程序；离线 EXE 不包含官方 MySQL 驱动。
 
 ## Clean V5 baseline / V5 已有基础
 

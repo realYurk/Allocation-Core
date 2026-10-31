@@ -215,3 +215,12 @@ AllocationCore.exe reconcile --actual output/run/results.csv --reference input/r
 **Warning / 提醒**: direct MySQL access requires the separate MySQL-enabled build (`go mod download && go build -tags mysql ...`) and an explicitly provisioned TLS CA/server certificate. Never enter database passwords into these public JSON examples or upload a real config. / MySQL 实库需要额外启用官方驱动和 TLS；密钥及业务文件只留本地。
 
 **Duplicate policy / 重复数据**: default compares the exact SUM for each full coordinate and writes `actual_duplicate_rows` / `reference_duplicate_rows` to `summary.json`, while `--reject-duplicates` blocks the entire acceptance report when a repeated coordinate exists. / 默认按坐标精确汇总但披露重复数量，严格模式会直接拒绝并不发布报告。
+
+
+## V8 MySQL connection acceptance / V8 MySQL 连接验收
+
+The offline EXE deliberately omits the official external driver. MySQL native connection requires `go build -tags mysql` or a successfully completed MySQL-enabled CI build. Never place passwords or corporate data in public JSON/config/CI. / 离线 EXE 不包括 MySQL 官方驱动，实库直连需要联网编译；企业凭据不能上传 GitHub。
+
+The native TLS client requires a verified CA PEM and an explicit DNS server identity that matches the certificate SAN. Reject mismatched SAN/CA and prevent any output from being published. The new GitHub CI job builds a temporary test CA and MySQL 8.4 server with `require_secure_transport=ON` solely for acceptance; observe the actual job result before calling it PASS. / 证书名称必须与 SAN 一致，证书错误必须拒绝且不发布输出；CI 需实际执行。
+
+MySQL `REPEATABLE READ` gives an intra-server transactional snapshot for InnoDB, **not** a cross-system snapshot with a vendor-specific Cube. / MySQL 事务不等于与外部 Cube 同一时点。
