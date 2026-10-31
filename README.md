@@ -1,5 +1,15 @@
 # Allocation Core — Business Onboarding Update / 通用分摊引擎
 
+## Finance-friendly percentage factors / 财务人员百分比因子配置
+
+In /multi → 科目规则 → 独立因子配置, enter 75% / 25% instead of fractional JSON values. Shares are checked exactly to 0.0001% precision and must sum to 100% for each active stage.
+
+Go validates the entire effective rule before writing overrides.csv; stale pages return HTTP 409 and cannot overwrite changed account assignments, templates, or factor overrides. Saved rules still require Inspect, Run and independent coordinate-level reconciliation.
+
+Compatibility: external API clients calling POST /api/multi/factor must provide the versions object (SHA-256 for assignments, template and overrides) returned from GET /api/multi/factor. Missing/stale tokens are rejected.
+
+一个 EXE、一个工作台，不改变现有金额计算算法；保存成功不等于业务验收。
+
 **One Go module · One Windows executable · One workspace.**
 **一个 Go 模块、一个 Windows 程序、一个业务工作台。**
 
