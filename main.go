@@ -16,8 +16,31 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 )
+
+// Build metadata is set by CI; source builds show unreleased/local status.
+var buildVersion = "unreleased"
+var buildCommit = "unknown"
+
+func versionInfo() string {
+	commit := buildCommit
+	if commit == "unknown" {
+		if info, ok := debug.ReadBuildInfo(); ok {
+			for _, setting := range info.Settings {
+				if setting.Key == "vcs.revision" {
+					commit = setting.Value
+				}
+			}
+		}
+	}
+	connector := "not linked"
+	if adapter.MySQLDriverLinked() {
+		connector = "linked (enterprise connection not verified)"
+	}
+	return fmt.Sprintf("Allocation Core %s\nRevision: %s\nMySQL driver: %s", buildVersion, commit, connector)
+}
 
 func main() {
 	if len(os.Args) < 2 {
@@ -116,7 +139,7 @@ func main() {
 		}
 		fmt.Printf("Synthetic example files generated: %d (local only)\n", n)
 	case "version", "--version":
-		fmt.Println("Allocation Core Clean / Business Onboarding")
+		fmt.Println(versionInfo())
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command %q. Use 'serve', 'core', 'multi', 'rule', 'explorer', 'data', 'profile', 'review' or double-click the application.\n", os.Args[1])
 		os.Exit(2)

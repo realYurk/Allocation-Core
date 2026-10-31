@@ -209,3 +209,6 @@ func ImportMySQLBundleConfig(ctx context.Context, configPath, destination string
 		return nil
 	})
 }
+
+// MySQLDriverLinked identifies build capability; it does not prove enterprise connectivity.
+func MySQLDriverLinked() bool { return true }

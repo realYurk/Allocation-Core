@@ -15,3 +15,6 @@ func ImportMySQLConfig(ctx context.Context, configPath, destination string) (Rep
 func ImportMySQLBundleConfig(ctx context.Context, configPath, dest string) (BundleReport, error) {
 	return BundleReport{}, fmt.Errorf("MySQL connector is not linked into this build; build with -tags mysql")
 }
+
+// MySQLDriverLinked identifies build capability; it does not prove enterprise connectivity.
+func MySQLDriverLinked() bool { return false }

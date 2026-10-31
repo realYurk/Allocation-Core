@@ -5,6 +5,7 @@ package studio
 
 import (
 	"allocationcore/internal/demo"
+	"allocationcore/internal/engine"
 	"allocationcore/internal/multi"
 	"context"
 	"crypto/rand"
@@ -19,6 +20,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -45,14 +47,14 @@ type Application struct {
 	editMu                                   sync.Mutex
 }
 type Job struct {
-	ID     string `json:"id"`
-	Case   string `json:"case"`
-	Status string `json:"status"`
-	Start  string `json:"start"`
-	End    string `json:"end,omitempty"`
-	Error  string `json:"error,omitempty"`
-	Output string `json:"-"`
-	Log    string `json:"log,omitempty"`
+	ID        string                  `json:"id"`
+	Case      string                  `json:"case"`
+	Status    string                  `json:"status"`
+	Start     string                  `json:"start"`
+	End       string                  `json:"end,omitempty"`
+	Error     string                  `json:"error,omitempty"`
+	Output    string                  `json:"-"`
+	Log       string                  `json:"log,omitempty"`
 	Diagnosis *multi.FailureDiagnosis `json:"diagnosis,omitempty"`
 }
 type GenericRule struct {
@@ -66,15 +68,18 @@ type GenericRule struct {
 	Precision int              `json:"precision"`
 }
 type CaseSummary struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Type         string `json:"type"`
-	Kind         string `json:"kind"`
-	Stages       int    `json:"stages"`
-	Drivers      int    `json:"drivers"`
-	AccountCount int    `json:"accountCount"`
-	Period       string `json:"period"`
-	Amount       string `json:"amount"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Type            string `json:"type"`
+	Kind            string `json:"kind"`
+	Stages          int    `json:"stages"`
+	Drivers         int    `json:"drivers"`
+	AccountCount    int    `json:"accountCount"`
+	Period          string `json:"period"`
+	Amount          string `json:"amount"`
+	SourceRows      int64  `json:"source_rows"`
+	SummaryComplete bool   `json:"summary_complete"`
+	SummaryError    string `json:"summary_error,omitempty"`
 }
 
 // Only these local-only business import endpoints accept multipart file data.
@@ -370,25 +375,73 @@ func (a *Application) allCaseIDs() []string {
 	ids := caseIds(filepath.Join(a.data, "examples"), "")
 	return append(ids, caseIds(a.custom, "user_")...)
 }
-func (a *Application) sourceRows(rule GenericRule, dir string) ([]map[string]string, error) {
+
+// sourceRows is intentionally a PREVIEW for the legacy Studio case explorer.
+// Never use these rows to calculate complete financial summaries.
+func (a *Application) sourceRows(rule GenericRule, dir string) ([]map[string]string, bool, error) {
 	rows := []map[string]string{}
+	truncated := false
 	names := make([]string, 0, len(rule.Datasets.Amounts))
 	for n := range rule.Datasets.Amounts {
 		names = append(names, n)
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		r, e := readCSV(filepath.Join(dir, rule.Datasets.Amounts[name]), 500)
+		r, e := readCSV(filepath.Join(dir, rule.Datasets.Amounts[name]), 501)
 		if e != nil {
-			return nil, e
+			return nil, false, e
+		}
+		if len(r) > 500 {
+			truncated = true
+			r = r[:500]
 		}
 		for _, item := range r {
 			item["_dataset"] = name
 			rows = append(rows, item)
 		}
 	}
-	return rows, nil
+	return rows, truncated, nil
 }
+
+// summarizeCaseAmounts streams ALL rows using the very same decimal parser
+// and dimension validation as the allocation engine. It never substitutes
+// the preview's first 500 rows for a financial total.
+func summarizeCaseAmounts(rule GenericRule, dir string) (int, string, string, int64, error) {
+	accounts := make(map[string]struct{})
+	var total int64
+	var sourceRows int64
+	period := ""
+	names := make([]string, 0, len(rule.Datasets.Amounts))
+	for n := range rule.Datasets.Amounts {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		path := filepath.Join(dir, rule.Datasets.Amounts[name])
+		err := engine.StreamAmounts(path, rule.Dimensions, rule.Precision, func(row engine.Row) error {
+			if row.Amount > 0 && total > math.MaxInt64-row.Amount || row.Amount < 0 && total < math.MinInt64-row.Amount {
+				return fmt.Errorf("amount sum overflows signed 64-bit precision")
+			}
+			total += row.Amount
+			sourceRows++
+			if ac := row.Coord["account"]; ac != "" {
+				accounts[ac] = struct{}{}
+			}
+			if period == "" {
+				period = row.Coord["period"]
+			}
+			return nil
+		})
+		if err != nil {
+			return 0, "", "", 0, fmt.Errorf("amount dataset %s: %w", name, err)
+		}
+	}
+	if rule.Precision < 0 || rule.Precision > 6 {
+		return 0, "", "", 0, fmt.Errorf("unsupported financial precision %d", rule.Precision)
+	}
+	return len(accounts), period, engine.Money(total, rule.Precision), sourceRows, nil
+}
+
 func readCSV(path string, limit int) ([]map[string]string, error) {
 	f, e := os.Open(path)
 	if e != nil {
@@ -434,23 +487,15 @@ func (a *Application) cases(w http.ResponseWriter, r *http.Request) {
 		if e != nil {
 			continue
 		}
-		rows, _ := a.sourceRows(rule, dir)
-		accounts := map[string]bool{}
-		amount := 0.
-		period := ""
-		drivers := map[string]bool{}
-		for _, row := range rows {
-			accounts[row["account"]] = true
-			v, _ := strconv.ParseFloat(row["amount"], 64)
-			amount += v
-			if period == "" {
-				period = row["period"]
-			}
+		accountCount, period, amount, rows, err := summarizeCaseAmounts(rule, dir)
+		info := CaseSummary{ID: id, Name: rule.Name, Type: kind, Kind: kind, Stages: len(rule.Stages),
+			Drivers: len(rule.Datasets.Drivers), AccountCount: accountCount, Period: period, Amount: amount,
+			SourceRows: rows, SummaryComplete: err == nil}
+		if err != nil {
+			// A partial total MUST NOT look like a complete financial total.
+			info.SummaryError = err.Error()
 		}
-		for k := range rule.Datasets.Drivers {
-			drivers[k] = true
-		}
-		out = append(out, CaseSummary{ID: id, Name: rule.Name, Type: kind, Kind: kind, Stages: len(rule.Stages), Drivers: len(drivers), AccountCount: len(accounts), Period: period, Amount: fmt.Sprintf("%.2f", amount)})
+		out = append(out, info)
 	}
 	jsonOut(w, 200, map[string]any{"cases": out})
 }
@@ -465,7 +510,7 @@ func (a *Application) caseDetail(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, e)
 		return
 	}
-	src, e := a.sourceRows(rule, dir)
+	src, sourceTruncated, e := a.sourceRows(rule, dir)
 	if e != nil {
 		fail(w, 422, e)
 		return
@@ -477,7 +522,7 @@ func (a *Application) caseDetail(w http.ResponseWriter, r *http.Request) {
 			drivers[k] = data
 		}
 	}
-	jsonOut(w, 200, map[string]any{"id": id, "type": kind, "rule": rule, "sources": src, "drivers": drivers})
+	jsonOut(w, 200, map[string]any{"id": id, "type": kind, "rule": rule, "sources": src, "sources_truncated": sourceTruncated, "sources_preview_limit_per_dataset": 500, "drivers": drivers})
 }
 func randomID() string {
 	b := make([]byte, 12)
