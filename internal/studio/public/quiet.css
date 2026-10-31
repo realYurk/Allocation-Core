@@ -71,3 +71,17 @@ input,select{border-color:#cbd5df;border-radius:5px}
 .failure-diagnosis .diagnosis-context{font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;background:#f6f7f9;border:1px solid #e2e7ec;padding:10px;border-radius:5px}
 .failure-diagnosis li{margin:6px 0;font-size:13px;line-height:1.5}
 .failure-diagnosis .diagnosis-limit{font-size:12px;color:#586676}
+
+/* Driver coverage: quiet enterprise-finance diagnostics. */
+.coverage-action{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0}
+.coverage-action small{color:#566779;font-size:12px}
+.coverage-panel{border-top:1px solid #d9e0e7;margin-top:16px;padding-top:14px}
+.coverage-panel[hidden]{display:none!important}
+.coverage-panel h3{font-size:15px;margin:0 0 8px}
+.coverage-panel #coverageSummary{font-weight:600;font-size:13px}
+.coverage-finding{border:1px solid #dce3e9;background:#fbfcfd;border-radius:5px;padding:10px;margin:8px 0}
+.coverage-finding strong{font-size:13px}
+.coverage-finding p{font-size:12px;margin:5px 0;line-height:1.5;overflow-wrap:anywhere}
+.coverage-panel .row{margin:14px 0}
+.coverage-panel .tablebox{max-height:320px;overflow:auto}
+.coverage-panel td{font-size:12px}
