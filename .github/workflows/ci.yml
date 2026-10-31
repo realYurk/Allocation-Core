@@ -19,6 +19,12 @@ jobs:
           go test ./... -count=1
           go vet ./...
           node --test internal/studio/factor_editor_node_test.cjs
+          # All finance-facing standalone scripts must parse before shipping.
+          node --check internal/studio/public/quickstart.js
+          node --check internal/studio/public/factor_editor.js
+          node --check internal/studio/public/preflight.js
+          node --check internal/studio/public/failure_diagnosis.js
+          node --check internal/studio/public/coverage.js
           go test -race ./internal/multi ./internal/studio ./internal/engine ./adapter ./internal/acceptance ./internal/profiling
           # Independent rational oracle, fixed business goldens and failure injection.
           go test ./internal/engine ./adapter ./internal/acceptance -run 'TestV7|TestV8' -count=1 -v
