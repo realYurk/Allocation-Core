@@ -198,3 +198,68 @@ func TestRunCompareIdenticalFinancialResultsDoesNotInventCauses(t *testing.T) {
 		t.Fatalf("changed driver encoding should not invent a business difference: %+v", report)
 	}
 }
+
+// A finance operator repeatedly clicking "compare" for the same immutable
+// pair must not create a second large difference archive. Changed or tampered
+// stored evidence must never be silently adopted as an intact comparison.
+func TestRunCompareIdenticalSnapshotsReusePublishedReport(t *testing.T) {
+	x, first, _ := stageEvidenceFixture(t)
+	second := strings.Repeat("d", 24)
+	project := filepath.Join(x.root, "finance")
+	out := filepath.Join(x.parent.data, "multi-jobs", second)
+	core := buildRunCompareEngine(t, x.parent.data)
+	result, err := multi.Run(project, out, core)
+	if err != nil || result.Status != "PASS" {
+		t.Fatalf("run second complete job: %+v %v", result, err)
+	}
+	if err = atomicJobUpdate(&Job{ID: second, Case: "finance", Status: "PASS", Start: "2026-10-31T11:00:00Z", Output: out}, true); err != nil {
+		t.Fatal(err)
+	}
+	request := `{"name":"finance","before":"` + first + `","after":"` + second + `"}`
+	fresh := callRunCompare(x, http.MethodPost, "/api/multi/compare-runs", request)
+	if fresh.Code != http.StatusCreated {
+		t.Fatalf("first compare %d %s", fresh.Code, fresh.Body.String())
+	}
+	var a runComparison
+	if err = json.Unmarshal(fresh.Body.Bytes(), &a); err != nil {
+		t.Fatal(err)
+	}
+	cached := callRunCompare(x, http.MethodPost, "/api/multi/compare-runs", request)
+	if cached.Code != http.StatusOK {
+		t.Fatalf("reuse compare %d %s", cached.Code, cached.Body.String())
+	}
+	var b runComparison
+	if err = json.Unmarshal(cached.Body.Bytes(), &b); err != nil {
+		t.Fatal(err)
+	}
+	if b.ID != a.ID || a.ID == "" {
+		t.Fatalf("same snapshots produced different IDs: %q vs %q", a.ID, b.ID)
+	}
+	dirs, err := os.ReadDir(filepath.Join(x.parent.data, "multi-run-comparisons"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dirs) != 1 || dirs[0].Name() != a.ID {
+		t.Fatalf("duplicate published comparison directories: %+v", dirs)
+	}
+	// Strictly validate stored evidence before reusing. No automatic repair or
+	// overwritten audit history if any saved CSV byte was modified.
+	diff := filepath.Join(x.parent.data, "multi-run-comparisons", a.ID, "differences.csv")
+	f, err := os.OpenFile(diff, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.WriteString("tampered\n")
+	f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	refused := callRunCompare(x, http.MethodPost, "/api/multi/compare-runs", request)
+	if refused.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("changed difference archive silently reused: %d %s", refused.Code, refused.Body.String())
+	}
+	dirs, err = os.ReadDir(filepath.Join(x.parent.data, "multi-run-comparisons"))
+	if err != nil || len(dirs) != 1 {
+		t.Fatal("tampering produced a second comparison archive", err)
+	}
+}

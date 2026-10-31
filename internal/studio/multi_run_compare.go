@@ -7,7 +7,6 @@ import (
 	"allocationcore/internal/acceptance"
 	"allocationcore/internal/multi"
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -17,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -221,12 +221,55 @@ func digestFile(ctx context.Context, path string) (string, error) {
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
-func randomCompareID() (string, error) {
-	b := make([]byte, 12)
-	if _, e := rand.Read(b); e != nil {
-		return "", e
+
+// stableComparisonID is content-addressed, not just a pair of job IDs.
+// If either archived result, saved input fingerprint or effective rule changes,
+// it produces a different report ID rather than reusing stale evidence. JSON
+// sorts map keys, so independent processes derive the same ID.
+func stableComparisonID(project, beforeJob, afterJob, beforeResultSHA, afterResultSHA string, beforeInputs, afterInputs, beforeRules, afterRules map[string]string) (string, error) {
+	payload := struct {
+		Project, BeforeJob, AfterJob, BeforeResultSHA, AfterResultSHA string
+		BeforeInputs, AfterInputs, BeforeRules, AfterRules            map[string]string
+	}{project, beforeJob, afterJob, beforeResultSHA, afterResultSHA, beforeInputs, afterInputs, beforeRules, afterRules}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
 	}
-	return hex.EncodeToString(b), nil
+	sha := sha256.Sum256(data)
+	return hex.EncodeToString(sha[:12]), nil
+}
+
+// An already-published comparison is reused only after its complete coordinate
+// difference file is verified. Corrupted evidence blocks instead of silently
+// recomputing and hiding the tamper. Legacy random-ID reports remain readable.
+func readReusableRunComparison(ctx context.Context, root, id, project, beforeJob, afterJob, beforeHash, afterHash string, inputs []runInputChange, rules []runRuleChange) (runComparison, bool, error) {
+	var report runComparison
+	dir := filepath.Join(root, id)
+	raw, err := readSmallRegular(filepath.Join(dir, "comparison.json"), 32<<20)
+	if os.IsNotExist(err) {
+		return report, false, nil
+	}
+	if err != nil {
+		return report, true, err
+	}
+	if err = json.Unmarshal(raw, &report); err != nil {
+		return report, true, err
+	}
+	if report.ID != id || report.Project != project || report.BeforeJob != beforeJob || report.AfterJob != afterJob ||
+		report.CoordinateComparison.ReferenceSHA256 != beforeHash || report.CoordinateComparison.ActualSHA256 != afterHash ||
+		!validSHA256(report.DifferencesSHA256) ||
+		!reflect.DeepEqual(report.InputChanges, inputs) || !reflect.DeepEqual(report.RuleChanges, rules) ||
+		(report.CoordinateComparison.Status != "MATCH" && report.CoordinateComparison.Status != "DIFFERENCES") {
+		return report, true, errors.New("已保存的历史对比指纹不一致，不能复用")
+	}
+	sha, err := digestFile(ctx, filepath.Join(dir, "differences.csv"))
+	if err != nil {
+		return report, true, err
+	}
+	if sha != report.DifferencesSHA256 {
+		return report, true, errors.New("已保存的坐标差异文件被修改，不能复用")
+	}
+	return report, true, nil
 }
 
 func (x *MultiApp) compareRuns(w http.ResponseWriter, r *http.Request) {
@@ -321,8 +364,33 @@ func (x *MultiApp) compareRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	beforeResult, afterResult := filepath.Join(beforeDir, "results.csv"), filepath.Join(afterDir, "results.csv")
+	// A single streaming SHA pass is cheaper than repeatedly partitioning two
+	// potentially multi-gigabyte CSVs or storing duplicate difference reports.
+	beforeHash, e := digestFile(r.Context(), beforeResult)
+	if e != nil {
+		fail(w, 422, e)
+		return
+	}
+	afterHash, e := digestFile(r.Context(), afterResult)
+	if e != nil {
+		fail(w, 422, e)
+		return
+	}
+	comparisonID, e := stableComparisonID(req.Name, req.Before, req.After, beforeHash, afterHash, beforeInputs, afterInputs, beforeRules, afterRules)
+	if e != nil {
+		fail(w, 500, e)
+		return
+	}
 	if e = os.MkdirAll(root, 0700); e != nil {
 		fail(w, 500, e)
+		return
+	}
+	if saved, found, er := readReusableRunComparison(r.Context(), root, comparisonID, req.Name, req.Before, req.After, beforeHash, afterHash, compareInputHashes(beforeInputs, afterInputs), compareRuleHashes(beforeRules, afterRules)); found {
+		if er != nil {
+			fail(w, 422, fmt.Errorf("历史对比记录不可复用: %w", er))
+			return
+		}
+		jsonOut(w, 200, saved)
 		return
 	}
 	tmp, e := os.MkdirTemp(root, ".compare-")
@@ -340,25 +408,21 @@ func (x *MultiApp) compareRuns(w http.ResponseWriter, r *http.Request) {
 	}
 	// Reject changes during or immediately following scan rather than creating
 	// an apparently immutable report from a moving historical CSV.
-	beforeHash, e := digestFile(r.Context(), beforeResult)
+	verifyBefore, e := digestFile(r.Context(), beforeResult)
 	if e != nil {
 		fail(w, 422, e)
 		return
 	}
-	afterHash, e := digestFile(r.Context(), afterResult)
+	verifyAfter, e := digestFile(r.Context(), afterResult)
 	if e != nil {
 		fail(w, 422, e)
 		return
 	}
-	if beforeHash != compared.ReferenceSHA256 || afterHash != compared.ActualSHA256 {
+	if verifyBefore != beforeHash || verifyAfter != afterHash || beforeHash != compared.ReferenceSHA256 || afterHash != compared.ActualSHA256 {
 		fail(w, 409, errors.New("历史结果在对比过程中发生变化，请重试"))
 		return
 	}
-	comparisonID, e := randomCompareID()
-	if e != nil {
-		fail(w, 500, e)
-		return
-	}
+
 	changeFile := filepath.Join(tmp, "coordinates", "differences.csv")
 	changesHash, e := digestFile(r.Context(), changeFile)
 	if e != nil {
@@ -388,8 +452,19 @@ func (x *MultiApp) compareRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if e = os.Rename(tmp, filepath.Join(root, comparisonID)); e != nil {
+		// Another comparison of the same immutable snapshots may have won the
+		// atomic publication race. Never overwrite it; validate and reuse.
+		if saved, found, er := readReusableRunComparison(r.Context(), root, comparisonID, req.Name, req.Before, req.After, beforeHash, afterHash, compareInputHashes(beforeInputs, afterInputs), compareRuleHashes(beforeRules, afterRules)); found {
+			if er != nil {
+				fail(w, 422, fmt.Errorf("并发发布记录不完整: %w", er))
+				return
+			}
+			jsonOut(w, 200, saved)
+			return
+		}
 		fail(w, 500, e)
 		return
 	}
+
 	jsonOut(w, 201, record)
 }
