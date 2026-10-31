@@ -140,16 +140,11 @@ func importDesignerRule(source []byte, projectDir string, mapping map[string]str
     assignments, err := readAssignments(filepath.Join(projectDir, "assignments.csv"))
     if err != nil {return nil, plan, err}
     if len(assignments) == 0 {return nil, plan, errors.New("project has no account assignments")}
-    canonical, err := os.ReadFile(filepath.Join(projectDir, "templates", assignments[0]["template"]))
+    contractPrecision, contractDimensions, err := readOnboardingTemplate(projectDir, assignments[0]["template"])
     if err != nil {return nil, plan, err}
-    var contract struct {
-        Dimensions []string `json:"dimensions"`
-        Precision int `json:"precision"`
-    }
-    if err := json.Unmarshal(canonical, &contract); err != nil {return nil, plan, err}
-    if contract.Precision != spec.Precision || !reflect.DeepEqual(contract.Dimensions, spec.Dimensions) {
+    if contractPrecision != spec.Precision || !reflect.DeepEqual(contractDimensions, spec.Dimensions) {
         return nil, plan, fmt.Errorf("designer rule dimensions/precision do not match project contract; project=%v precision=%d, designer=%v precision=%d",
-            contract.Dimensions, contract.Precision, spec.Dimensions, spec.Precision)
+            contractDimensions, contractPrecision, spec.Dimensions, spec.Precision)
     }
 
     // Dataset paths are reconstructed, never trusted from the designer.
