@@ -28,6 +28,8 @@ type PreflightDataset struct {
 	WeightFields []string `json:"weight_fields"`
 	ReferencedBy int      `json:"referenced_by_rule_groups"`
 	Error        string   `json:"error,omitempty"`
+    WeightSignals []DriverWeightSignal `json:"weight_signals"`
+    allAffected map[string]map[string]bool // transient only; excluded from JSON
 }
 type PreflightReport struct {
 	Status            string             `json:"status"`
@@ -41,6 +43,12 @@ type PreflightReport struct {
 	Problems          []string           `json:"problems"`
 	ElapsedMS         int64              `json:"elapsed_ms"`
 	Scope             string             `json:"scope"`
+    Findings []BusinessFinding `json:"findings"`
+    AccountDetails []AccountReadiness `json:"account_details"`
+    ReviewAccounts int `json:"review_accounts"`
+    BlockedAccounts int `json:"blocked_accounts"`
+    CheckCount int `json:"check_count"`
+    DataMatchVerified bool `json:"data_match_verified"`
 }
 
 func (r *PreflightReport) block(format string, args ...any) {
@@ -56,13 +64,19 @@ func InspectProject(ctx context.Context, projectDir string) (report PreflightRep
 	begin := time.Now()
 	report = PreflightReport{Status: "PASS", InputAmount: "0", Drivers: []PreflightDataset{}, Problems: []string{},
 		Scope: "Configuration, account coverage and input numeric checks ONLY; no driver eligibility, allocation accuracy or reference-system equivalence verified."}
-	defer func() { report.ElapsedMS = time.Since(begin).Milliseconds() }()
+	var working *project
+    var inputCounts map[string]int64
+    defer func() {
+        addBusinessDiagnostics(&report,working,inputCounts)
+        report.ElapsedMS = time.Since(begin).Milliseconds()
+    }()
 	dir, err := filepath.Abs(projectDir)
 	if err != nil {
 		report.block("invalid project directory: %v", err)
 		return
 	}
 	p := &project{dir: dir, ctx: ctx}
+    working=p
 	if err = p.initialize(); err != nil {
 		report.block("rule/assignment configuration: %v", err)
 		return
@@ -105,6 +119,7 @@ func InspectProject(ctx context.Context, projectDir string) (report PreflightRep
 		return
 	}
 	counts := make(map[string]int64, len(p.assign))
+    inputCounts=counts
 	total := new(big.Int)
 	for {
 		if e := ctx.Err(); e != nil {
@@ -165,7 +180,8 @@ func InspectProject(ctx context.Context, projectDir string) (report PreflightRep
 		fields map[string]bool
 		groups map[string]bool
 		name   string
-	}
+        accounts map[string]map[string]bool
+    }
 	demands := map[string]*demand{}
 	for _, g := range p.groups {
 		var spec engine.Spec
@@ -189,11 +205,13 @@ func InspectProject(ctx context.Context, projectDir string) (report PreflightRep
 				// initialize() has already validated every referenced path.
 				d := demands[path]
 				if d == nil {
-					d = &demand{fields: map[string]bool{}, groups: map[string]bool{}, name: filepath.Base(path)}
+					d = &demand{fields: map[string]bool{}, groups: map[string]bool{}, name: filepath.Base(path), accounts: map[string]map[string]bool{}}
 					demands[path] = d
 				}
 				d.fields[alloc.WeightField] = true
-				d.groups[g.ID] = true
+                if d.accounts[alloc.WeightField]==nil {d.accounts[alloc.WeightField]=map[string]bool{}}
+                for _,account:=range g.Accounts {d.accounts[alloc.WeightField][account]=true}
+                d.groups[g.ID] = true
 				report.DriverReferences++
 			}
 		}
@@ -211,7 +229,7 @@ func InspectProject(ctx context.Context, projectDir string) (report PreflightRep
 			fields = append(fields, field)
 		}
 		sort.Strings(fields)
-		check := PreflightDataset{Name: d.name, WeightFields: fields, ReferencedBy: len(d.groups)}
+		check := PreflightDataset{Name: d.name, WeightFields: fields, ReferencedBy: len(d.groups), allAffected:d.accounts}
 		if e := scanDriverForPreflight(ctx, path, fields, p.canonicalHeader, &check); e != nil {
 			check.Error = e.Error()
 			report.block("driver %s: %v", d.name, e)
@@ -266,11 +284,11 @@ func scanDriverForPreflight(ctx context.Context, path string, fields, dimensions
 	if found == 0 {
 		return fmt.Errorf("driver has no matching dimension columns")
 	}
-	for {
-		if e := ctx.Err(); e != nil {
-			return e
-		}
-		row, e := r.Read()
+	signals:=make(map[string]*DriverWeightSignal,len(fields))
+    for _,field:=range fields {signals[field]=&DriverWeightSignal{Field:field}}
+    for {
+        if e := ctx.Err(); e != nil {return e}
+        row, e := r.Read()
 		if e == io.EOF {
 			break
 		}
@@ -287,15 +305,19 @@ func scanDriverForPreflight(ctx context.Context, path string, fields, dimensions
 			}
 		}
 		for _, field := range fields {
-			if _, e := engine.ParseScaled(get(row, ix[field]), 6); e != nil {
-				return fmt.Errorf("row %d field %s: %w", out.Rows+1, field, e)
-			}
+			value, e := engine.ParseScaled(get(row, ix[field]), 6)
+            if e != nil {return fmt.Errorf("row %d field %s: %w",out.Rows+1,field,e)}
+            sig:=signals[field]
+            if value>0 {sig.PositiveRows++} else if value<0 {sig.NegativeRows++} else {sig.ZeroRows++}
 		}
 	}
-	if out.Rows == 0 {
-		return fmt.Errorf("no driver rows")
-	}
-	return nil
+	if out.Rows == 0 {return fmt.Errorf("no driver rows")}
+    for _,field:=range fields {
+        sig:=signals[field]
+        sig.AccountExamples,sig.AffectedAccounts=sortedSamples(out.allAffected[field],8)
+        out.WeightSignals=append(out.WeightSignals,*sig)
+    }
+    return nil
 }
 
 // runInspectCLI produces a stable, machine-readable quality gate suitable for
