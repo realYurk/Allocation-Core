@@ -189,3 +189,28 @@ func TestDesignerBridgeMissingDriverIsReportedNotCopied(t *testing.T) {
         t.Fatal("source case driver data was copied into business project")
     }
 }
+
+func TestDesignerBridgePreservesRealMultiStageGraph(t *testing.T) {
+    _,project,_,raw:=designerBridgeFixture(t)
+    spec,err:=engine.ParseSpec(raw);if err!=nil {t.Fatal(err)}
+    // A real chained second step: downstream source is the first stage,
+    // not an invented new expense dataset. Account remains immutable.
+    copyBytes,err:=json.Marshal(spec.Stages[0]);if err!=nil {t.Fatal(err)}
+    var second engine.Stage
+    if err:=json.Unmarshal(copyBytes,&second);err!=nil {t.Fatal(err)}
+    second.ID="Second product redistribution"
+    second.Inputs=[]engine.InputEdge{{From:spec.Stages[0].ID,Share:"1"}}
+    second.Source.Grouping["sku"]="AS_IS"
+    second.Target["sku"]=engine.Target{Mode:"SOURCE"}
+    second.ConservationKeys=append(second.ConservationKeys,"sku")
+    spec.Stages=append(spec.Stages,second)
+    prepared,err:=json.Marshal(spec);if err!=nil {t.Fatal(err)}
+    imported,plan,err:=importDesignerRule(prepared,project,map[string]string{"units":"units.csv"})
+    if err!=nil {t.Fatalf("valid two-stage graph rejected: %v",err)}
+    if plan.Stages!=2 || !plan.Ready {t.Fatalf("wrong multi-stage import plan: %+v",plan)}
+    got,err:=engine.ParseSpec(imported);if err!=nil {t.Fatal(err)}
+    if len(got.Stages)!=2 || got.Stages[1].Inputs[0].From!=got.Stages[0].ID {
+        t.Fatal("pipeline dependency graph was not preserved")
+    }
+    if _,err:=engine.Compile(got);err!=nil {t.Fatalf("imported multi-stage rule invalid: %v",err)}
+}
