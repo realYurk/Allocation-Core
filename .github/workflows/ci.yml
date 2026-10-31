@@ -25,6 +25,7 @@ jobs:
           node --check internal/studio/public/preflight.js
           node --check internal/studio/public/failure_diagnosis.js
           node --check internal/studio/public/coverage.js
+          node --check internal/studio/public/stage_evidence.js
           go test -race ./internal/multi ./internal/studio ./internal/engine ./adapter ./internal/acceptance ./internal/profiling
           # Independent rational oracle, fixed business goldens and failure injection.
           go test ./internal/engine ./adapter ./internal/acceptance -run 'TestV7|TestV8' -count=1 -v
@@ -67,6 +68,7 @@ jobs:
           $bin = (Resolve-Path .\AllocationCore.exe).Path
           .\AllocationCore.exe multi inspect -project testdata\multi_sample -json
           go test ./internal/studio -run 'TestDesignerBridge' -count=1
+          go test ./internal/studio -run 'TestStageEvidence' -count=1
           .\AllocationCore.exe multi -project testdata\multi_sample -out output\ci-multi -engine $bin
           .\AllocationCore.exe reconcile --actual output\ci-multi\results.csv --reference output\ci-multi\results.csv --out output\ci-acceptance --precision 2 --tolerance 0
       - name: Archive one-folder product

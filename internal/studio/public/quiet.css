@@ -85,3 +85,11 @@ input,select{border-color:#cbd5df;border-radius:5px}
 .coverage-panel .row{margin:14px 0}
 .coverage-panel .tablebox{max-height:320px;overflow:auto}
 .coverage-panel td{font-size:12px}
+
+/* Read-only published stage evidence: plain finance table, not another dashboard. */
+.stage-evidence{margin:14px 0;padding:16px;border:1px solid #d9e0e7;background:#fff;border-radius:7px}
+.stage-evidence h3{font-size:15px;margin:0 0 8px;color:#263747}
+.stage-evidence label{font-size:13px;color:#3a4d5b}
+.stage-evidence select,.stage-evidence input{margin-left:6px;max-width:220px}
+.stage-evidence #stageEvidenceNotice{white-space:pre-wrap;line-height:1.5}
+.stage-evidence details p{font-size:12px;overflow-wrap:anywhere;max-width:360px}

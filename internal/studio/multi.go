@@ -88,6 +88,7 @@ func (a *Application) registerMulti(m *http.ServeMux) *MultiApp {
 	m.HandleFunc("/api/multi/upload", x.upload)
 	m.HandleFunc("/api/multi/run", x.run)
 	m.HandleFunc("/api/multi/jobs", x.jobList)
+	m.HandleFunc("/api/multi/stage-evidence", x.stageEvidence)
 	m.HandleFunc("/api/multi/jobs/", x.jobDetail)
 	m.HandleFunc("/api/multi/batch/status", x.batchStatus)
 	m.HandleFunc("/api/multi/batch/records", x.batchRecords)

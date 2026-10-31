@@ -125,7 +125,13 @@
 <div class="card"><h2>⑤ 运行状态 / 结果与历史</h2>
 <p>Studio 重启后会恢复任务历史。<b>INTERRUPTED</b> 表示运行中断，不能直接发布；需要重新执行以获取新快照。</p>
 <div class="row" style="margin-bottom:10px"><select id="jobHistory" style="flex:1" aria-label="历史任务"></select><button class="alt" onclick="loadJobHistory()">刷新历史</button><button class="alt" onclick="retryFromHistory()">按当前数据重新执行</button></div>
-<div id="message"></div><div id="job">尚未启动任务</div><section id="failureDiagnosis" class="failure-diagnosis" hidden role="status" aria-live="polite"></section><section id="accountReport" style="display:none;margin-top:15px;border:1px solid #dbe7f7;border-radius:12px;padding:14px"><h3 style="font-size:15px;margin-top:0">逐科目计算结果 / Account results</h3><div class="row"><input id="resultSearch" style="max-width:300px" placeholder="搜索科目、规则或状态..." oninput="renderAccountReport()"><select id="resultStatus" style="max-width:150px" onchange="renderAccountReport()"><option value="">全部状态</option><option value="PASS">PASS</option><option value="FAILED">FAILED</option></select></div><p id="accountReportCount" class="muted"></p><div class="tablebox"><table><thead><tr><th>科目</th><th>规则</th><th>分摊前</th><th>分摊后</th><th>输出行</th><th>状态</th></tr></thead><tbody id="accountReportRows"></tbody></table></div><button class="alt" onclick="exportAccountReport()" style="margin-top:12px">导出完整逐科目结果 CSV</button><p class="muted">分摊前后金额守恒不等于业务规则正确；仍需参考系统逐坐标验收。</p></section><a id="download" style="display:none" target="_blank" href="#">下载完整 results.csv</a><section id="flow-acceptance" style="margin-top:18px;border:1px solid #dbe7f7;border-radius:12px;padding:15px;background:#f6faff">
+<div id="message"></div><div id="job">尚未启动任务</div><section id="failureDiagnosis" class="failure-diagnosis" hidden role="status" aria-live="polite"></section><section id="accountReport" style="display:none;margin-top:15px;border:1px solid #dbe7f7;border-radius:12px;padding:14px"><h3 style="font-size:15px;margin-top:0">逐科目计算结果 / Account results</h3><div class="row"><input id="resultSearch" style="max-width:300px" placeholder="搜索科目、规则或状态..." oninput="renderAccountReport()"><select id="resultStatus" style="max-width:150px" onchange="renderAccountReport()"><option value="">全部状态</option><option value="PASS">PASS</option><option value="FAILED">FAILED</option></select></div><p id="accountReportCount" class="muted"></p><div class="tablebox"><table><thead><tr><th>科目</th><th>规则</th><th>分摊前</th><th>分摊后</th><th>输出行</th><th>状态</th></tr></thead><tbody id="accountReportRows"></tbody></table></div><button class="alt" onclick="exportAccountReport()" style="margin-top:12px">导出完整逐科目结果 CSV</button><p class="muted">分摊前后金额守恒不等于业务规则正确；仍需参考系统逐坐标验收。</p></section><section id="stageEvidence" class="stage-evidence" hidden aria-label="历史阶段证据">
+<h3>按科目查看实际分摊阶段 / Historical stage evidence</h3>
+<p class="muted">只读取成功任务保存的 Core Ledger。先选择科目，可选填期间；不同阶段的金额不能相加。</p>
+<div class="row"><label>科目 <select id="stageEvidenceAccount" onchange="invalidateStageEvidence()"></select></label><label>期间（可选） <input id="stageEvidencePeriod" placeholder="例如 2026-01" oninput="invalidateStageEvidence()"></label><button id="stageEvidenceBtn" class="alt" onclick="loadStageEvidence()">查看阶段与因子金额</button><a id="stageEvidenceDownload" hidden download="stage_evidence.csv">导出阶段证据 CSV</a></div>
+<p id="stageEvidenceNotice" role="status" class="muted"></p>
+<div class="tablebox"><table><thead><tr><th>阶段</th><th>分摊规则</th><th>Driver / 权重字段</th><th>已分摊金额</th><th>流水行数</th><th>来源池</th></tr></thead><tbody id="stageEvidenceRows"></tbody></table></div>
+</section><a id="download" style="display:none" target="_blank" href="#">下载完整 results.csv</a><section id="flow-acceptance" style="margin-top:18px;border:1px solid #dbe7f7;border-radius:12px;padding:15px;background:#f6faff">
 <h3 style="margin:0 0 7px;font-size:15px">参考系统逐坐标验收 / Reference reconciliation</h3>
 <p>直接上传参考系统导出的 CSV（不超过 256 MiB），不需要打开项目文件夹。只接受与项目相同的业务维度及 <code>amount</code> / <code>value</code> 金额字段；不做隐式维度填充或四舍五入。历史验收不会自动代表新数据。</p>
 <div class="row"><button class="alt" onclick="downloadReferenceHeader()">下载参考数据表头</button><button class="alt" onclick="loadReferenceStatus()">刷新参考文件状态</button></div>
@@ -964,9 +970,9 @@ async function reconcileReference(){
  }catch(e){if(project===active){box.style.color='#b42f35';box.textContent='验收失败：'+e.message}}
  finally{btn.disabled=false}
 }
-async function run(){try{const v=await api('/api/multi/run',{name:active});busyJob=v.id;renderFailureDiagnosis({status:'QUEUED'});document.getElementById('run').disabled=true;document.getElementById('cancel').disabled=false;document.getElementById('job').textContent='任务提交：'+busyJob;document.getElementById('download').style.display='none';if(interval)clearInterval(interval);interval=setInterval(poll,1200);await poll()}catch(e){message(e.message)}}
+async function run(){try{const v=await api('/api/multi/run',{name:active});busyJob=v.id;resetStageEvidence();renderFailureDiagnosis({status:'QUEUED'});document.getElementById('run').disabled=true;document.getElementById('cancel').disabled=false;document.getElementById('job').textContent='任务提交：'+busyJob;document.getElementById('download').style.display='none';if(interval)clearInterval(interval);interval=setInterval(poll,1200);await poll()}catch(e){message(e.message)}}
 async function cancelRun(){if(!busyJob)return;try{await api('/api/multi/jobs/'+busyJob+'/cancel',{});document.getElementById('cancel').disabled=true;message('已请求取消；当前引擎将停止执行并清理未发布的数据')}catch(e){message(e.message)}}
-async function poll(){try{const v=await api('/api/multi/jobs/'+busyJob);const j=v.job,summary=v.summary;renderFailureDiagnosis(j);if(summary)showAccountReport(summary);document.getElementById('job').textContent=summary?
+async function poll(){try{const v=await api('/api/multi/jobs/'+busyJob);const j=v.job,summary=v.summary;renderFailureDiagnosis(j);if(summary){showAccountReport(summary);if(j.status==='PASS'&&stageEvidenceJob!==busyJob)setStageEvidenceJob(busyJob,summary)}document.getElementById('job').textContent=summary?
   [`任务结果：${j.status} / ${summary.status||'待核对'}`,
    `科目：${summary.accounts} ｜ 有效规则组：${summary.groups} ｜ 明细：${summary.result_rows}`,
    `分摊前：${summary.input_amount}  →  分摊后：${summary.output_amount}`,
@@ -1002,9 +1008,9 @@ async function loadJobHistory(){try{
 }catch(e){message('获取运行历史失败：'+e.message)}}
 async function showHistoryJob(){
  const id=document.getElementById('jobHistory').value;if(!id)return;
- const r=await api('/api/multi/jobs/'+id),j=r.job;renderFailureDiagnosis(j);
+ resetStageEvidence();const r=await api('/api/multi/jobs/'+id),j=r.job;renderFailureDiagnosis(j);
  if(document.getElementById('jobHistory').value!==id)return;
- document.getElementById('job').textContent=JSON.stringify(r,null,2);showAccountReport(r.summary);
+ document.getElementById('job').textContent=JSON.stringify(r,null,2);showAccountReport(r.summary);if(j.status==='PASS')setStageEvidenceJob(id,r.summary);
  const a=document.getElementById('download');
  if(j.status==='PASS'){busyJob=id;a.href='/api/multi/jobs/'+id+'?download=results';a.style.display='inline-block';await loadAcceptanceHistory()}
  else {acceptanceRequest++;acceptanceReport=null;document.getElementById('acceptanceHistory').replaceChildren();document.getElementById('acceptanceDashboard').style.display='none';a.style.display='none';if(j.status==='INTERRUPTED')message('历史任务在 Studio 重启时中断。不可直接发布；可以点击“按当前数据重新执行”。')}
@@ -1016,7 +1022,7 @@ async function retryFromHistory(){
  await run();
 }
 document.getElementById('jobHistory').addEventListener('change',()=>showHistoryJob().catch(e=>message(e.message)));
-document.getElementById('project').onchange=async()=>{renderFailureDiagnosis(null);await openProject();busyJob='';await loadJobHistory()};
+document.getElementById('project').onchange=async()=>{resetStageEvidence();renderFailureDiagnosis(null);await openProject();busyJob='';await loadJobHistory()};
 list().then(loadJobHistory);loadDesignerCases();loadMappingProfiles();
 
-</script><script src="/assets/quickstart.js"></script><script src="/assets/factor_editor.js"></script><script src="/assets/preflight.js"></script><script src="/assets/failure_diagnosis.js"></script><script src="/assets/coverage.js"></script></body></html>
+</script><script src="/assets/stage_evidence.js"></script><script src="/assets/quickstart.js"></script><script src="/assets/factor_editor.js"></script><script src="/assets/preflight.js"></script><script src="/assets/failure_diagnosis.js"></script><script src="/assets/coverage.js"></script></body></html>
