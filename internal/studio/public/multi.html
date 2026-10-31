@@ -68,7 +68,13 @@
 <pre id="designerImportReport" style="white-space:pre-wrap;overflow-wrap:anywhere;background:#edf4ff;padding:12px;border-radius:9px;font-size:12px" role="status" aria-live="polite">先从设计器选择已保存的规则，检查是否匹配当前项目维度、精度和 Driver 字段。</pre>
 <p>这一步<b>只导入规则描述</b>，不会复制设计器里的金额、Driver 样例、覆盖规则或已发布结果；也不会自动改变任何科目分派。缺少的真实 Driver 放进当前项目的 <code>drivers</code> 目录，运行前必须体检。</p>
 </div>
-<div class="card" id="flow-rules"><h2>④ 指定每个科目的业务规则</h2><div class="row"><div class="stat" id="count">0</div><small>科目已指定规则</small></div><div class="row" style="margin-top:15px"><input id="search" placeholder="搜索科目..." oninput="renderTable()"><select style="width:200px" id="bulkrule"></select><button class="alt" onclick="bulkAll()">为筛选科目批量指定</button></div><p>下拉修改后点击“保存规则分派”。不同科目可以选择不同模板；更复杂的多阶段规则可复制 <code>templates</code> 中的 JSON 模板修改。权重、Driver 可以在 <code>overrides.csv</code> 逐科目覆盖。</p><div class="row" style="margin:12px 0"><button class="alt" type="button" onclick="exportAssignments()">导出全部规则分派 CSV（Excel 可编辑）</button><label style="margin:0"><span class="muted">导入规则分派 CSV</span><input type="file" id="assignmentFile" accept=".csv,text/csv" onchange="importAssignments()" style="max-width:220px"></label></div><p class="muted">导入需提供 account,template 两列，必须与当前项目所有科目一一对应，不允许新增、漏填或重复；导入只修改待保存的页面草稿，点击“保存规则分派”才会写入项目。</p><div class="tablebox"><table><thead><tr><th>科目</th><th>规则模板</th><th>因子配置</th></tr></thead><tbody id="rows"></tbody></table></div><div id="factorEditor" style="display:none;background:#f5f9ff;border:1px solid #dbe7f7;padding:14px;margin-top:14px;border-radius:10px"><h2 id="factorTitle"></h2><p>编辑本账户各阶段的 Driver 数据集、字段和配比。请保证同阶段分摊比例之和为 1。</p><div id="factorRows"></div><button onclick="saveFactors()">保存该科目因子配置</button> <button class="alt" onclick="document.getElementById('factorEditor').style.display='none'">关闭</button></div><div class="row" style="margin-top:14px"><button onclick="save()">保存规则分派</button><small id="dirty">无未保存更改</small></div></div>
+<div class="card" id="flow-rules"><h2>④ 指定每个科目的业务规则</h2><div class="row"><div class="stat" id="count">0</div><small>科目已指定规则</small></div><div class="row" style="margin-top:15px"><input id="search" placeholder="搜索科目..." oninput="renderTable()"><select style="width:200px" id="bulkrule"></select><button class="alt" onclick="bulkAll()">为筛选科目批量指定</button></div><p>下拉修改后点击“保存规则分派”。不同科目可以选择不同模板；更复杂的多阶段规则可复制 <code>templates</code> 中的 JSON 模板修改。权重、Driver 可以在 <code>overrides.csv</code> 逐科目覆盖。</p><div class="row" style="margin:12px 0"><button class="alt" type="button" onclick="exportAssignments()">导出全部规则分派 CSV（Excel 可编辑）</button><label style="margin:0"><span class="muted">导入规则分派 CSV</span><input type="file" id="assignmentFile" accept=".csv,text/csv" onchange="importAssignments()" style="max-width:220px"></label></div><p class="muted">导入需提供 account,template 两列，必须与当前项目所有科目一一对应，不允许新增、漏填或重复；导入只修改待保存的页面草稿，点击“保存规则分派”才会写入项目。</p><div class="tablebox"><table><thead><tr><th>科目</th><th>规则模板</th><th>因子配置</th></tr></thead><tbody id="rows"></tbody></table></div><div id="ruleExplainPanel" style="display:none;margin-top:14px;padding:16px;border:1px solid #c9dbf4;border-radius:12px;background:#f8fbff">
+<div class="row" style="justify-content:space-between"><h3 style="font-size:15px;margin:0">当前科目实际生效规则 / Effective rule</h3><button type="button" class="alt" onclick="resetRuleExplanation()">关闭</button></div>
+<p class="muted">这里读取运行器合成的最终规则（包括逐科目覆盖），而非模板原文。不执行分摊、不验证 Driver 覆盖率，也不代表业务验收完成。</p>
+<div id="ruleExplainContent" role="status" aria-live="polite"></div>
+<button type="button" class="alt" id="ruleExplainExport" onclick="exportRuleExplanation()" style="display:none;margin-top:12px">导出当前规则说明 CSV</button>
+</div>
+<div id="factorEditor" style="display:none;background:#f5f9ff;border:1px solid #dbe7f7;padding:14px;margin-top:14px;border-radius:10px"><h2 id="factorTitle"></h2><p>编辑本账户各阶段的 Driver 数据集、字段和配比。请保证同阶段分摊比例之和为 1。</p><div id="factorRows"></div><button onclick="saveFactors()">保存该科目因子配置</button> <button class="alt" onclick="document.getElementById('factorEditor').style.display='none'">关闭</button></div><div class="row" style="margin-top:14px"><button onclick="save()">保存规则分派</button><small id="dirty">无未保存更改</small></div></div>
 <div class="card"><h2>⑤ 运行状态 / 结果与历史</h2>
 <p>Studio 重启后会恢复任务历史。<b>INTERRUPTED</b> 表示运行中断，不能直接发布；需要重新执行以获取新快照。</p>
 <div class="row" style="margin-bottom:10px"><select id="jobHistory" style="flex:1" aria-label="历史任务"></select><button class="alt" onclick="loadJobHistory()">刷新历史</button><button class="alt" onclick="retryFromHistory()">按当前数据重新执行</button></div>
@@ -101,7 +107,7 @@
 <p>发布不会覆盖或删除旧版本；恢复会新建一个独立目录。历史清理预览不删除任何数据，实际清理需通过命令行明确加 <code>--apply</code>。</p></div>
 </section></div></main>
 <script>
-let data=null,chosen={},active='',busyJob='',interval=null,factorContext=null,accountReport=[],designerPlan=null,designerContext='',designerPreviewRequest=0;
+let data=null,chosen={},active='',busyJob='',interval=null,factorContext=null,accountReport=[],designerPlan=null,designerContext='',designerPreviewRequest=0,ruleExplanation=null,ruleExplainRequest=0;
 let driverNeedsState=null,driverHeader=[],driverNeedsRequest=0;
 let amountHeader=[],amountMappingFile=null,amountMappingTemplate='',amountMapRequest=0;
 let savedMappingProfiles=[];
@@ -363,7 +369,7 @@ function message(t,ok=false){const v=document.getElementById('message');v.style.
 async function list(){try{const v=await api('/api/multi/projects');const el=document.getElementById('project');let old=el.value;el.innerHTML=v.projects.map(x=>`<option>${x}</option>`).join('');if(v.projects.includes(old))el.value=old;if(el.value)await openProject()}catch(e){message(e.message)}}
 async function saveCache(){if(!data||!active){message('请先选择项目 / Choose project');return}try{await api('/api/multi/cache',{name:active,scope:document.getElementById('persistCache').checked?'project':'run',base_sha256:data.project_sha256,reuse_workers:document.getElementById('reuseWorkers').checked});message('缓存设置已保存 / Cache policy saved',true);await openProject()}catch(e){message(e.message)}}
 async function createProject(){try{let name=document.getElementById('newname').value.trim();if(!name)name='demo_'+Date.now();await api('/api/multi/create',{name});await list();document.getElementById('project').value=name;await openProject();message('项目建立成功，现在可以选择各科目规则',true)}catch(e){message(e.message)}}
-async function openProject(){active=document.getElementById('project').value;resetAcceptanceWorkspace();clearDesignerPreview();document.getElementById('dirty').textContent='无未保存更改';accountReport=[];document.getElementById('accountReport').style.display='none';document.getElementById('inspectResult').textContent='数据或规则可能已变化，请重新体检。';try{data=await api('/api/multi/project?name='+encodeURIComponent(active));chosen=Object.fromEntries(data.assignments.map(x=>[x.account,x.template]));document.getElementById('persistCache').checked=data.driver_cache_scope==='project';document.getElementById('reuseWorkers').checked=!!data.reuse_workers;document.getElementById('count').textContent=data.count;document.getElementById('path').textContent=data.manualDataDir;document.getElementById('bulkrule').innerHTML=data.templates.map(x=>`<option value="${x}">${x}</option>`).join('');const templateSelect=document.getElementById('onboardTemplate');const previous=templateSelect.value;templateSelect.replaceChildren();for(const template of data.templates.filter(x=>data.template_columns?.[x])){const option=document.createElement('option');option.value=template;option.textContent=template;templateSelect.appendChild(option)}if([...templateSelect.options].some(x=>x.value===previous))templateSelect.value=previous;showOnboardColumns();prepareAmountMapping();renderTable();refreshBusinessSetup();refreshMappingProfileSelects();loadReferenceStatus()}catch(e){message(e.message)}}
+async function openProject(){active=document.getElementById('project').value;resetRuleExplanation();resetAcceptanceWorkspace();clearDesignerPreview();document.getElementById('dirty').textContent='无未保存更改';accountReport=[];document.getElementById('accountReport').style.display='none';document.getElementById('inspectResult').textContent='数据或规则可能已变化，请重新体检。';try{data=await api('/api/multi/project?name='+encodeURIComponent(active));chosen=Object.fromEntries(data.assignments.map(x=>[x.account,x.template]));document.getElementById('persistCache').checked=data.driver_cache_scope==='project';document.getElementById('reuseWorkers').checked=!!data.reuse_workers;document.getElementById('count').textContent=data.count;document.getElementById('path').textContent=data.manualDataDir;document.getElementById('bulkrule').innerHTML=data.templates.map(x=>`<option value="${x}">${x}</option>`).join('');const templateSelect=document.getElementById('onboardTemplate');const previous=templateSelect.value;templateSelect.replaceChildren();for(const template of data.templates.filter(x=>data.template_columns?.[x])){const option=document.createElement('option');option.value=template;option.textContent=template;templateSelect.appendChild(option)}if([...templateSelect.options].some(x=>x.value===previous))templateSelect.value=previous;showOnboardColumns();prepareAmountMapping();renderTable();refreshBusinessSetup();refreshMappingProfileSelects();loadReferenceStatus()}catch(e){message(e.message)}}
 function showOnboardColumns(){
  const box=document.getElementById('onboardColumns'),tpl=document.getElementById('onboardTemplate').value;
  const fields=data?.template_columns?.[tpl]||[];
@@ -614,12 +620,119 @@ function exportAccountReport(){
  const keys=['account','template','input_amount','output_amount','result_rows','status'];
  exportCSV(active+'_account_results.csv',keys,accountReport.map(x=>keys.map(k=>x[k]??'')));
 }
+
+function resetRuleExplanation(){
+ ruleExplainRequest++;ruleExplanation=null;
+ const panel=document.getElementById('ruleExplainPanel');if(panel)panel.style.display='none';
+ const btn=document.getElementById('ruleExplainExport');if(btn)btn.style.display='none';
+}
+function ruleNode(tag,value,cls){
+ const e=document.createElement(tag);
+ if(value!==undefined)e.textContent=String(value);
+ if(cls)e.className=cls;
+ return e;
+}
+function routeSummary(route){
+ let result=route.name+'：'+route.grouping+' → '+route.target_mode;
+ if(route.target_value)result+=' '+route.target_value;
+ if(route.include?.length)result+=' ['+route.include.join('、')+']';
+ if(route.exclude?.length)result+=' 排除['+route.exclude.join('、')+']';
+ if(route.conserved)result+=' · 守恒';
+ return result;
+}
+function filterSummary(filters){
+ const result=[];
+ for(const [dim,filter] of Object.entries(filters||{})){
+  const terms=[];
+  if(filter.include?.length)terms.push('包含 '+filter.include.join('、'));
+  if(filter.exclude?.length)terms.push('排除 '+filter.exclude.join('、'));
+  if(terms.length)result.push(dim+': '+terms.join(' / '));
+ }
+ return result.join('；');
+}
+async function showEffectiveRule(account){
+ const request=++ruleExplainRequest,project=active;
+ const panel=document.getElementById('ruleExplainPanel');
+ const target=document.getElementById('ruleExplainContent');
+ panel.style.display='block';
+ target.replaceChildren(ruleNode('p','正在读取 '+account+' 的实际生效规则...','muted'));
+ document.getElementById('ruleExplainExport').style.display='none';
+ ruleExplanation=null;
+ try{
+  if(!project||!data)throw Error('请先选择项目');
+  const view=await api('/api/multi/account-plan?name='+encodeURIComponent(project)+'&account='+encodeURIComponent(account));
+  if(request!==ruleExplainRequest||project!==active)return;
+  ruleExplanation=view;target.replaceChildren();
+  target.appendChild(ruleNode('h3',view.account+' · '+view.template));
+  target.appendChild(ruleNode('p','有效规则组 '+view.effective_group_id+' · '+view.stages.length+' 个阶段 · 金额精度 '+view.precision+' 位','muted'));
+  target.appendChild(ruleNode('p','当前规则 SHA-256：'+view.rule_sha256,'muted'));
+  const saved=data.assignments.find(x=>x.account===account)?.template;
+  if(chosen[account]!==saved)target.appendChild(ruleNode('p','页面尚有未保存的科目分派，此处展示已保存的生效规则。','bad'));
+  target.appendChild(ruleNode('p','不可变维度：'+(view.immutable_dimensions||[]).join('、'),'muted'));
+  for(const [index,stage] of view.stages.entries()){
+   const section=document.createElement('details');section.open=index===0;
+   section.style.padding='10px 0';section.style.borderTop='1px solid #dae6f5';
+   const title=ruleNode('summary',(index+1)+'. '+stage.id+' · '+stage.operation+(stage.enabled?'':' · 停用'));
+   title.style.cursor='pointer';title.style.fontWeight='700';section.appendChild(title);
+   section.appendChild(ruleNode('p','金额来源：'+(stage.inputs||[]).map(x=>x.from+'（份额 '+(x.share||'1')+'）').join(' + '),'muted'));
+   section.appendChild(ruleNode('p','守恒边界：'+(stage.conservation_keys||[]).join('、'),'muted'));
+   const filters=filterSummary(stage.source_filters);
+   if(filters)section.appendChild(ruleNode('p','来源筛选：'+filters,'muted'));
+   section.appendChild(ruleNode('strong','分摊因子与实际比例'));
+   if(!(stage.drivers||[]).length){
+    section.appendChild(ruleNode('p','本阶段没有分摊因子，请结合操作类型理解。','muted'));
+   }else{
+    const table=document.createElement('table'),thead=document.createElement('thead'),head=document.createElement('tr');
+    for(const label of ['分摊路径','Driver 文件 / 字段','比例','状态'])head.appendChild(ruleNode('th',label));
+    thead.appendChild(head);table.appendChild(thead);
+    const tbody=document.createElement('tbody');
+    for(const driver of stage.drivers){
+     const tr=document.createElement('tr');
+     for(const val of [driver.allocation,driver.dataset+' / '+driver.file+' / '+driver.weight_field,driver.share,driver.enabled?'启用':'停用'])tr.appendChild(ruleNode('td',val));
+     tbody.appendChild(tr);
+     const detail=filterSummary(driver.filters);
+     if(detail){
+      const row=document.createElement('tr'),td=ruleNode('td','Driver 筛选：'+detail,'muted');
+      td.colSpan=4;row.appendChild(td);tbody.appendChild(row);
+     }
+    }
+    table.appendChild(tbody);section.appendChild(table);
+   }
+   section.appendChild(ruleNode('strong','维度流向（汇总粒度 → 目标粒度）'));
+   const list=document.createElement('ul');list.style.paddingLeft='20px';
+   for(const route of stage.dimensions||[])list.appendChild(ruleNode('li',routeSummary(route)));
+   section.appendChild(list);target.appendChild(section);
+  }
+  target.appendChild(ruleNode('p','规则说明仅针对当前配置。运行前须 Inspect，运行后须独立参考结果逐坐标对账。','muted'));
+  document.getElementById('ruleExplainExport').style.display='inline-block';
+  panel.scrollIntoView({block:'nearest',behavior:'smooth'});
+ }catch(e){
+  if(request===ruleExplainRequest)target.replaceChildren(ruleNode('p','无法读取实际生效规则：'+e.message,'bad'));
+ }
+}
+function exportRuleExplanation(){
+ if(!ruleExplanation)return message('请先选择一个已保存的科目规则');
+ const p=ruleExplanation,rows=[];
+ for(const [index,stage] of p.stages.entries()){
+  const drivers=stage.drivers?.length?stage.drivers:[null];
+  for(const driver of drivers){
+   rows.push([p.account,p.template,p.rule_sha256,index+1,stage.id,stage.operation,
+    (stage.inputs||[]).map(x=>x.from+':'+(x.share||'1')).join(' | '),
+    (stage.conservation_keys||[]).join(' | '),
+    (stage.dimensions||[]).map(routeSummary).join(' | '),
+    driver?.allocation||'',driver?.dataset||'',driver?.file||'',driver?.weight_field||'',driver?.share||'',driver?.enabled===false?'停用':'启用']);
+  }
+ }
+ exportCSV('effective_rule_'+p.account.replace(/[^A-Za-z0-9_-]/g,'_')+'.csv',
+ ['account','template','rule_sha256','stage_order','stage','operation','inputs','conservation_keys','dimensions','allocation','driver_dataset','driver_file','weight_field','share','status'],rows);
+}
+
 function filtered(){if(!data)return [];let q=document.getElementById('search').value.toLowerCase();return data.assignments.filter(x=>x.account.toLowerCase().includes(q))}
-function renderTable(){const v=document.getElementById('rows');if(!data)return;let matches=filtered();v.replaceChildren();for(const item of matches.slice(0,250)){let tr=document.createElement('tr'),td=document.createElement('td'),pick=document.createElement('td'),select=document.createElement('select');td.textContent=item.account;for(const tpl of data.templates){const option=document.createElement('option');option.value=tpl;option.textContent=tpl;select.appendChild(option)}select.value=chosen[item.account];select.onchange=()=>{chosen[item.account]=select.value;document.getElementById('dirty').textContent='未保存更改'};pick.appendChild(select);let action=document.createElement('td'),btn=document.createElement('button');btn.className='alt';btn.textContent='配置因子';btn.onclick=()=>editFactors(item.account);action.appendChild(btn);tr.append(td,pick,action);v.appendChild(tr)}document.getElementById('hint').textContent=`显示 ${Math.min(matches.length,250)} / ${matches.length} 科目；当前批量操作覆盖全部筛选结果。`;}
+function renderTable(){const v=document.getElementById('rows');if(!data)return;let matches=filtered();v.replaceChildren();for(const item of matches.slice(0,250)){let tr=document.createElement('tr'),td=document.createElement('td'),pick=document.createElement('td'),select=document.createElement('select');td.textContent=item.account;for(const tpl of data.templates){const option=document.createElement('option');option.value=tpl;option.textContent=tpl;select.appendChild(option)}select.value=chosen[item.account];select.onchange=()=>{chosen[item.account]=select.value;document.getElementById('dirty').textContent='未保存更改'};pick.appendChild(select);let action=document.createElement('td'),btn=document.createElement('button');btn.className='alt';btn.textContent='配置因子';btn.onclick=()=>editFactors(item.account);action.appendChild(btn);const explain=document.createElement('button');explain.className='alt';explain.style.marginLeft='6px';explain.textContent='查看生效规则';explain.onclick=()=>showEffectiveRule(item.account);action.appendChild(explain);tr.append(td,pick,action);v.appendChild(tr)}document.getElementById('hint').textContent=`显示 ${Math.min(matches.length,250)} / ${matches.length} 科目；当前批量操作覆盖全部筛选结果。`;}
 function bulkAll(){const rule=document.getElementById('bulkrule').value;for(const x of filtered())chosen[x.account]=rule;renderTable();document.getElementById('dirty').textContent='未保存更改'}
 async function save(){try{await api('/api/multi/assign',{name:active,base_sha256:data.assignments_sha256,updates:data.assignments.map(x=>({account:x.account,template:chosen[x.account]}))});document.getElementById('dirty').textContent='已保存';message('所有科目映射已写入 assignments.csv',true);await openProject()}catch(e){message(e.message)}}
 async function editFactors(account){try{const v=await api('/api/multi/factor?name='+encodeURIComponent(active)+'&account='+encodeURIComponent(account));factorContext=v;const box=document.getElementById('factorEditor');box.style.display='block';document.getElementById('factorTitle').textContent='独立因子配置：'+account;const target=document.getElementById('factorRows');target.replaceChildren();const dr=Object.keys(v.rule.datasets.drivers);for(const st of v.rule.stages||[]){const title=document.createElement('h3');title.textContent=st.id;title.style.fontSize='14px';target.appendChild(title);for(const a of st.allocations||[]){const old=v.overrides.find(x=>x.stage===st.id&&x.allocation===a.id)||{};const wrapper=document.createElement('div');wrapper.className='row';wrapper.style.marginBottom='10px';wrapper.dataset.stage=st.id;wrapper.dataset.allocation=a.id;const label=document.createElement('strong');label.textContent=a.id;label.style.width='95px';const sel=document.createElement('select');sel.style.width='150px';sel.dataset.key='driver_dataset';for(const d of dr){const op=document.createElement('option');op.value=d;op.textContent=d;sel.appendChild(op)}sel.value=old.driver_dataset||a.driver_dataset;const field=document.createElement('input');field.style.width='135px';field.dataset.key='weight_field';field.value=old.weight_field||a.weight_field;field.placeholder='权重字段';const share=document.createElement('input');share.style.width='90px';share.dataset.key='share';share.value=old.share||a.share||'1';share.placeholder='比例 0-1';wrapper.append(label,sel,field,share);target.appendChild(wrapper)}}box.scrollIntoView({behavior:'smooth',block:'nearest'})}catch(e){message(e.message)}}
-async function saveFactors(){try{const v=factorContext;if(!v)return;const rows=[];for(const div of document.querySelectorAll('#factorRows .row')){const get=k=>div.querySelector('[data-key="'+k+'"]').value;rows.push({account:v.account,stage:div.dataset.stage,allocation:div.dataset.allocation,driver_dataset:get('driver_dataset'),weight_field:get('weight_field'),share:get('share')})};await api('/api/multi/factor',{name:active,account:v.account,rows});message('已保存 '+v.account+' 的因子覆盖，请运行后检查每个科目金额分布',true)}catch(e){message(e.message)}}
+async function saveFactors(){try{const v=factorContext;if(!v)return;const rows=[];for(const div of document.querySelectorAll('#factorRows .row')){const get=k=>div.querySelector('[data-key="'+k+'"]').value;rows.push({account:v.account,stage:div.dataset.stage,allocation:div.dataset.allocation,driver_dataset:get('driver_dataset'),weight_field:get('weight_field'),share:get('share')})};await api('/api/multi/factor',{name:active,account:v.account,rows});resetRuleExplanation();message('已保存 '+v.account+' 的因子覆盖，请运行后检查每个科目金额分布',true)}catch(e){message(e.message)}}
 async function upload(){try{const f=document.getElementById('csvfile').files[0];if(!f)throw new Error('请先选择 CSV 文件');if(f.size>5*1024*1024)throw new Error('超出5MB，使用文件管理器复制到项目目录');const content=await f.text();await api('/api/multi/upload',{name:active,file:document.getElementById('file').value,content});message('CSV 导入成功',true);await openProject()}catch(e){message(e.message)}}
 async function inspectProject(){
  const box=document.getElementById('inspectResult');const btn=document.getElementById('inspectBtn');
