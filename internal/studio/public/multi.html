@@ -90,7 +90,7 @@
   <div id="financeDriverSummary"></div>
   <div class="row"><input id="financeReadinessSearch" placeholder="搜索科目、规则、提示" oninput="showFinanceReadinessAccounts()" aria-label="筛选体检科目">
   <select id="financeReadinessStatus" onchange="showFinanceReadinessAccounts()" aria-label="按体检状态筛选">
-    <option value="">全部科目</option><option value="CHECK_DRIVER">需核对因子</option><option value="BLOCK">缺少金额数据</option><option value="INPUT_OK">输入正常</option>
+    <option value="">全部科目</option><option value="CHECK_DRIVER">需核对因子</option><option value="NOT_CHECKED">扫描未完成</option><option value="BLOCK">缺少金额数据</option><option value="INPUT_OK">输入正常</option>
   </select><button type="button" class="alt" onclick="downloadFinanceReadinessAccounts()">导出全部科目体检 CSV</button></div>
   <p id="financeReadinessCount" class="muted"></p>
   <div class="tablebox"><table><thead><tr><th>科目</th><th>规则模板</th><th>金额记录</th><th>输入状态</th><th>操作提示</th></tr></thead><tbody id="financeReadinessRows"></tbody></table></div>
