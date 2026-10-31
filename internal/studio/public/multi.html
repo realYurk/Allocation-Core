@@ -74,7 +74,7 @@
 <div id="ruleExplainContent" role="status" aria-live="polite"></div>
 <button type="button" class="alt" id="ruleExplainExport" onclick="exportRuleExplanation()" style="display:none;margin-top:12px">导出当前规则说明 CSV</button>
 </div>
-<div id="factorEditor" style="display:none;background:#f5f9ff;border:1px solid #dbe7f7;padding:14px;margin-top:14px;border-radius:10px"><h2 id="factorTitle"></h2><p>编辑本账户各阶段的 Driver 数据集、字段和配比。请保证同阶段分摊比例之和为 1。</p><div id="factorRows"></div><button onclick="saveFactors()">保存该科目因子配置</button> <button class="alt" onclick="document.getElementById('factorEditor').style.display='none'">关闭</button></div><div class="row" style="margin-top:14px"><button onclick="save()">保存规则分派</button><small id="dirty">无未保存更改</small></div></div>
+<div id="factorEditor" style="display:none;background:#f5f9ff;border:1px solid #dbe7f7;padding:14px;margin-top:14px;border-radius:10px"><h2 id="factorTitle"></h2><p>编辑本账户各阶段的 Driver 数据集、字段和配比。请保证同阶段分摊比例之和为 1。</p><div id="factorRows"></div><button onclick="saveFactors()">保存该科目因子配置</button> <button class="alt" onclick="document.getElementById('factorEditor').style.display='none'">关闭</button></div><div class="row" style="margin-top:14px"><button onclick="save()">保存规则分派</button><button class="alt" type="button" onclick="previewAssignmentChanges()">保存前检查变更</button><button class="alt" type="button" onclick="exportAssignmentChanges()">导出变更清单</button><small id="dirty">无未保存更改</small></div><pre id="assignmentDiffPreview" style="display:none;max-height:260px;overflow:auto;background:#f2f7ff;border:1px solid #dde9f6;border-radius:10px;padding:12px;white-space:pre-wrap" role="status" aria-live="polite"></pre></div>
 <div class="card"><h2>⑤ 运行状态 / 结果与历史</h2>
 <p>Studio 重启后会恢复任务历史。<b>INTERRUPTED</b> 表示运行中断，不能直接发布；需要重新执行以获取新快照。</p>
 <div class="row" style="margin-bottom:10px"><select id="jobHistory" style="flex:1" aria-label="历史任务"></select><button class="alt" onclick="loadJobHistory()">刷新历史</button><button class="alt" onclick="retryFromHistory()">按当前数据重新执行</button></div>
@@ -590,7 +590,7 @@ async function importAssignments(){
    next[row[0]]=row[1];
   }
   if(Object.keys(next).length!==known.size)throw Error('科目数量不一致：文件 '+Object.keys(next).length+' / 项目 '+known.size+'，不得漏填');
-  chosen=next;renderTable();document.getElementById('dirty').textContent='导入待保存';
+  chosen=next;renderTable();
   message('已校验并预览 '+known.size+' 个科目分派；点击保存后才生效',true);
  }catch(e){message('导入失败，未修改原有配置：'+e.message)}finally{el.value=''}
 }
@@ -728,9 +728,29 @@ function exportRuleExplanation(){
 }
 
 function filtered(){if(!data)return [];let q=document.getElementById('search').value.toLowerCase();return data.assignments.filter(x=>x.account.toLowerCase().includes(q))}
-function renderTable(){const v=document.getElementById('rows');if(!data)return;let matches=filtered();v.replaceChildren();for(const item of matches.slice(0,250)){let tr=document.createElement('tr'),td=document.createElement('td'),pick=document.createElement('td'),select=document.createElement('select');td.textContent=item.account;for(const tpl of data.templates){const option=document.createElement('option');option.value=tpl;option.textContent=tpl;select.appendChild(option)}select.value=chosen[item.account];select.onchange=()=>{chosen[item.account]=select.value;document.getElementById('dirty').textContent='未保存更改'};pick.appendChild(select);let action=document.createElement('td'),btn=document.createElement('button');btn.className='alt';btn.textContent='配置因子';btn.onclick=()=>editFactors(item.account);action.appendChild(btn);const explain=document.createElement('button');explain.className='alt';explain.style.marginLeft='6px';explain.textContent='查看生效规则';explain.onclick=()=>showEffectiveRule(item.account);action.appendChild(explain);tr.append(td,pick,action);v.appendChild(tr)}document.getElementById('hint').textContent=`显示 ${Math.min(matches.length,250)} / ${matches.length} 科目；当前批量操作覆盖全部筛选结果。`;}
-function bulkAll(){const rule=document.getElementById('bulkrule').value;for(const x of filtered())chosen[x.account]=rule;renderTable();document.getElementById('dirty').textContent='未保存更改'}
-async function save(){try{await api('/api/multi/assign',{name:active,base_sha256:data.assignments_sha256,updates:data.assignments.map(x=>({account:x.account,template:chosen[x.account]}))});document.getElementById('dirty').textContent='已保存';message('所有科目映射已写入 assignments.csv',true);await openProject()}catch(e){message(e.message)}}
+function renderTable(){const v=document.getElementById('rows');if(!data)return;let matches=filtered();v.replaceChildren();for(const item of matches.slice(0,250)){let tr=document.createElement('tr'),td=document.createElement('td'),pick=document.createElement('td'),select=document.createElement('select');td.textContent=item.account;for(const tpl of data.templates){const option=document.createElement('option');option.value=tpl;option.textContent=tpl;select.appendChild(option)}select.value=chosen[item.account];select.onchange=()=>{chosen[item.account]=select.value;refreshAssignmentChangeCount()};pick.appendChild(select);let action=document.createElement('td'),btn=document.createElement('button');btn.className='alt';btn.textContent='配置因子';btn.onclick=()=>editFactors(item.account);action.appendChild(btn);const explain=document.createElement('button');explain.className='alt';explain.style.marginLeft='6px';explain.textContent='查看生效规则';explain.onclick=()=>showEffectiveRule(item.account);action.appendChild(explain);tr.append(td,pick,action);v.appendChild(tr)}document.getElementById('hint').textContent=`显示 ${Math.min(matches.length,250)} / ${matches.length} 科目；当前批量操作覆盖全部筛选结果。`;refreshAssignmentChangeCount();}
+function assignmentChanges(){
+ if(!data)return [];
+ return data.assignments.filter(x=>chosen[x.account]!==x.template).map(x=>({account:x.account,before:x.template,after:chosen[x.account]||''}));
+}
+function refreshAssignmentChangeCount(){
+ const count=assignmentChanges().length,el=document.getElementById('dirty');
+ if(el)el.textContent=count?'待保存 '+count+' 项':'无未保存更改';
+ const report=document.getElementById('assignmentDiffPreview');
+ if(report)report.style.display='none';
+}
+function previewAssignmentChanges(){
+ const delta=assignmentChanges(),box=document.getElementById('assignmentDiffPreview');
+ box.style.display='block';
+ box.textContent=delta.length?'共 '+delta.length+' 个科目规则将改变：\n'+delta.slice(0,100).map(x=>x.account+'：'+x.before+' → '+x.after).join('\n')+(delta.length>100?'\n其余变更请导出完整清单。':''):'当前没有未保存的科目规则变更。';
+}
+function exportAssignmentChanges(){
+ const delta=assignmentChanges();
+ if(!delta.length)return message('当前没有未保存的规则变更');
+ exportCSV(active+'_assignment_changes.csv',['account','previous_template','new_template'],delta.map(x=>[x.account,x.before,x.after]));
+}
+function bulkAll(){const rule=document.getElementById('bulkrule').value;for(const x of filtered())chosen[x.account]=rule;renderTable()}
+async function save(){try{const delta=assignmentChanges();if(!delta.length)return message('没有需要保存的分派变更',true);if(delta.length>=20&&!confirm('将修改 '+delta.length+' 个科目的分摊规则。请确认已核对变更清单，是否继续保存？'))return;await api('/api/multi/assign',{name:active,base_sha256:data.assignments_sha256,updates:data.assignments.map(x=>({account:x.account,template:chosen[x.account]}))});document.getElementById('dirty').textContent='已保存';message('所有科目映射已写入 assignments.csv',true);await openProject()}catch(e){message(e.message)}}
 async function editFactors(account){try{const v=await api('/api/multi/factor?name='+encodeURIComponent(active)+'&account='+encodeURIComponent(account));factorContext=v;const box=document.getElementById('factorEditor');box.style.display='block';document.getElementById('factorTitle').textContent='独立因子配置：'+account;const target=document.getElementById('factorRows');target.replaceChildren();const dr=Object.keys(v.rule.datasets.drivers);for(const st of v.rule.stages||[]){const title=document.createElement('h3');title.textContent=st.id;title.style.fontSize='14px';target.appendChild(title);for(const a of st.allocations||[]){const old=v.overrides.find(x=>x.stage===st.id&&x.allocation===a.id)||{};const wrapper=document.createElement('div');wrapper.className='row';wrapper.style.marginBottom='10px';wrapper.dataset.stage=st.id;wrapper.dataset.allocation=a.id;const label=document.createElement('strong');label.textContent=a.id;label.style.width='95px';const sel=document.createElement('select');sel.style.width='150px';sel.dataset.key='driver_dataset';for(const d of dr){const op=document.createElement('option');op.value=d;op.textContent=d;sel.appendChild(op)}sel.value=old.driver_dataset||a.driver_dataset;const field=document.createElement('input');field.style.width='135px';field.dataset.key='weight_field';field.value=old.weight_field||a.weight_field;field.placeholder='权重字段';const share=document.createElement('input');share.style.width='90px';share.dataset.key='share';share.value=old.share||a.share||'1';share.placeholder='比例 0-1';wrapper.append(label,sel,field,share);target.appendChild(wrapper)}}box.scrollIntoView({behavior:'smooth',block:'nearest'})}catch(e){message(e.message)}}
 async function saveFactors(){try{const v=factorContext;if(!v)return;const rows=[];for(const div of document.querySelectorAll('#factorRows .row')){const get=k=>div.querySelector('[data-key="'+k+'"]').value;rows.push({account:v.account,stage:div.dataset.stage,allocation:div.dataset.allocation,driver_dataset:get('driver_dataset'),weight_field:get('weight_field'),share:get('share')})};await api('/api/multi/factor',{name:active,account:v.account,rows});resetRuleExplanation();message('已保存 '+v.account+' 的因子覆盖，请运行后检查每个科目金额分布',true)}catch(e){message(e.message)}}
 async function upload(){try{const f=document.getElementById('csvfile').files[0];if(!f)throw new Error('请先选择 CSV 文件');if(f.size>5*1024*1024)throw new Error('超出5MB，使用文件管理器复制到项目目录');const content=await f.text();await api('/api/multi/upload',{name:active,file:document.getElementById('file').value,content});message('CSV 导入成功',true);await openProject()}catch(e){message(e.message)}}
