@@ -83,7 +83,18 @@
 <div class="card"><h2>Driver 索引缓存 / Driver cache</h2><p>项目级缓存复用可降低相同数据和相同生效规则的重复索引成本。首次运行仍需计算源 SHA-256；数据或规则变化会生成新索引。/ Reuses a validated index across runs. Source digest is still checked.</p><label><input id="persistCache" type="checkbox" style="width:auto"> 跨批次复用索引 / Reuse across runs</label> <label style="display:block;margin-top:12px"><input id="reuseWorkers" type="checkbox" style="width:auto"> 复用计算进程 / Reuse calculation workers</label> <button class="alt" onclick="saveCache()">保存缓存设置 / Save</button><small>仅在本机受信任的项目目录使用 / Trusted local projects only.</small></div><div class="card" id="flow-preflight"><h2>④ 运行前数据体检 / Preflight</h2>
 <p>一次检查所有科目规则映射和实际金额 CSV，每个不同 Driver 文件仅扫描一次。不生成分摊结果，不能代替金额守恒及参考系统对账。</p>
 <button class="alt" id="inspectBtn" onclick="inspectProject()">检查全部科目和因子 / Inspect</button>
-<div id="inspectResult" style="margin-top:12px;background:#f5f9ff;border:1px solid #dbe7f7;padding:12px;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px" role="status" aria-live="polite">未检查 / Not checked</div></div>
+<div id="inspectResult" style="margin-top:12px;border:1px solid #d9e0e7;padding:12px;border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px" role="status" aria-live="polite">未检查 / Not checked</div>
+<section id="financeReadiness" class="finance-check" hidden aria-label="业务体检与处理建议">
+  <h3>业务体检与处理建议</h3><p id="financeReadinessSummary" aria-live="polite"></p>
+  <div id="financeReadinessFindings"></div>
+  <div class="row"><input id="financeReadinessSearch" placeholder="搜索科目、规则、提示" oninput="showFinanceReadinessAccounts()" aria-label="筛选体检科目">
+  <select id="financeReadinessStatus" onchange="showFinanceReadinessAccounts()" aria-label="按体检状态筛选">
+    <option value="">全部科目</option><option value="CHECK_DRIVER">需核对因子</option><option value="BLOCK">缺少金额数据</option><option value="INPUT_OK">输入正常</option>
+  </select><button type="button" class="alt" onclick="downloadFinanceReadinessAccounts()">导出全部科目体检 CSV</button></div>
+  <p id="financeReadinessCount" class="muted"></p>
+  <div class="tablebox"><table><thead><tr><th>科目</th><th>规则模板</th><th>金额记录</th><th>输入状态</th><th>操作提示</th></tr></thead><tbody id="financeReadinessRows"></tbody></table></div>
+  <p id="financeReadinessScope" class="muted"></p>
+</section></div>
 <div class="card"><h2>④ 启动所有科目计算</h2><p>引擎按“相同有效规则”分组执行，规则不同则独立运行；每个科目仍有单独守恒检查。</p><button id="run" onclick="run()">一键执行全量分摊</button> <button id="cancel" class="alt" onclick="cancelRun()" disabled>取消本次任务</button><p id="hint"></p></div>
 </section><section>
 <div class="card">
@@ -397,7 +408,7 @@ function message(t,ok=false){if(!ok&&typeof financeReadableError==='function'){c
 async function list(){try{const v=await api('/api/multi/projects');const el=document.getElementById('project');let old=el.value;el.innerHTML=v.projects.map(x=>`<option>${x}</option>`).join('');if(v.projects.includes(old))el.value=old;if(el.value)await openProject()}catch(e){message(e.message)}}
 async function saveCache(){if(!data||!active){message('请先选择项目 / Choose project');return}try{await api('/api/multi/cache',{name:active,scope:document.getElementById('persistCache').checked?'project':'run',base_sha256:data.project_sha256,reuse_workers:document.getElementById('reuseWorkers').checked});message('缓存设置已保存 / Cache policy saved',true);await openProject()}catch(e){message(e.message)}}
 async function createProject(){try{let name=document.getElementById('newname').value.trim();if(!name)name='demo_'+Date.now();await api('/api/multi/create',{name});await list();document.getElementById('project').value=name;await openProject();message('项目建立成功，现在可以选择各科目规则',true)}catch(e){message(e.message)}}
-async function openProject(){document.getElementById('factorEditor').style.display='none';factorContext=null;active=document.getElementById('project').value;resetRuleExplanation();resetAcceptanceWorkspace();clearDesignerPreview();document.getElementById('dirty').textContent='无未保存更改';accountReport=[];document.getElementById('accountReport').style.display='none';document.getElementById('inspectResult').textContent='数据或规则可能已变化，请重新体检。';try{data=await api('/api/multi/project?name='+encodeURIComponent(active));chosen=Object.fromEntries(data.assignments.map(x=>[x.account,x.template]));document.getElementById('persistCache').checked=data.driver_cache_scope==='project';document.getElementById('reuseWorkers').checked=!!data.reuse_workers;document.getElementById('count').textContent=data.count;document.getElementById('path').textContent=data.manualDataDir;document.getElementById('bulkrule').innerHTML=data.templates.map(x=>`<option value="${x}">${x}</option>`).join('');const templateSelect=document.getElementById('onboardTemplate');const previous=templateSelect.value;templateSelect.replaceChildren();for(const template of data.templates.filter(x=>data.template_columns?.[x])){const option=document.createElement('option');option.value=template;option.textContent=template;templateSelect.appendChild(option)}if([...templateSelect.options].some(x=>x.value===previous))templateSelect.value=previous;showOnboardColumns();prepareAmountMapping();renderTable();if(window.quickGuideRefresh)window.quickGuideRefresh();refreshBusinessSetup();refreshMappingProfileSelects();loadReferenceStatus()}catch(e){message(e.message)}}
+async function openProject(){document.getElementById('factorEditor').style.display='none';factorContext=null;active=document.getElementById('project').value;if(window.resetFinanceReadiness)resetFinanceReadiness();resetRuleExplanation();resetAcceptanceWorkspace();clearDesignerPreview();document.getElementById('dirty').textContent='无未保存更改';accountReport=[];document.getElementById('accountReport').style.display='none';document.getElementById('inspectResult').textContent='数据或规则可能已变化，请重新体检。';try{data=await api('/api/multi/project?name='+encodeURIComponent(active));chosen=Object.fromEntries(data.assignments.map(x=>[x.account,x.template]));document.getElementById('persistCache').checked=data.driver_cache_scope==='project';document.getElementById('reuseWorkers').checked=!!data.reuse_workers;document.getElementById('count').textContent=data.count;document.getElementById('path').textContent=data.manualDataDir;document.getElementById('bulkrule').innerHTML=data.templates.map(x=>`<option value="${x}">${x}</option>`).join('');const templateSelect=document.getElementById('onboardTemplate');const previous=templateSelect.value;templateSelect.replaceChildren();for(const template of data.templates.filter(x=>data.template_columns?.[x])){const option=document.createElement('option');option.value=template;option.textContent=template;templateSelect.appendChild(option)}if([...templateSelect.options].some(x=>x.value===previous))templateSelect.value=previous;showOnboardColumns();prepareAmountMapping();renderTable();if(window.quickGuideRefresh)window.quickGuideRefresh();refreshBusinessSetup();refreshMappingProfileSelects();loadReferenceStatus()}catch(e){message(e.message)}}
 function showOnboardColumns(){
  const box=document.getElementById('onboardColumns'),tpl=document.getElementById('onboardTemplate').value;
  const fields=data?.template_columns?.[tpl]||[];
@@ -789,10 +800,13 @@ async function saveFactors(){return financeFactorSave()}
 async function upload(){try{const f=document.getElementById('csvfile').files[0];if(!f)throw new Error('请先选择 CSV 文件');if(f.size>5*1024*1024)throw new Error('超出5MB，使用文件管理器复制到项目目录');const content=await f.text();await api('/api/multi/upload',{name:active,file:document.getElementById('file').value,content});message('CSV 导入成功',true);await openProject()}catch(e){message(e.message)}}
 async function inspectProject(){
  const box=document.getElementById('inspectResult');const btn=document.getElementById('inspectBtn');
+ const project=active;const requestId=++financeReadinessRequest;
  if(!active){message('请先创建并选择项目');return}
  btn.disabled=true;box.textContent='正在流式检查金额、科目分派与不同 Driver 文件...';
  try {
-   const r=await api('/api/multi/preflight',{name:active});
+   const r=await api('/api/multi/preflight',{name:project});
+   if(project!==active || requestId!==financeReadinessRequest)return;
+   renderFinanceReadiness(r);
    const lines=[`输入体检：${r.status==='PASS'?'PASS（输入格式通过）':'BLOCK（发现输入问题）'}`,
     `科目 ${r.accounts} · 有效规则组 ${r.rule_groups} · 金额记录 ${r.amount_rows}`,
     `待分摊金额 ${r.input_amount} · Driver 文件 ${r.unique_driver_files} · 规则引用 ${r.driver_references}`,
@@ -998,4 +1012,4 @@ document.getElementById('jobHistory').addEventListener('change',()=>showHistoryJ
 document.getElementById('project').onchange=async()=>{await openProject();busyJob='';await loadJobHistory()};
 list().then(loadJobHistory);loadDesignerCases();loadMappingProfiles();
 
-</script><script src="/assets/quickstart.js"></script><script src="/assets/factor_editor.js"></script></body></html>
+</script><script src="/assets/quickstart.js"></script><script src="/assets/factor_editor.js"></script><script src="/assets/preflight.js"></script></body></html>
