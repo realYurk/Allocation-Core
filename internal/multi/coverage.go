@@ -50,6 +50,7 @@ type CoverageReport struct {
  Accounts []CoverageAccount `json:"accounts"`
  TruncatedFindings int `json:"truncated_findings"`
  Stale bool `json:"source_changed_during_inspection"`
+ Invalidated bool `json:"diagnosis_invalidated"`
 }
 type coveragePool struct {coord map[string]string;sum big.Int}
 type coveragePlan struct {group *Group;rule engine.Spec;stage engine.Stage;pools map[string]*coveragePool}
@@ -112,6 +113,7 @@ func InspectDriverCoverage(ctx context.Context,projectDir string) (r CoverageRep
    current,err:=fileDigest(path)
    if err!=nil||current!=old {
     r.Stale=true
+    r.Invalidated=true
     r.add(CoverageFinding{Level:"UNVERIFIED",Reason:"检查期间源文件发生变化；本次报告作废",Advice:"固定输入快照后重新检查。"})
     for _,a:=range statuses {a.Status="UNVERIFIED"}
     break
@@ -121,7 +123,17 @@ func InspectDriverCoverage(ctx context.Context,projectDir string) (r CoverageRep
    r.Accounts=append(r.Accounts,*statuses[a])
    if statuses[a].Status=="UNVERIFIED" {r.UnverifiedAccounts++}
   }
-  if r.Stale {r.Status="PARTIAL"} else if r.BlockedPairs>0 {r.Status="BLOCK"} else if r.UnverifiedAccounts==0&&r.TruncatedFindings==0&&r.CheckedPairs>0&&!coverageReview(r.Accounts) {r.Status="SOURCE_MATCHED"}
+  if r.Invalidated {
+   r.CheckedPairs=0
+   r.BlockedPairs=0
+   for i:=range r.Findings {
+    if r.Findings[i].Level=="BLOCK"||r.Findings[i].Level=="REVIEW" {
+     r.Findings[i].Level="UNVERIFIED"
+     r.Findings[i].Reason="输入或规则版本变化，原检查证据已失效："+r.Findings[i].Reason
+    }
+   }
+   r.Status="PARTIAL"
+  } else if r.BlockedPairs>0 {r.Status="BLOCK"} else if r.UnverifiedAccounts==0&&r.TruncatedFindings==0&&r.CheckedPairs>0&&!coverageReview(r.Accounts) {r.Status="SOURCE_MATCHED"}
  }()
  plans:=map[string]*coveragePlan{}
  for i,g:=range p.groups {
@@ -221,6 +233,7 @@ func InspectDriverCoverage(ctx context.Context,projectDir string) (r CoverageRep
   for _,a:=range statuses {if a.Status!="BLOCK" {a.Status="UNVERIFIED"}}
  }
  if err:=p.verifyControls();err!=nil {
+  r.Invalidated=true
   r.add(CoverageFinding{Level:"UNVERIFIED",Reason:"规则检查期间变化："+err.Error()})
   for _,a:=range statuses {a.Status="UNVERIFIED"}
  }
