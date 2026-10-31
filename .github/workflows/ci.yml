@@ -60,7 +60,7 @@ jobs:
         shell: pwsh
         run: |
           go mod download
-          go build -tags mysql -trimpath -ldflags="-s -w" -o AllocationCore.exe .
+          go build -tags mysql -trimpath -ldflags="-s -w -X main.buildVersion=preview -X main.buildCommit=${{ github.sha }}" -o AllocationCore.exe .
           .\AllocationCore.exe demo .
           .\AllocationCore.exe inspect examples/manufacturing/rule.json
           .\AllocationCore.exe data csv --config examples/import_mapping.json output\ci-normalized.csv
@@ -70,6 +70,9 @@ jobs:
           .\AllocationCore.exe multi inspect -project testdata\multi_sample -json
           go test ./internal/studio -run 'TestDesignerBridge' -count=1
           go test ./internal/studio -run 'TestStageEvidence' -count=1
+          go test ./internal/studio -run 'TestCasesSummaryReadsAllRowsNotJustPreview|TestCaseSummary' -count=1
+          $v = (.\AllocationCore.exe version) -join "`n"
+          if ($v -notmatch 'MySQL driver: linked' -or $v -notmatch '${{ github.sha }}') { throw "Version or MySQL connector mismatch: $v" }
           .\AllocationCore.exe multi -project testdata\multi_sample -out output\ci-multi -engine $bin
           .\AllocationCore.exe reconcile --actual output\ci-multi\results.csv --reference output\ci-multi\results.csv --out output\ci-acceptance --precision 2 --tolerance 0
       - name: Archive one-folder product
