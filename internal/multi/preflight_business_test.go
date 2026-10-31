@@ -68,3 +68,16 @@ func TestBusinessReadinessThousandAccounts(t *testing.T) {
  }
  if businessAccount(r,"Bulk-0995")!="INPUT_OK" {t.Fatal("tail account missing")}
 }
+
+func TestBusinessReadinessInterruptedScanNotMissing(t *testing.T) {
+ dir:=preflightFixture(t)
+ file:=filepath.Join(dir,"amounts.csv")
+ b,e:=os.ReadFile(file);if e!=nil {t.Fatal(e)}
+ lines:=strings.Split(string(b),"\n")
+ if len(lines)<5 {t.Fatal("fixture too short")}
+ lines[2]="invalid,data,row"
+ if e:=os.WriteFile(file,[]byte(strings.Join(lines,"\n")),0600);e!=nil {t.Fatal(e)}
+ got:=InspectProject(context.Background(),dir)
+ if got.Status!="BLOCK"||got.BlockedAccounts!=0 {t.Fatalf("partial scan invented missing accounts: %+v",got)}
+ if businessAccount(got,"Cost-D")!="NOT_CHECKED" {t.Fatal("unscanned input was falsely classified")}
+}
