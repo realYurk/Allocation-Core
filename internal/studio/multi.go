@@ -89,6 +89,7 @@ func (a *Application) registerMulti(m *http.ServeMux) *MultiApp {
 	m.HandleFunc("/api/multi/run", x.run)
 	m.HandleFunc("/api/multi/jobs", x.jobList)
 	m.HandleFunc("/api/multi/stage-evidence", x.stageEvidence)
+	m.HandleFunc("/api/multi/compare-runs", x.compareRuns)
 	m.HandleFunc("/api/multi/jobs/", x.jobDetail)
 	m.HandleFunc("/api/multi/batch/status", x.batchStatus)
 	m.HandleFunc("/api/multi/batch/records", x.batchRecords)
@@ -232,12 +233,23 @@ func (x *MultiApp) preflight(w http.ResponseWriter, r *http.Request) {
 
 // driverCoverage checks first-source-stage Driver matching without executing a batch.
 func (x *MultiApp) driverCoverage(w http.ResponseWriter, r *http.Request) {
- if r.Method != http.MethodPost { w.WriteHeader(http.StatusMethodNotAllowed); return }
- var req struct { Name string `json:"name"` }
- if err := multiRequest(w, r, &req, 2048); err != nil {fail(w, 400, err);return}
- dir, err := x.projectDir(req.Name)
- if err != nil {fail(w, 404, err);return}
- jsonOut(w, 200, multi.InspectDriverCoverage(r.Context(), dir))
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := multiRequest(w, r, &req, 2048); err != nil {
+		fail(w, 400, err)
+		return
+	}
+	dir, err := x.projectDir(req.Name)
+	if err != nil {
+		fail(w, 404, err)
+		return
+	}
+	jsonOut(w, 200, multi.InspectDriverCoverage(r.Context(), dir))
 }
 
 func readAssignments(path string) ([]map[string]string, error) {
@@ -885,9 +897,15 @@ func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 		}
 		// Keep the three edit tokens consistent with the account the user saw.
 		assignmentBytes, e := os.ReadFile(filepath.Join(dir, "assignments.csv"))
-		if e != nil { fail(w, 500, e); return }
+		if e != nil {
+			fail(w, 500, e)
+			return
+		}
 		overrideBytes, e := os.ReadFile(filepath.Join(dir, "overrides.csv"))
-		if e != nil { fail(w, 500, e); return }
+		if e != nil {
+			fail(w, 500, e)
+			return
+		}
 		jsonOut(w, 200, map[string]any{"account": account, "template": template, "rule": rule, "overrides": current,
 			"versions": map[string]string{"assignments": sha256Hex(assignmentBytes), "template": sha256Hex(b), "overrides": sha256Hex(overrideBytes)},
 		})
@@ -898,13 +916,13 @@ func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Name    string      `json:"name"`
-		Account string      `json:"account"`
-		Rows    []factorRow `json:"rows"`
+		Name     string      `json:"name"`
+		Account  string      `json:"account"`
+		Rows     []factorRow `json:"rows"`
 		Versions struct {
 			Assignments string `json:"assignments"`
-			Template string `json:"template"`
-			Overrides string `json:"overrides"`
+			Template    string `json:"template"`
+			Overrides   string `json:"overrides"`
 		} `json:"versions"`
 	}
 	if e := multiRequest(w, r, &req, 128<<10); e != nil {
@@ -949,9 +967,15 @@ func (x *MultiApp) factor(w http.ResponseWriter, r *http.Request) {
 	}
 	// Reject stale edits, including changed template assignments.
 	assignmentBytes, e := os.ReadFile(filepath.Join(dir, "assignments.csv"))
-	if e != nil { fail(w, 500, e); return }
+	if e != nil {
+		fail(w, 500, e)
+		return
+	}
 	overrideBytes, e := os.ReadFile(filepath.Join(dir, "overrides.csv"))
-	if e != nil { fail(w, 500, e); return }
+	if e != nil {
+		fail(w, 500, e)
+		return
+	}
 	if req.Versions.Assignments == "" || req.Versions.Template == "" || req.Versions.Overrides == "" ||
 		req.Versions.Assignments != sha256Hex(assignmentBytes) ||
 		req.Versions.Template != sha256Hex(raw) ||

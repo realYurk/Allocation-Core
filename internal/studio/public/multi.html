@@ -131,6 +131,13 @@
 <div class="row"><label>科目 <select id="stageEvidenceAccount" onchange="invalidateStageEvidence()"></select></label><label>期间（可选） <input id="stageEvidencePeriod" placeholder="例如 2026-01" oninput="invalidateStageEvidence()"></label><button id="stageEvidenceBtn" class="alt" onclick="loadStageEvidence()">查看阶段与因子金额</button><a id="stageEvidenceDownload" hidden download="stage_evidence.csv">导出阶段证据 CSV</a></div>
 <p id="stageEvidenceNotice" role="status" class="muted"></p>
 <div class="tablebox"><table><thead><tr><th>阶段</th><th>分摊规则</th><th>Driver / 权重字段</th><th>已分摊金额</th><th>流水行数</th><th>来源池</th></tr></thead><tbody id="stageEvidenceRows"></tbody></table></div>
+</section><section id="runComparison" class="run-comparison" aria-label="历史两次分摊对比">
+<h3>比较两次历史分摊 / Run-to-run comparison</h3>
+<p class="muted">选择同一项目的两个已成功发布任务。对比已保存的输入文件与生效规则指纹，再用精确逐坐标比较定位结果变化。不声称单一文件或规则一定导致某个差异。</p>
+<div class="row"><label>旧任务<select id="runCompareBefore" onchange="clearRunComparison()"></select></label><label>新任务<select id="runCompareAfter" onchange="clearRunComparison()"></select></label><button id="runCompareBtn" class="alt" onclick="compareHistoricalRuns()">比较两个历史任务</button><a id="runCompareDownload" hidden download="run_differences.csv">下载完整坐标差异 CSV</a></div>
+<p id="runCompareStatus" class="muted" role="status" aria-live="polite">请选择两个历史成功任务。</p>
+<div class="row"><input id="runCompareSearch" placeholder="搜索科目" oninput="renderRunCompareAccounts()" aria-label="搜索历史对比科目"><select id="runCompareFilter" onchange="renderRunCompareAccounts()" aria-label="筛选历史对比状态"><option value="all">全部科目</option><option value="issues">仅有差异</option><option value="match">仅一致</option></select></div>
+<p id="runCompareCount" class="muted"></p><div class="tablebox"><table><thead><tr><th>科目</th><th>一致坐标</th><th>金额不同</th><th>新任务缺少</th><th>新任务新增</th><th>状态</th></tr></thead><tbody id="runCompareRows"></tbody></table></div>
 </section><a id="download" style="display:none" target="_blank" href="#">下载完整 results.csv</a><section id="flow-acceptance" style="margin-top:18px;border:1px solid #dbe7f7;border-radius:12px;padding:15px;background:#f6faff">
 <h3 style="margin:0 0 7px;font-size:15px">参考系统逐坐标验收 / Reference reconciliation</h3>
 <p>直接上传参考系统导出的 CSV（不超过 256 MiB），不需要打开项目文件夹。只接受与项目相同的业务维度及 <code>amount</code> / <code>value</code> 金额字段；不做隐式维度填充或四舍五入。历史验收不会自动代表新数据。</p>
@@ -995,6 +1002,7 @@ async function batchRestore(){try{const id=document.getElementById('batchRecord'
 async function batchPrune(){try{batchLog(await api('/api/multi/batch/prune-preview'))}catch(e){batchLog('清理预览失败：'+e.message)}}
 async function loadJobHistory(){try{
  const v=await api('/api/multi/jobs');
+ refreshRunCompareJobs(v.jobs);
  const select=document.getElementById('jobHistory'),old=select.value;
  select.replaceChildren();
  for(const j of v.jobs.filter(x=>x.case===active)){
@@ -1022,7 +1030,7 @@ async function retryFromHistory(){
  await run();
 }
 document.getElementById('jobHistory').addEventListener('change',()=>showHistoryJob().catch(e=>message(e.message)));
-document.getElementById('project').onchange=async()=>{resetStageEvidence();renderFailureDiagnosis(null);await openProject();busyJob='';await loadJobHistory()};
+document.getElementById('project').onchange=async()=>{clearRunComparison();resetStageEvidence();renderFailureDiagnosis(null);await openProject();busyJob='';await loadJobHistory()};
 list().then(loadJobHistory);loadDesignerCases();loadMappingProfiles();
 
-</script><script src="/assets/stage_evidence.js"></script><script src="/assets/quickstart.js"></script><script src="/assets/factor_editor.js"></script><script src="/assets/preflight.js"></script><script src="/assets/failure_diagnosis.js"></script><script src="/assets/coverage.js"></script></body></html>
+</script><script src="/assets/run_compare.js"></script><script src="/assets/stage_evidence.js"></script><script src="/assets/quickstart.js"></script><script src="/assets/factor_editor.js"></script><script src="/assets/preflight.js"></script><script src="/assets/failure_diagnosis.js"></script><script src="/assets/coverage.js"></script></body></html>

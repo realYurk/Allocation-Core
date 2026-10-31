@@ -1,5 +1,16 @@
 # Allocation Core — Business Onboarding Update / 通用分摊引擎
 
+## Historical run-to-run financial comparison / 两次历史任务差异对比
+
+在 **/multi → 历史任务** 选择两个同项目、已成功发布的任务，点击「比较两个历史任务」。工作台依次核对当次保存的金额/Driver/控制文件 SHA-256、逐科目生效规则 SHA-256，并复用原有 32 分区精确逐坐标对账器比较 **新结果 − 旧结果**。页面提供科目级差异数量、完整 `run_differences.csv` 下载以及结果文件的 SHA-256。
+
+- **输入或规则有变化，不等于已证明差异根因。** 即使 Driver 文件内容变化，最终业务坐标仍可能完全一致；反过来总额相同也可能存在错误分配。只陈述经证据证明的变化，不自动给出因果判断。
+- 对比完全只读：不修改源项目、历史任务或财务结果。每次生成一个独立私有报告目录，文件保存后不覆盖；下载前校验差异明细 SHA-256。历史数据在比较期间变化则拒绝生成报告。
+- 使用已有 `acceptance.Compare` 对大结果流式分区聚合：内存随最大分区的**不同坐标数**增长，而不是宣称恒定内存。并发对比限制为 2 个，避免大量历史任务比较争抢磁盘。
+- 输入指纹来自成功任务已保存的快照清单；对比结果包含当次扫描文件指纹。此工具不替代企业独立参考系统验收，也不证明历史文件在创建之后从未被修改，生产归档仍需完整的证据保存与现场验收。
+
+**English:** Select two PASS jobs in `/multi` to compare saved input/driver/control fingerprints, per-account effective rule fingerprints and exact final business-coordinate amounts. Coordinate changes and source changes are independently observed; causality is **not inferred**. Reports are separate, never overwrite jobs, and download integrity is checked. This does not replace independent reference-system reconciliation.
+
 ## 财务运行前体检 / Finance readiness checklist
 
 ## Read-only Driver source-pool coverage / 运行前 Driver 来源池匹配检查
