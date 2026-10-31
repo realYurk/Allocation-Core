@@ -165,8 +165,13 @@ func (a *Application) designerRule(w http.ResponseWriter, r *http.Request) {
 			fail(w, 500, e)
 			return
 		}
+		_, draftOnly, e := readVisualDraft(dir)
+		if e != nil {
+			fail(w, 422, e)
+			return
+		}
 		fingerprint, _ := a.designerFingerprint(id)
-		jsonOut(w, 200, map[string]any{"rule": rule, "editable": kind == "custom", "case": id, "sha256": fingerprint})
+		jsonOut(w, 200, map[string]any{"rule": rule, "editable": kind == "custom", "case": id, "sha256": fingerprint, "draft_only": draftOnly})
 		return
 	}
 	if r.Method != "POST" {
@@ -209,11 +214,27 @@ func (a *Application) designerRule(w http.ResponseWriter, r *http.Request) {
 		fail(w, 422, e)
 		return
 	}
-	// No core writes until the new rule has passed the authoritative doctor.
-	output, e := a.checkRuleFile(dir, cleaned)
+	meta, draftOnly, e := readVisualDraft(dir)
 	if e != nil {
-		jsonOut(w, 422, map[string]any{"error": "后端规则检查未通过", "detail": output})
+		fail(w, 422, e)
 		return
+	}
+	verification := "DOCTOR"
+	output := ""
+	if draftOnly {
+		if e = validateStructuralDraft(cleaned, meta); e != nil {
+			fail(w, 422, e)
+			return
+		}
+		verification = "STRUCTURE_ONLY"
+		output = "规则结构检查通过；这里没有金额或 Driver 明细。回到多科目工作台创建新模板，完成 Inspect、执行和独立参考对账后才可验收。"
+	} else {
+		// Normal designer projects must still pass the original full doctor.
+		output, e = a.checkRuleFile(dir, cleaned)
+		if e != nil {
+			jsonOut(w, 422, map[string]any{"error": "后端规则检查未通过", "detail": output})
+			return
+		}
 	}
 	tmp, e := os.CreateTemp(dir, ".rule-change-")
 	if e != nil {
@@ -240,7 +261,7 @@ func (a *Application) designerRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	newHash := sha256.Sum256(cleaned)
-	jsonOut(w, 200, map[string]any{"saved": true, "sha256": hex.EncodeToString(newHash[:]), "doctor": output})
+	jsonOut(w, 200, map[string]any{"saved": true, "sha256": hex.EncodeToString(newHash[:]), "doctor": output, "verification": verification})
 }
 func validateRuleBytes(raw json.RawMessage) ([]byte, error) {
 	if len(raw) > 480*1024 || len(raw) == 0 {
@@ -327,6 +348,19 @@ func (a *Application) designerCheck(w http.ResponseWriter, r *http.Request) {
 	raw, e := validateRuleBytes(req.Rule)
 	if e != nil {
 		fail(w, 422, e)
+		return
+	}
+	meta, draftOnly, e := readVisualDraft(dir)
+	if e != nil {
+		fail(w, 422, e)
+		return
+	}
+	if draftOnly {
+		if e = validateStructuralDraft(raw, meta); e != nil {
+			fail(w, 422, e)
+			return
+		}
+		jsonOut(w, 200, map[string]any{"status": "STRUCTURE_ONLY", "detail": "结构校验通过，草稿没有金额或 Driver 明细。正式数据须回多科目工作台 Inspect、运行并对账。"})
 		return
 	}
 	log, e := a.checkRuleFile(dir, raw)
