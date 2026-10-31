@@ -41,3 +41,19 @@ input,select{border-color:#cbd5df;border-radius:5px}
 .finance-factor-total{font-size:13px;margin:10px 0 0;font-weight:650}
 #factorValidation{font-size:13px;white-space:pre-wrap;line-height:1.5}
 @media(max-width:700px){.finance-factor-line{grid-template-columns:1fr 1fr}.finance-factor-name{grid-column:1/-1}}
+
+/* Business preflight: compact, accessible diagnostics; no decorative color. */
+.finance-check{border-top:1px solid #d9e0e7;margin-top:16px;padding-top:12px}
+.finance-check[hidden]{display:none!important}
+.finance-check h3{font-size:15px;margin:0 0 7px;color:#263747}
+.finance-check #financeReadinessSummary{font-size:13px;font-weight:600}
+.finance-check-finding{border:1px solid #d9e0e7;border-radius:5px;padding:10px 12px;margin:9px 0;background:#fbfcfd}
+.finance-check-finding strong{font-size:13px}
+.finance-check-finding p{font-size:12px;line-height:1.5;margin:6px 0}
+.finance-check-finding small{font-size:12px;color:#526577}
+.finance-check-action{font-weight:550;color:#31516a}
+.finance-check .row{margin:12px 0;align-items:center}
+.finance-check .row input{min-width:150px;flex:1}
+.finance-check .row select{max-width:170px}
+.finance-check .tablebox{max-height:350px;overflow:auto}
+.finance-check td{font-size:12px;white-space:normal;overflow-wrap:anywhere}
