@@ -38,3 +38,6 @@ AllocationCore.exe
 # CPU/heap profiling artifacts and local inspection outputs
 **/*.profile/
 **/*.profile/**
+
+# Build provenance is release-only; source Git tracks reproducible inputs.
+BUILD_MANIFEST.json

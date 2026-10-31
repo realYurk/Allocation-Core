@@ -1,4 +1,4 @@
-# Allocation Core Clean V6 / 通用分摊引擎
+# Allocation Core Clean V7 / 通用分摊引擎
 
 **One Go module · One Windows executable · One workspace.**
 **一个 Go 模块、一个 Windows 程序、一个业务工作台。**
@@ -6,6 +6,30 @@
 This repository contains **no company data or proprietary allocation rules**. Inputs, outputs, mappings and runtime records stay outside version control. / 本仓库不包含企业真实数据和私有规则；输入、输出、映射与运行状态默认不纳入 Git。
 
 > **MySQL 注意 / IMPORTANT**：本 ZIP 内附的离线 Windows EXE 保留全部已有功能，但**不包含官方 MySQL 驱动**。需要使用在线构建的 MySQL-enabled EXE（GitHub Actions）或 `go mod download && go build -tags mysql` 才能执行 `data mysql` / `mysql-bundle`。源码已实现，模拟事务测试通过；**目标企业 MySQL 实库联调仍待执行**。
+
+## New in V7: Financial Correctness & Production Hardening / V7 财务正确性与生产加固
+
+**No new program entrances / 不增加新的程序入口。** Still one Go module, one Windows EXE, four bilingual Markdown files. The public engine is unchanged at the amount-formula layer. / 保持一个 Go 模块、一个 Windows EXE、四份中英双语文档；金额分摊公式未改。
+
+- **Independent financial oracle / 独立金额黄金测试**: manually calculated two-stage outcomes and 5,000 deterministic rational-number cases verify exact cents, signed weights, tie handling, conservation and permutation stability. / 手工预期值与独立有理数计算器共同验证尾差、负金额、因子、顺序及守恒。
+- **Same-transaction MySQL validation / MySQL 元数据与数据同事务**: InnoDB table, unique signed BIGINT key and exact DECIMAL/integer measure are checked inside the SAME `REPEATABLE READ` read-only transaction as all pages. / 所有源表预检、分页及多表导出共用同一个快照事务；拒绝 FLOAT/DOUBLE。
+- **Publish after snapshot release / 先关闭事务再发布**: a single MySQL CSV remains in a private staging directory until all pages, checks and the transaction release succeed. A multi-table snapshot publishes the entire directory once. / 任何断线、非法数据、事务释放失败都不产生正式结果。
+- **Import integrity / 输入文件指纹**: every normalized CSV report now contains exact output `SHA-256` and byte size. MySQL bundle manifest records these for all exported files. / 输出记录哈希与字节数，便于后续验证。
+- **Strict duplicate-coordinate option / 严格重复坐标验收**: `reconcile --reject-duplicates` rejects repeated full business coordinates on either side, rather than silently aggregating. The legacy aggregation mode remains available and now reports duplicate counts. The Studio page offers a checkbox. / 同坐标重复金额既可按旧方式显式聚合并报告数量，也可严格拒绝。
+
+**What is NOT proven / 尚未完成的验收**: official-driver TLS/SAN client-to-server test with a purpose-issued certificate; real enterprise MySQL credentials/permissions, concurrent DDL fault injection, multi-million-row representative business references and Windows target-device UAT. Current bundled offline EXE does not link the external MySQL driver; build with `-tags mysql` in a networked environment or use the corresponding GitHub CI artifact. / 官方驱动 TLS 全链路、目标企业生产前 UAT、复杂业务大规模基准仍需独立验证；离线 EXE 不含外部 MySQL 驱动。
+
+Quick verification / 快速检查：
+
+```text
+AllocationCore.exe version
+AllocationCore.exe demo .
+AllocationCore.exe inspect examples/manufacturing/rule.json
+AllocationCore.exe run examples/manufacturing/rule.json output/v7-run --workers 4
+AllocationCore.exe reconcile --actual output/v7-run/results.csv --reference input/reference/reference.csv --out output/v7-acceptance --precision 2 --tolerance 0 --reject-duplicates
+```
+
+Only the last command needs your independently prepared reference file; never use engine output as the sole correctness oracle. / 最后一条需自行提供独立参考结果；不能只用引擎输出证明自己正确。
 
 ## 30-second start / 小白快速启动
 

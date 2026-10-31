@@ -25,9 +25,6 @@ type InputFingerprint struct {
 }
 
 func snapshotLegacyCase(ctx context.Context, original, destParent string) (dest string, ruleBytes []byte, manifest []InputFingerprint, err error) {
-	// Canonicalize the project directory so that 8.3 short-path expansion on
-	// Windows does not make filepath.Rel(original, resolved) report a false
-	// escape (short dir vs long EvalSymlinks result).
 	if resolvedOriginal, e := filepath.EvalSymlinks(original); e == nil {
 		original = resolvedOriginal
 	}

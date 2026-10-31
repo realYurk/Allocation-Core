@@ -16,16 +16,20 @@ jobs:
           ./AllocationCore demo .
       - name: Go tests, static checks and examples
         run: |
-          go test ./...
+          go test ./... -count=1
           go vet ./...
-          go test -race ./internal/multi ./internal/studio ./internal/engine ./adapter ./internal/profiling
+          go test -race ./internal/multi ./internal/studio ./internal/engine ./adapter ./internal/acceptance ./internal/profiling
+          # Independent rational oracle, fixed business goldens and failure injection.
+          go test ./internal/engine ./adapter ./internal/acceptance -run 'TestV7' -count=1 -v
+          # Performance measurements are archived as diagnostics, never flaky pass/fail gates.
+          go test ./internal/engine -run '^$' -bench 'BenchmarkShardEncoding|BenchmarkPoolScheduler' -benchmem -benchtime=150ms > output/ci-benchmark.txt
           ./AllocationCore inspect examples/manufacturing/rule.json
           ./AllocationCore data csv --config examples/import_mapping.json output/ci-normalized.csv
           ./AllocationCore profile examples/manufacturing/rule.json output/ci-profile --workers 2 --disk-partitions 4 --evidence-gzip
           ./AllocationCore run examples/manufacturing/rule.json output/ci-simple --workers 4
           ./AllocationCore multi inspect -project testdata/multi_sample -json > output/ci-preflight.json
           ./AllocationCore multi -project testdata/multi_sample -out output/ci-multi -engine ./AllocationCore
-          ./AllocationCore reconcile --actual output/ci-multi/results.csv --reference output/ci-multi/results.csv --out output/ci-acceptance --precision 2 --tolerance 0
+          ./AllocationCore reconcile --actual output/ci-multi/results.csv --reference output/ci-multi/results.csv --out output/ci-acceptance --precision 2 --tolerance 0 --reject-duplicates
           ./AllocationCore demo . 1000
           ./AllocationCore multi inspect -project testdata/scale_1000 -json > output/ci-preflight-1000.json
           ./AllocationCore multi -project testdata/scale_1000 -out output/ci-pooled-1000 -engine ./AllocationCore
@@ -94,6 +98,8 @@ jobs:
           ALLOCATION_TEST_MYSQL_DSN: "root:temporary_ci_only@tcp(127.0.0.1:3306)/allocation_ci"
         run: |
           go build -tags mysql -o AllocationCore .
+          # The real MySQL test now exports via a SELECT-only account, not root.
           go test -tags "mysql mysql_integration" ./adapter -run TestLiveMySQLSnapshot -count=1 -v
+          # Native TLS/SAN integration is separately opt-in when test CA is provisioned.
           go test -tags mysql ./adapter -count=1
           go vet -tags mysql ./adapter

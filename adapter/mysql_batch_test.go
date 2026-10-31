@@ -2,8 +2,10 @@ package adapter
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/hex"
 	"errors"
 	"io"
 	"os"
@@ -17,13 +19,14 @@ import (
 
 type snapshotDriver struct{ state *snapshotState }
 type snapshotState struct {
-	mu          sync.Mutex
-	queries     int
-	beginnings  int
-	rollbacks   int
-	injectError bool
-	idRows      []driver.Value
-	badValues   bool
+	mu           sync.Mutex
+	queries      int
+	beginnings   int
+	rollbacks    int
+	injectError  bool
+	idRows       []driver.Value
+	badValues    bool
+	failRollback bool
 }
 type snapshotConn struct{ s *snapshotState }
 type snapshotTx struct{ s *snapshotState }
@@ -51,7 +54,15 @@ func (c *snapshotConn) BeginTx(_ context.Context, o driver.TxOptions) (driver.Tx
 func (t *snapshotTx) Commit() error {
 	return errors.New("read only transaction committed unexpectedly")
 }
-func (t *snapshotTx) Rollback() error { t.s.mu.Lock(); t.s.rollbacks++; t.s.mu.Unlock(); return nil }
+func (t *snapshotTx) Rollback() error {
+	t.s.mu.Lock()
+	defer t.s.mu.Unlock()
+	t.s.rollbacks++
+	if t.s.failRollback {
+		return errors.New("simulated rollback failure")
+	}
+	return nil
+}
 func (c *snapshotConn) QueryContext(ctx context.Context, q string, args []driver.NamedValue) (driver.Rows, error) {
 	c.s.mu.Lock()
 	defer c.s.mu.Unlock()
@@ -228,5 +239,107 @@ func TestMySQLStrictConfigAndUnsafeSQLBlocked(t *testing.T) {
 	}
 	if !reflect.DeepEqual([]string{"1", "2"}, []string{strconv.Itoa(1), strconv.Itoa(2)}) {
 		t.Fatal("sanity")
+	}
+}
+
+// V7: Preflight is in the exact same transaction as both exports. A rejected
+// preflight must not touch data or publish any directory.
+func TestV7PreflightSameTransactionAndFailClosed(t *testing.T) {
+	state := &snapshotState{idRows: []driver.Value{int64(1), int64(2), int64(3)}}
+	db := newSnapshotDB(t, state)
+	q, m := sampleSQLBatch()
+	jobs := []BundleExport{{Name: "amounts.csv", Query: q, Mapping: m}, {Name: "drivers.csv", Query: q, Mapping: m}}
+	called := 0
+	dst := filepath.Join(t.TempDir(), "verified")
+	got, e := importSQLBundleWithPreflight(context.Background(), db, jobs, dst, func(ctx context.Context, tx *sql.Tx) error {
+		called++
+		state.mu.Lock()
+		started := state.beginnings
+		alreadyRead := state.queries
+		state.mu.Unlock()
+		if started != 1 || alreadyRead != 0 {
+			return errors.New("preflight not in first transaction before data reads")
+		}
+		return nil
+	})
+	if e != nil || called != 1 || got.Status != "PASS" {
+		t.Fatalf("preflight call=%d report=%v err=%v", called, got, e)
+	}
+	state.mu.Lock()
+	starts, rolled := state.beginnings, state.rollbacks
+	state.mu.Unlock()
+	if starts != 1 || rolled != 1 {
+		t.Fatalf("two transactions used: begin=%d rollback=%d", starts, rolled)
+	}
+	state.mu.Lock()
+	state.queries = 0
+	state.mu.Unlock()
+	bad := filepath.Join(t.TempDir(), "blocked")
+	_, e = importSQLBundleWithPreflight(context.Background(), db, jobs, bad, func(context.Context, *sql.Tx) error { return errors.New("schema changed") })
+	if e == nil || !strings.Contains(e.Error(), "schema changed") {
+		t.Fatalf("preflight failure should block: %v", e)
+	}
+	if _, e = os.Stat(bad); !os.IsNotExist(e) {
+		t.Fatal("preflight failure published snapshot")
+	}
+	state.mu.Lock()
+	queries := state.queries
+	state.mu.Unlock()
+	if queries != 0 {
+		t.Fatalf("read %d rows before rejecting invalid schema", queries)
+	}
+}
+
+func TestV7SnapshotReleaseFailureDoesNotPublish(t *testing.T) {
+	state := &snapshotState{idRows: []driver.Value{int64(1), int64(2), int64(3)}, failRollback: true}
+	db := newSnapshotDB(t, state)
+	q, m := sampleSQLBatch()
+	one := filepath.Join(t.TempDir(), "single.csv")
+	_, err := importMySQLSingleFromDB(context.Background(), db, "sample", q, m, one, nil)
+	if err == nil || !strings.Contains(err.Error(), "snapshot release failed") {
+		t.Fatalf("expected release failure: %v", err)
+	}
+	if _, err = os.Stat(one); !os.IsNotExist(err) {
+		t.Fatal("published single output despite rollback failure")
+	}
+	state.mu.Lock()
+	state.queries = 0
+	state.mu.Unlock()
+	dir := filepath.Join(t.TempDir(), "bundle")
+	_, err = ImportSQLBundle(context.Background(), db, []BundleExport{{Name: "a.csv", Query: q, Mapping: m}}, dir)
+	if err == nil || !strings.Contains(err.Error(), "releasing snapshot failed") {
+		t.Fatalf("expected bundle rollback failure: %v", err)
+	}
+	if _, err = os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatal("published bundle despite rollback failure")
+	}
+}
+
+func TestV7SingleSourceSnapshotPublishingAndChecksums(t *testing.T) {
+	state := &snapshotState{idRows: []driver.Value{int64(1), int64(2), int64(3)}}
+	db := newSnapshotDB(t, state)
+	q, m := sampleSQLBatch()
+	dest := filepath.Join(t.TempDir(), "output.csv")
+	seen := 0
+	rep, err := importMySQLSingleFromDB(context.Background(), db, "sample", q, m, dest, func(_ context.Context, tx *sql.Tx) error {
+		seen++
+		state.mu.Lock()
+		n := state.beginnings
+		state.mu.Unlock()
+		if n != 1 || tx == nil {
+			return errors.New("wrong transaction")
+		}
+		return nil
+	})
+	if err != nil || seen != 1 || rep.Rows != 3 || rep.SHA256 == "" || rep.Bytes < 20 {
+		t.Fatalf("report %+v preflight %d err %v", rep, seen, err)
+	}
+	b, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(b)
+	if rep.SHA256 != hex.EncodeToString(sum[:]) || rep.Bytes != int64(len(b)) {
+		t.Fatalf("bad checksum %+v", rep)
 	}
 }

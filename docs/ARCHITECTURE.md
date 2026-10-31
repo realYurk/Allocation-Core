@@ -42,7 +42,7 @@ The financial engine is unchanged. The optional, read-only `internal/acceptance`
 
 The disk Driver cache key is formed from the source content SHA-256, selected weight column, Driver filters, target constraints, dimensions and hierarchies. Allocation labels, shares and negative Driver policy do not alter the stored index and therefore do not fragment its identity. Every cached entry is verified against its source and the committed data digest before reuse. Cache hit/build counts are diagnostic only, never a correctness verdict. / Driver 索引缓存只依赖确实影响索引内容的输入和语义，不再依赖计算后才使用的规则名称和份额。缓存读取仍验证源数据和索引 SHA-256，命中计数只是性能诊断，不代表业务验收通过。
 
-Native MySQL/Cube connectors remain future work: upstream systems must explicitly map to the generic coordinate-and-amount contract. The reference verifier neither infers column mappings nor performs cross-source joins. / MySQL 和 Cube 原生连接器暂未实现，仍需在外部转换为明确的稀疏坐标＋金额契约；验收器不会猜测字段或擅自进行跨来源关联。
+Native MySQL code exists behind the optional `mysql` build tag; it requires the official dependency and has an isolated MySQL 8.4 CI test. The vendor-neutral Cube cursor is still an interface, not a completed vendor connector. The financial engine never performs cross-source joins implicitly. / MySQL 源码已实现、通过构建标签隔离依赖；Cube 仍为厂商无关接口，不能宣称已连通实际 Cube；金额引擎不会自动跨来源聚合。
 
 ## Clean V5: data source boundary / 数据源边界
 
@@ -97,3 +97,26 @@ The 50k-row disk-profile experiment identified the JSON intermediate-spool decod
 MySQL-native code lives exclusively inside `adapter/mysql_enabled.go` (enabled with `-tags mysql`). The financial engine does not import a driver. Both the MySQL `SQLSource` and vendor `CubeSource` produce the same `adapter.Rows` stream and pass through unchanged `adapter.ImportCSV` validation. MySQL bundles use one read-only REPEATABLE READ transaction for all related datasets and commit as a single directory after complete validation. A future Cube vendor connector should implement the same snapshot scope plus the `Rows` or `CellCursor` contract; it **must not** embed Cube-specific aggregation or business fallback inside `internal/engine`. / 数据源负责快照与读取；统一映射层负责坐标与精确数值检查；财务引擎只消费标准稀疏数据。Cube 未来连接器使用相同契约，不能另写金额算法。
 
 The MySQL transaction read view is established by the first consistent SELECT and retained for all keyset pages. No mid-import failover/retry is permitted. An isolated connection is held until all tables have been streamed and checked. / 同一事务内的第一次一致性读建立读取视图，后续分页始终使用它；中途重连必须整批重新导出。
+
+## V7 snapshot boundaries and financial oracle / V7 快照边界与独立金额证明
+
+```text
+MySQL least-privilege SELECT account / MySQL 最小权限账号
+ -> BEGIN READ ONLY, REPEATABLE READ / 只读一致性事务
+ -> Validate source table, unique signed BIGINT key, exact measure precision
+ -> Keyset page data for all configured amount/Driver sources
+ -> Write private, verified, SHA-256-recorded CSV files
+ -> ROLLBACK to release snapshot (failure = no publication)
+ -> Publish new output atomically inside one filesystem / 完整发布
+ -> Independent full-coordinate reconciliation (optionally reject duplicates)
+```
+
+**Same snapshot, same metadata validation / 同一事务验证**: V6 first validated MySQL metadata in one transaction and exported in another. V7 moves all source checks into the export transaction itself. The metadata queries do not guarantee protection from all concurrent DDL races; metadata-lock behavior and release under DDL pressure still need real-server fault testing. / V7 修复元数据预检与导出分属两次事务的窗口；DDL 极端并发仍需针对目标 MySQL 验收。
+
+**Strict SQL type check / 严格数值类型**: FLOAT/DOUBLE/text are not accepted as financial measure sources even if the driver returns strings. Integer and DECIMAL columns must fit configured precision. The row parser also checks each value for range and accuracy. / 原生 SQL 源必须是精确数值类型，精度超限必须拒绝。
+
+**No new financial formula / 金额公式不变**: independent rational oracle tests live in `internal/engine/golden_oracle_v7_test.go`; fixed synthetic end-to-end expected values in `independent_e2e_v7_test.go`. / 公式不变，另以独立预期检验。
+
+**Duplicate coordinates / 重复坐标**: legacy reconciliation intentionally aggregates duplicate coordinates but now counts them separately; `--reject-duplicates` opts into fail-closed acceptance. / 为兼容历史默认汇总，严格模式可立即阻断重复导入。
+
+**Source scope / 来源范围**: MySQL's transaction guarantees only data from that MySQL database/session; a separate Cube system must carry explicit source version and freshness evidence. / MySQL 一致性不能自动推导 Cube 具备相同时间点的数据快照。

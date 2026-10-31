@@ -182,7 +182,16 @@ type BundleReport struct {
 	Output   string   `json:"output"`
 }
 
-func ImportSQLBundle(ctx context.Context, db *sql.DB, jobs []BundleExport, destinationDir string) (r BundleReport, err error) {
+// ImportSQLBundle is vendor-neutral; optional source verification is performed
+// in the SAME read-only transaction as every data page. In particular MySQL
+// metadata may never be checked in a separate transaction and then trusted.
+func ImportSQLBundle(ctx context.Context, db *sql.DB, jobs []BundleExport, destinationDir string) (BundleReport, error) {
+	return importSQLBundleWithPreflight(ctx, db, jobs, destinationDir, nil)
+}
+
+// preflight is called exactly once after BEGIN and before any data read.
+// It must only issue SELECTs, and must not retain the transaction.
+func importSQLBundleWithPreflight(ctx context.Context, db *sql.DB, jobs []BundleExport, destinationDir string, preflight func(context.Context, *sql.Tx) error) (r BundleReport, err error) {
 	if ctx == nil || db == nil || len(jobs) == 0 {
 		return r, fmt.Errorf("context, database and exports required")
 	}
@@ -210,6 +219,11 @@ func ImportSQLBundle(ctx context.Context, db *sql.DB, jobs []BundleExport, desti
 			_ = tx.Rollback()
 		}
 	}()
+	if preflight != nil {
+		if e := preflight(ctx, tx); e != nil {
+			return r, fmt.Errorf("snapshot preflight: %w", e)
+		}
+	}
 	seen := map[string]bool{}
 	for _, job := range jobs {
 		if !regexp.MustCompile(`^[A-Za-z0-9_-]+\.csv$`).MatchString(job.Name) || seen[strings.ToLower(job.Name)] {
@@ -231,6 +245,10 @@ func ImportSQLBundle(ctx context.Context, db *sql.DB, jobs []BundleExport, desti
 		return r, fmt.Errorf("releasing snapshot failed: %w", e)
 	}
 	released = true
+	// Even when the snapshot release succeeds, cancellation must not publish.
+	if e := ctx.Err(); e != nil {
+		return r, e
+	}
 	r.Status = "PASS"
 	r.Output = destinationDir
 	r.Snapshot = "single REPEATABLE READ read-only transaction, one database connection"
@@ -244,5 +262,69 @@ func ImportSQLBundle(ctx context.Context, db *sql.DB, jobs []BundleExport, desti
 	if e := os.Rename(stage, destinationDir); e != nil {
 		return r, e
 	}
+	return r, nil
+}
+
+// importMySQLSingleFromDB is also exercised with a fault-injecting SQL driver.
+// It publishes only after input EOF, snapshot release and cancellation checks.
+// The final destination is never created during a failed read.
+func importMySQLSingleFromDB(ctx context.Context, db *sql.DB, database string, q MySQLQuery, mapping Mapping, destination string, verify func(context.Context, *sql.Tx) error) (r Report, err error) {
+	if ctx == nil || db == nil {
+		return r, fmt.Errorf("context and database required")
+	}
+	if e := q.validate(); e != nil {
+		return r, e
+	}
+	if _, e := os.Lstat(destination); e == nil {
+		return r, fmt.Errorf("destination already exists")
+	} else if !os.IsNotExist(e) {
+		return r, e
+	}
+	parent := filepath.Dir(destination)
+	if e := os.MkdirAll(parent, 0700); e != nil {
+		return r, e
+	}
+	stage, e := os.MkdirTemp(parent, ".allocation-mysql-*")
+	if e != nil {
+		return r, e
+	}
+	defer os.RemoveAll(stage)
+	tempPath := filepath.Join(stage, "validated.csv")
+	tx, e := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
+	if e != nil {
+		return r, fmt.Errorf("snapshot transaction rejected: %w", e)
+	}
+	released := false
+	defer func() {
+		if !released {
+			_ = tx.Rollback()
+		}
+	}()
+	if verify != nil {
+		if e := verify(ctx, tx); e != nil {
+			return r, fmt.Errorf("snapshot preflight: %w", e)
+		}
+	}
+	r, e = ImportCSV(ctx, q.sqlSource(db, tx), mapping, tempPath)
+	if e != nil {
+		return Report{}, e
+	}
+	// An abnormal snapshot release must not leave final output behind.
+	if e := tx.Rollback(); e != nil {
+		return Report{}, fmt.Errorf("snapshot release failed: %w", e)
+	}
+	released = true
+	if e := ctx.Err(); e != nil {
+		return Report{}, e
+	}
+	if _, e := os.Lstat(destination); e == nil {
+		return Report{}, fmt.Errorf("destination appeared during import")
+	} else if !os.IsNotExist(e) {
+		return Report{}, e
+	}
+	if e := os.Rename(tempPath, destination); e != nil {
+		return Report{}, e
+	}
+	r.Output, r.SourceKind = destination, "mysql"
 	return r, nil
 }

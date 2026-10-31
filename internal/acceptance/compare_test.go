@@ -94,3 +94,21 @@ func TestToleranceAndNegativeAmounts(t *testing.T) {
 		t.Fatalf("%#v", r)
 	}
 }
+
+func TestV7DuplicateCoordinatePolicy(t *testing.T) {
+	d := t.TempDir()
+	a := write(t, d, "a.csv", "period,account,sku,amount\n2026-01,A,P1,6.00\n2026-01,A,P1,4.00\n")
+	ref := write(t, d, "ref.csv", "sku,period,account,amount\nP1,2026-01,A,10.00\n")
+	r, e := Compare(context.Background(), a, ref, filepath.Join(d, "aggregate"), Options{Precision: 2})
+	if e != nil || r.Status != "MATCH" || r.ActualDuplicateRows != 1 || r.ReferenceDuplicateRows != 0 || r.DuplicatePolicy != "AGGREGATE_WITH_COUNTS" {
+		t.Fatalf("duplicate accounting: %+v error=%v", r, e)
+	}
+	strict := filepath.Join(d, "strict")
+	_, e = Compare(context.Background(), a, ref, strict, Options{Precision: 2, RejectDuplicates: true})
+	if e == nil || !strings.Contains(e.Error(), "duplicate") {
+		t.Fatalf("strict did not reject: %v", e)
+	}
+	if _, e = os.Stat(strict); !os.IsNotExist(e) {
+		t.Fatal("published strict duplicate result")
+	}
+}

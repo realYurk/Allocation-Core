@@ -101,9 +101,9 @@ func checkInnoDB(ctx context.Context, db *sql.DB, tx *sql.Tx, database, table st
 		name = parts[1]
 	}
 	// INFORMATION_SCHEMA metadata verification runs in the same snapshot.
-	var engine sql.NullString
-	e := tx.QueryRowContext(ctx, "SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?", schema, name).Scan(&engine)
-	if e != nil || !engine.Valid || !strings.EqualFold(engine.String, "InnoDB") {
+	var engine, tableType sql.NullString
+	e := tx.QueryRowContext(ctx, "SELECT ENGINE, TABLE_TYPE FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?", schema, name).Scan(&engine, &tableType)
+	if e != nil || !engine.Valid || !strings.EqualFold(engine.String, "InnoDB") || !tableType.Valid || !strings.EqualFold(tableType.String, "BASE TABLE") {
 		return fmt.Errorf("source table %s must be an InnoDB BASE TABLE for snapshot guarantees; view/non-InnoDB/unknown table rejected", table)
 	}
 	return nil
@@ -131,39 +131,55 @@ func checkUniqueBigintKey(ctx context.Context, tx *sql.Tx, database string, q My
 	}
 	return nil
 }
-func ImportMySQLConfig(ctx context.Context, configPath, destination string) (r Report, err error) {
+
+// checkExactMeasureType rejects binary floating-point SQL columns, even if
+// the driver happens to return their formatted bytes as strings. Financial
+// accuracy must not depend on driver-specific scan representation.
+func checkExactMeasureType(ctx context.Context, tx *sql.Tx, database, table, valueColumn string, precision int) error {
+	parts := strings.Split(table, ".")
+	schema, name := database, parts[0]
+	if len(parts) == 2 {
+		schema, name = parts[0], parts[1]
+	}
+	var dataType string
+	var scale sql.NullInt64
+	e := tx.QueryRowContext(ctx, "SELECT DATA_TYPE, NUMERIC_SCALE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?", schema, name, valueColumn).Scan(&dataType, &scale)
+	if e != nil {
+		return fmt.Errorf("value column %s must exist and use an exact SQL numeric type: %w", valueColumn, e)
+	}
+	switch strings.ToLower(dataType) {
+	case "decimal", "numeric", "bigint", "int", "integer", "mediumint", "smallint", "tinyint":
+		if scale.Valid && scale.Int64 > int64(precision) {
+			return fmt.Errorf("%s scale %d exceeds configured precision %d", valueColumn, scale.Int64, precision)
+		}
+		return nil
+	default:
+		return fmt.Errorf("value column %s uses %s; only exact DECIMAL or integer SQL types are supported", valueColumn, dataType)
+	}
+}
+
+func ImportMySQLConfig(ctx context.Context, configPath, destination string) (Report, error) {
 	cfg, e := readMySQLFileConfig(configPath)
 	if e != nil {
-		return r, e
+		return Report{}, e
 	}
 	db, jobCtx, cancel, e := openMySQL(ctx, cfg.Source.MySQLConnection)
 	if e != nil {
-		return r, e
+		return Report{}, e
 	}
 	defer cancel()
 	defer db.Close()
-	tx, e := db.BeginTx(jobCtx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
-	if e != nil {
-		return r, fmt.Errorf("snapshot transaction rejected: %w", e)
-	}
-	defer tx.Rollback()
-	if e = checkInnoDB(jobCtx, db, tx, cfg.Source.Database, cfg.Source.Table); e != nil {
-		return r, e
-	}
-	if e = checkUniqueBigintKey(jobCtx, tx, cfg.Source.Database, cfg.Source.MySQLQuery); e != nil {
-		return r, e
-	}
-	r, e = ImportCSV(jobCtx, cfg.Source.MySQLQuery.sqlSource(db, tx), cfg.Mapping, destination)
-	if e != nil {
-		return r, e
-	}
-	if e = tx.Rollback(); e != nil {
-		os.Remove(destination)
-		return Report{}, fmt.Errorf("snapshot release failed: %w", e)
-	}
-	r.SourceKind = "mysql"
-	return r, nil
+	return importMySQLSingleFromDB(jobCtx, db, cfg.Source.Database, cfg.Source.MySQLQuery, cfg.Mapping, destination, func(ctx context.Context, tx *sql.Tx) error {
+		if e := checkInnoDB(ctx, db, tx, cfg.Source.Database, cfg.Source.Table); e != nil {
+			return e
+		}
+		if e := checkUniqueBigintKey(ctx, tx, cfg.Source.Database, cfg.Source.MySQLQuery); e != nil {
+			return e
+		}
+		return checkExactMeasureType(ctx, tx, cfg.Source.Database, cfg.Source.Table, cfg.Mapping.ValueSource, cfg.Mapping.Precision)
+	})
 }
+
 func ImportMySQLBundleConfig(ctx context.Context, configPath, destination string) (BundleReport, error) {
 	cfg, e := readMySQLBundleConfig(configPath)
 	if e != nil {
@@ -175,27 +191,23 @@ func ImportMySQLBundleConfig(ctx context.Context, configPath, destination string
 	}
 	defer cancel()
 	defer db.Close()
-	// Verify all source tables before starting the one-snapshot import.
-	tx, e := db.BeginTx(jobCtx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
-	if e != nil {
-		return BundleReport{}, e
-	}
-	for _, job := range cfg.Exports {
-		if e = checkInnoDB(jobCtx, db, tx, cfg.Source.Database, job.Table); e != nil {
-			_ = tx.Rollback()
-			return BundleReport{}, e
-		}
-		if e = checkUniqueBigintKey(jobCtx, tx, cfg.Source.Database, job.MySQLQuery); e != nil {
-			_ = tx.Rollback()
-			return BundleReport{}, e
-		}
-	}
-	if e = tx.Rollback(); e != nil {
-		return BundleReport{}, e
-	}
 	jobs := make([]BundleExport, 0, len(cfg.Exports))
 	for _, v := range cfg.Exports {
 		jobs = append(jobs, BundleExport{Name: v.Name, Query: v.MySQLQuery, Mapping: v.Mapping})
 	}
-	return ImportSQLBundle(jobCtx, db, jobs, destination)
+	// Metadata and data reads are now in ONE read-only REPEATABLE READ tx.
+	return importSQLBundleWithPreflight(jobCtx, db, jobs, destination, func(ctx context.Context, tx *sql.Tx) error {
+		for _, job := range cfg.Exports {
+			if e := checkInnoDB(ctx, db, tx, cfg.Source.Database, job.Table); e != nil {
+				return e
+			}
+			if e := checkUniqueBigintKey(ctx, tx, cfg.Source.Database, job.MySQLQuery); e != nil {
+				return e
+			}
+			if e := checkExactMeasureType(ctx, tx, cfg.Source.Database, job.Table, job.Mapping.ValueSource, job.Mapping.Precision); e != nil {
+				return e
+			}
+		}
+		return nil
+	})
 }

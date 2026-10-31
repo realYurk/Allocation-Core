@@ -12,16 +12,17 @@
 <div class="card"><h2>④ 启动所有科目计算</h2><p>引擎按“相同有效规则”分组执行，规则不同则独立运行；每个科目仍有单独守恒检查。</p><button id="run" onclick="run()">一键执行全量分摊</button> <button id="cancel" class="alt" onclick="cancelRun()" disabled>取消本次任务</button><p id="hint"></p></div>
 </section><section>
 <div class="card"><h2>③ 指定每个科目的业务规则</h2><div class="row"><div class="stat" id="count">0</div><small>科目已指定规则</small></div><div class="row" style="margin-top:15px"><input id="search" placeholder="搜索科目..." oninput="renderTable()"><select style="width:200px" id="bulkrule"></select><button class="alt" onclick="bulkAll()">为筛选科目批量指定</button></div><p>下拉修改后点击“保存规则分派”。不同科目可以选择不同模板；更复杂的多阶段规则可复制 <code>templates</code> 中的 JSON 模板修改。权重、Driver 可以在 <code>overrides.csv</code> 逐科目覆盖。</p><div class="tablebox"><table><thead><tr><th>科目</th><th>规则模板</th><th>因子配置</th></tr></thead><tbody id="rows"></tbody></table></div><div id="factorEditor" style="display:none;background:#f5f9ff;border:1px solid #dbe7f7;padding:14px;margin-top:14px;border-radius:10px"><h2 id="factorTitle"></h2><p>编辑本账户各阶段的 Driver 数据集、字段和配比。请保证同阶段分摊比例之和为 1。</p><div id="factorRows"></div><button onclick="saveFactors()">保存该科目因子配置</button> <button class="alt" onclick="document.getElementById('factorEditor').style.display='none'">关闭</button></div><div class="row" style="margin-top:14px"><button onclick="save()">保存规则分派</button><small id="dirty">无未保存更改</small></div></div>
-<div class="card"><h2>⑤ 运行状态 / 结果（VNext4：重启可追溯）</h2>
+<div class="card"><h2>⑤ 运行状态 / 结果与历史</h2>
 <p>Studio 重启后会恢复任务历史。<b>INTERRUPTED</b> 表示运行中断，不能直接发布；需要重新执行以获取新快照。</p>
 <div class="row" style="margin-bottom:10px"><select id="jobHistory" style="flex:1" aria-label="历史任务"></select><button class="alt" onclick="loadJobHistory()">刷新历史</button><button class="alt" onclick="retryFromHistory()">按当前数据重新执行</button></div>
 <div id="message"></div><div id="job">尚未启动任务</div><a id="download" style="display:none" target="_blank" href="#">下载完整 results.csv</a><section style="margin-top:18px;border:1px solid #dbe7f7;border-radius:12px;padding:15px;background:#f6faff">
 <h3 style="margin:0 0 7px;font-size:15px">参考系统逐坐标验收 / Reference reconciliation</h3>
 <p>把参考结果保存为当前项目目录下的 <code>reference.csv</code>（小于 5 MB 可在左侧上传）。该文件只包含业务维度和 <code>amount</code> 或 <code>value</code>；维度名必须与结果一致。程序按完整坐标合并同坐标重复行，独立对比金额和缺失/多余坐标。当前演示数据无参考文件，不会自动判定为一致。</p>
 <div class="row"><label>金额小数位 / Precision<input id="refPrecision" type="number" min="0" max="6" value="2" style="width:85px"></label><label>允许差额 / Tolerance<input id="refTolerance" value="0" style="width:105px"></label><button class="alt" id="reconcileBtn" onclick="reconcileReference()">检查选中任务与参考结果 / Compare</button></div>
+<label style="margin-top:9px"><input type="checkbox" id="rejectDup" style="width:auto"> 严格拒绝重复的完整业务坐标 / Reject duplicate full coordinates</label>
 <pre id="reconcileResult" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:240px;overflow:auto" role="status" aria-live="polite">尚未检查参考结果 / Not compared</pre>
 </section><p>分摊成功后，请查看逐科目 <code>run_summary.json</code> 和各规则组完整血缘证据，再与参考系统逐坐标比对。</p></div>
-<div class="card"><h2>⑥ 整批正式版本库（VNext3）</h2>
+<div class="card"><h2>⑥ 业务版本库</h2>
 <p>1000 个科目的完整结果、有效规则、快照和证据作为一份不可拆分的业务版本归档。先登记，再发布；新旧版切换遵循 CAS 校验。</p>
 <div class="row"><label style="flex:1">业务场景<input id="batchScenario" value="scenario_01" placeholder="例如 scenario_01"></label><label style="flex:1">业务版本<input id="batchVersion" value="revision_01" placeholder="例如 revision_01"></label></div>
 <div class="row" style="margin-top:10px"><button class="alt" onclick="batchStatus()">查看当前生效版本</button><button onclick="batchRegister()">登记最近成功的整批任务</button></div>
@@ -67,11 +68,12 @@ async function reconcileReference(){
  if(!active||!id){box.textContent='请先选择一个成功完成的项目任务。';return}
  btn.disabled=true;box.textContent='正在逐坐标对齐和校验；大文件会在本机建立临时分区...';
  try{
-  const r=(await api('/api/multi/reconcile',{name:active,job:id,precision:Number(document.getElementById('refPrecision').value),tolerance:document.getElementById('refTolerance').value.trim()})).report;
+  const r=(await api('/api/multi/reconcile',{name:active,job:id,precision:Number(document.getElementById('refPrecision').value),tolerance:document.getElementById('refTolerance').value.trim(),reject_duplicates:document.getElementById('rejectDup').checked})).report;
   const lines=[`验收结论：${r.status==='MATCH'?'MATCH / 逐坐标一致':'DIFFERENCES / 发现差异'}`,
    `已比对坐标：一致 ${r.matched} · 金额不符 ${r.different} · 缺少 ${r.missing} · 多余 ${r.extra}`,
    `参考总金额 ${r.reference_total} · 本引擎总金额 ${r.actual_total}（只作辅助诊断）`,
    `参考行数 ${r.reference_rows} · 引擎行数 ${r.actual_rows} · 耗时 ${r.elapsed_ms} ms`,
+   `重复坐标（额外行）: 参考 ${r.reference_duplicate_rows||0} · 引擎 ${r.actual_duplicate_rows||0} · 策略 ${r.duplicate_policy||'AGGREGATE'}`,
    `验收科目：${r.accounts.length}，下面展示差异最大的 10 个坐标：`,
    ...(r.top_differences||[]).slice(0,10).map(d=>`${d.kind}: ${d.coordinate} | 参考 ${d.reference_amount} / 引擎 ${d.actual_amount} / 差额 ${d.difference}`),
    `完整报告保存在任务本地结果目录的 acceptance-* 文件夹中（summary.json / differences.csv）`,

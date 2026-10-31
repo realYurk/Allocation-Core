@@ -5,6 +5,7 @@ package adapter
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -66,17 +67,23 @@ func TestLiveMySQLSnapshot(t *testing.T) {
 	}
 
 	q := MySQLQuery{Table: "clean_connector_test", Columns: []string{"id", "period", "site", "amount"}, KeyColumn: "id", BatchSize: 2}
-	tx, e := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
+	tx, e := reader.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
 	if e != nil {
 		t.Fatal(e)
 	}
-	if e = checkInnoDB(ctx, db, tx, "allocation_ci", q.Table); e != nil {
+	if e = checkInnoDB(ctx, reader, tx, "allocation_ci", q.Table); e != nil {
 		t.Fatal(e)
 	}
 	if e = checkUniqueBigintKey(ctx, tx, "allocation_ci", q); e != nil {
 		t.Fatal(e)
 	}
-	rows, e := q.sqlSource(db, tx).Open(ctx)
+	if e = checkExactMeasureType(ctx, tx, "allocation_ci", q.Table, "amount", 2); e != nil {
+		t.Fatal(e)
+	}
+	if e = checkExactMeasureType(ctx, tx, "allocation_ci", q.Table, "amount", 1); e == nil {
+		t.Fatal("underprecise mapping accepted")
+	}
+	rows, e := q.sqlSource(reader, tx).Open(ctx)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -106,7 +113,7 @@ func TestLiveMySQLSnapshot(t *testing.T) {
 	mapping := Mapping{Dimensions: []string{"period", "site"}, Columns: map[string]string{"period": "period", "site": "site"}, ValueSource: "amount", ValueName: "amount", Precision: 2}
 	// The subsequent independent transaction must see the newer value.
 	dest := filepath.Join(t.TempDir(), "out.csv")
-	report, e := ImportCSV(ctx, q.sqlSource(db, nil), mapping, dest)
+	report, e := ImportCSV(ctx, q.sqlSource(reader, nil), mapping, dest)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -116,8 +123,91 @@ func TestLiveMySQLSnapshot(t *testing.T) {
 	}
 	// Bundle publishes exactly once for all tables.
 	bundle := filepath.Join(t.TempDir(), "bundle")
-	got, e := ImportSQLBundle(ctx, db, []BundleExport{{Name: "amounts.csv", Query: q, Mapping: mapping}, {Name: "drivers.csv", Query: q, Mapping: mapping}}, bundle)
+	got, e := ImportSQLBundle(ctx, reader, []BundleExport{{Name: "amounts.csv", Query: q, Mapping: mapping}, {Name: "drivers.csv", Query: q, Mapping: mapping}}, bundle)
 	if e != nil || got.Status != "PASS" {
 		t.Fatal(e, got)
+	}
+	// Import through the same least-privilege connection and protect from
+	// silently accepting float columns when a driver returns textual values.
+	if _, e = db.ExecContext(ctx, "CREATE TABLE clean_connector_float (id BIGINT NOT NULL PRIMARY KEY, amount DOUBLE NOT NULL) ENGINE=InnoDB"); e != nil {
+		t.Fatal(e)
+	}
+	defer db.ExecContext(context.Background(), "DROP TABLE clean_connector_float")
+	txFloat, e := reader.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = checkExactMeasureType(ctx, txFloat, "allocation_ci", "clean_connector_float", "amount", 2); e == nil {
+		t.Fatal("FLOAT measure allowed")
+	}
+	_ = txFloat.Rollback()
+}
+
+// TestLiveMySQLNativeTLSImport is opt-in because the generic MySQL 8.4 service
+// uses an auto-generated certificate without the expected SAN. Provide a
+// purpose-issued CA and server cert for the ephemeral test server. This test
+// verifies the actual native connector (not only an injected database/sql).
+func TestLiveMySQLNativeTLSImport(t *testing.T) {
+	if os.Getenv("ALLOCATION_MYSQL_TEST_EPHEMERAL") != "1" {
+		t.Skip("isolated test server only")
+	}
+	ca := os.Getenv("ALLOCATION_TEST_MYSQL_TLS_CA_FILE")
+	serverName := os.Getenv("ALLOCATION_TEST_MYSQL_TLS_SERVER_NAME")
+	if ca == "" || serverName == "" {
+		t.Skip("requires SAN-verified ephemeral server certificate")
+	}
+	rootDSN := os.Getenv("ALLOCATION_TEST_MYSQL_DSN")
+	if !strings.Contains(rootDSN, "@tcp(127.0.0.1:") {
+		t.Skip("must be isolated localhost test")
+	}
+	db, e := sql.Open("mysql", rootDSN)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	for _, statement := range []string{
+		"CREATE TABLE clean_connector_tls_v7 (id BIGINT PRIMARY KEY, period VARCHAR(20) NOT NULL, amount DECIMAL(20,2) NOT NULL) ENGINE=InnoDB",
+		"INSERT INTO clean_connector_tls_v7 VALUES (1,'2026-01',12.34),(2,'2026-01',56.78)",
+		"CREATE USER IF NOT EXISTS 'allocation_tls_ci'@'%' IDENTIFIED BY 'isolated-test-password'",
+		"GRANT SELECT ON allocation_ci.clean_connector_tls_v7 TO 'allocation_tls_ci'@'%'",
+	} {
+		if _, e = db.ExecContext(ctx, statement); e != nil {
+			t.Fatal(e)
+		}
+	}
+	defer db.ExecContext(context.Background(), "DROP TABLE clean_connector_tls_v7")
+	t.Setenv("ALLOCATION_CI_TLS_USER", "allocation_tls_ci")
+	t.Setenv("ALLOCATION_CI_TLS_PASSWORD", "isolated-test-password")
+	// No password is serialized. The reader can only SELECT this test table.
+	address := "127.0.0.1:3306"
+	if v := os.Getenv("ALLOCATION_TEST_MYSQL_TLS_ADDRESS"); v != "" {
+		address = v
+	}
+	cfg := MySQLFileConfig{}
+	cfg.Source.Type = "mysql"
+	cfg.Source.MySQLConnection = MySQLConnection{Address: address, Database: "allocation_ci", UserEnv: "ALLOCATION_CI_TLS_USER", PasswordEnv: "ALLOCATION_CI_TLS_PASSWORD", TLSCAFile: ca, TLSServerName: serverName}
+	cfg.Source.MySQLQuery = MySQLQuery{Table: "clean_connector_tls_v7", Columns: []string{"id", "period", "amount"}, KeyColumn: "id", BatchSize: 1}
+	cfg.Mapping = Mapping{Dimensions: []string{"period"}, Columns: map[string]string{"period": "period"}, ValueSource: "amount", ValueName: "amount", Precision: 2}
+	bytes, e := json.Marshal(cfg)
+	if e != nil {
+		t.Fatal(e)
+	}
+	config := filepath.Join(t.TempDir(), "mysql-test.json")
+	if e = os.WriteFile(config, bytes, 0600); e != nil {
+		t.Fatal(e)
+	}
+	dest := filepath.Join(t.TempDir(), "strictly-read-only.csv")
+	rep, e := ImportMySQLConfig(ctx, config, dest)
+	if e != nil || rep.Rows != 2 || rep.SHA256 == "" {
+		t.Fatalf("TLS native connector: %+v err=%v", rep, e)
+	}
+	raw, e := os.ReadFile(dest)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if !strings.Contains(string(raw), "12.34") || !strings.Contains(string(raw), "56.78") {
+		t.Fatalf("wrong DECIMAL output: %s", raw)
 	}
 }

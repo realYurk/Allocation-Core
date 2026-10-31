@@ -33,7 +33,7 @@ Windows binaries are cross-compiled and structurally inspected in Linux; Windows
 - Windows smoke test on target machine and CI runner. / Windows 实机/CI。
 - Multi-million and hundred-million row benchmarks with evidence and disk quotas. / 百万至亿级容量及性能压测。
 - Controlled interruption and recovery of expensive runs, retention/GC and multi-instance safety. / 中断恢复、归档清理、多实例安全。
-- Read-only relational database connector, if needed; currently use external extraction. / 原生数据库连接器待做。
+- Native MySQL connector exists but full verified-TLS and enterprise UAT remain open; Cube vendor connector not implemented. / MySQL 源码已有，真实证书全链路与企业 UAT 仍需验证；Cube 厂商连接器尚未实现。
 
 ## Publishing safety / 公开安全
 
@@ -131,3 +131,51 @@ Golden regression / 黄金结果回归：same input and V4 rule must produce byt
 - **Ephemeral real MySQL 8.4 / 隔离实库**: CI job with `mysql` + `mysql_integration` build tags tests InnoDB key metadata, cross-page consistent snapshot despite concurrent update, and multi-table bundle. CI must report PASS before production pilot. / GitHub CI 需在真实隔离 MySQL 中校验并发更新下的跨页快照。
 - **Actual enterprise UAT / 企业预生产**: Verify SELECT-only credentials, TLS PKI and hostname, schema grants, InnoDB & unique BIGINT primary key, batch sizes, 1M–10M+ rows, loss/reconnection, disk capacity, server load and end-to-end results against independent reference coordinates. / 生产环境权限、证书、负载、回滚及逐坐标财务验收必须单独执行。
 - **Prohibited claims / 禁止误报**: Mock tests do not establish connectivity. A read-only transaction is not proof that the login lacks DML rights. An import PASS is not an allocation or reference reconciliation PASS. / 模拟测试不等于实库连通，只读事务不等于账号最小权限，数据导出 PASS 不等于分摊正确。
+
+## V7 Financial Correctness & Production Hardening / V7 财务正确性与生产加固
+
+**Baseline / 版本基线**: latest audited public V6 source plus the Windows 8.3-path correction and pinned `go.sum`, followed by V7 changes. / 在 GitHub 公共 V6 最新基线上开发，保留短路径修复及官方依赖校验文件。
+
+**Independent correctness / 独立准确性**:
+
+```bash
+go test ./internal/engine -run TestV7 -count=1 -v
+go test ./adapter ./internal/acceptance -run TestV7 -count=1 -v
+go test -race ./internal/engine ./internal/studio ./internal/multi ./adapter ./internal/acceptance
+go vet ./...
+```
+
+- Static amount cases include exact cents, negative totals, signed/zero drivers, ties, `MinInt64` and `MaxInt64`. / 预设金额正确答案，包含极值、尾差等。
+- A *separate* `big.Rat`-based oracle evaluates 5,000 deterministic random cases, order permutations, conservation and repeatability. / 独立有理数验算 5000 组。
+- The two-stage example independently expects 100.00, 300.00, 400.00, 400.00 on four products. Memory(1), memory(4), and disk(4 partitions) results are byte-identical. / 多阶段样例手工验收，并行/磁盘完全一致。
+- `ImportSQLBundle` preflight and data reading must happen in the same read-only REPEATABLE READ transaction. Injected validation failure, network interruption and transaction-release failure must publish **nothing**. / 同事务预检、断线及回滚错误不得发布。
+- The isolated MySQL 8.4 CI test now reads through a SELECT-only account, and rejects non-exact measure columns. The native TLS+SAN test is opt-in when a purpose-issued certificate is supplied; **do not count it as passed without actual execution**. / 隔离 MySQL 最小权限实际读取；TLS 全链路另需证书验证。
+- Duplicate full business coordinates are counted in default reconciliation, and strictly rejected when `--reject-duplicates` is supplied. / 记录重复行，严格模式失败关闭。
+
+**Synthetic 50,000-row disk profile (Linux Go 1.23.2, current environment, CPU profiling ON) / 5 万行合成磁盘执行与剖析**:
+
+| Configuration / 配置 | V6 baseline | V7 | V7 plain evidence |
+|---|---:|---:|---:|
+| Engine elapsed / 引擎耗时 | 1.087 s | 0.946 s | 0.807 s |
+| Sampled Go heap peak / 采样堆峰值 | 11.26 MB | 11.06 MB | 11.03 MB |
+| Allocated Go heap / 累计堆分配 | 252.19 MB | 252.16 MB | 248.27 MB |
+| Persisted files / 最终输出体积 | 301,425 B | 301,425 B | 7,993,229 B |
+| Linux process write_bytes / 进程写入计数 | 20.94 MB | 20.94 MB | 28.63 MB |
+
+All five V6/V7 financial and gzip evidence files match byte-for-byte. / 5 份财务数据及压缩证据逐字节一致。
+
+**Interpretation / 解释**: these are single short runs, NOT stable speedup estimates. The plain-evidence mode produces much larger output but avoided gzip CPU cost on this sample. CPU samples continue to implicate JSON spool decoding and temporary allocations; replacing checkpoint storage is deferred until compatibility and failover can be proven. / 单次短测不能证明整体提速。证据压缩显著减小磁盘体积但消耗 CPU；JSON 解码仍有优化空间，暂不冒险改检查点格式。
+
+**Pending / 待验收**: MySQL official-driver TLS/SAN end-to-end, simultaneous DDL, 10-million-row real reference correctness, actual Windows launch, power-loss/disk-full recovery, and enterprise-specific legal/IP approval. / 实库证书、并发 DDL、千万行参考验收、Windows 实机、断电与磁盘写满及知识产权审批仍未关闭。
+
+**1,000-account V6/V7 gold run / 千科目新旧版本对跑（Linux Go 1.23.2，纯合成）**:
+
+| Metric / 指标 | V6 | V7 |
+|---|---:|---:|
+| Accounts and effective rule groups / 科目与规则组 | 1,000 / 1,000 | 1,000 / 1,000 |
+| Terminal rows / 结果明细 | 4,000 | 4,000 |
+| Input and output total / 前后金额 | 1,000,000.00 / 1,000,000.00 | 1,000,000.00 / 1,000,000.00 |
+| Observed wall time / 单次墙钟耗时 | 4.46 s | 4.62 s |
+| Results and account reconciliation SHA-256 / 结果与逐科目对账哈希 | **Identical / 一致** | **Identical / 一致** |
+
+**Do not claim a performance speedup from V7 / V7 不宣传速度提升**: this release primarily strengthens correctness, fail-closed publication and type validation. / 本轮主要是正确性、异常阻断与数值类型安全的工程加固。

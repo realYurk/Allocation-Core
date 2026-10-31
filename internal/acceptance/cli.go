@@ -18,6 +18,7 @@ func CLI() {
 	out := flags.String("out", "", "new local private report directory")
 	precision := flags.Int("precision", 2, "fixed decimal precision 0..6")
 	tolerance := flags.String("tolerance", "0", "absolute difference tolerance")
+	rejectDuplicates := flags.Bool("reject-duplicates", false, "fail closed if either CSV repeats a full business coordinate")
 	if e := flags.Parse(os.Args[2:]); e != nil {
 		os.Exit(2)
 	}
@@ -25,7 +26,7 @@ func CLI() {
 		fmt.Fprintln(os.Stderr, "usage: AllocationCore reconcile --actual results.csv --reference reference.csv --out report_dir [--precision 2] [--tolerance 0]")
 		os.Exit(2)
 	}
-	r, e := Compare(context.Background(), *actual, *reference, *out, Options{Precision: *precision, Tolerance: *tolerance})
+	r, e := Compare(context.Background(), *actual, *reference, *out, Options{Precision: *precision, Tolerance: *tolerance, RejectDuplicates: *rejectDuplicates})
 	if e != nil {
 		fmt.Fprintln(os.Stderr, "RECONCILIATION BLOCK:", e)
 		os.Exit(1)

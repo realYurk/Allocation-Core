@@ -49,7 +49,7 @@ To see the exact files, run `AllocationCore.exe demo .`, then inspect `testdata/
 
 Use a read-only exporter to produce the same sparse contract. Multi-dimensional members become columns; a database record already supplies those columns. / 多维系统导出维度成员，关系型数据库导出字段，进入相同通用接口。
 
-A native, live MySQL driver is **not yet included**. The engine must not hold production credentials or hard-code database-specific business logic. / 暂未提供实时 MySQL 连接器；正式凭据不得硬编码在公共引擎中。
+A native MySQL connector is implemented behind `-tags mysql`, but the supplied offline EXE intentionally excludes its external driver. Use a network-enabled build and a least-privilege account with verified TLS. A real Cube connector remains provider-supplied. / 原生 MySQL 接口已实现，但离线程序未链接外部驱动；联机编译并用只读账号、证书校验才可直连。实际 Cube 厂商连接器仍需独立实现。
 
 ## 6. Reference comparison / 分摊前后对比
 
@@ -199,3 +199,19 @@ AllocationCore.exe data mysql-bundle --config input/mapping/mysql-bundle.json ou
 **Recovery / 错误恢复:** No retry inside a transaction after page-read errors, because a retry could silently switch snapshots. The failed staging area is deleted. For a full retry, create a **new** uniquely named output directory and rerun from the beginning. `PASS` here means source export validation, NOT financial allocation correctness. Then use the existing `inspect → validate → run → reconcile` chain. / 分页中断不在事务内部悄悄重试，失败不发布；重新执行必须重新获取完整快照，并重新进行规则与逐坐标验收。
 
 **Limits / 边界:** The adapter's cross-table snapshot applies only to InnoDB tables on **one MySQL connection**. MySQL views, other engines, replica failover during import, moving reference datasets and cross-database snapshots from different servers are not certified. No real customer's MySQL was connected during development. The GitHub integration job uses an isolated temporary MySQL instance; a separate UAT on the target MySQL version, privileges, TLS PKI, volume and network is still mandatory. / 并非已经在贵公司数据库完成生产联调；真实网络、证书、权限、版本和千万行场景仍需专门 UAT。
+
+## V7: strict financial import and acceptance / V7 严格财务接入与验收
+
+1. **Map exact SQL measure types / 映射精确 SQL 数值类型**: the MySQL connector accepts DECIMAL/numeric/integer, rejects FLOAT/DOUBLE/text, rejects values requiring more precision than configured. / 禁止将 FLOAT 隐式转成金额。
+2. **Stable keyset / 稳定分页**: the key column must have a single-column UNIQUE or PRIMARY index, `NOT NULL`, signed BIGINT. `OFFSET` is not used. / 要求唯一、非空、有符号 BIGINT。
+3. **Snapshot and publication / 快照与发布**: all source validation and page reads use one read-only transaction; single/bundle files are staged locally. The manifest reports SHA-256 and file size. / 元数据及分页在同一事务，结束后整体发布。
+4. **Reconcile against an independent source / 独立对账**: specify all business dimensions, amount precision and zero tolerance for strict comparison. For legally unique full coordinates, enable duplicate rejection. / 严格场景建议勾选“拒绝重复业务坐标”。
+
+```bash
+AllocationCore.exe data mysql-bundle --config input/mapping/mysql-bundle.json output/private-snapshot-001
+AllocationCore.exe reconcile --actual output/run/results.csv --reference input/reference/reference.csv --out output/check-v7 --precision 2 --tolerance 0 --reject-duplicates
+```
+
+**Warning / 提醒**: direct MySQL access requires the separate MySQL-enabled build (`go mod download && go build -tags mysql ...`) and an explicitly provisioned TLS CA/server certificate. Never enter database passwords into these public JSON examples or upload a real config. / MySQL 实库需要额外启用官方驱动和 TLS；密钥及业务文件只留本地。
+
+**Duplicate policy / 重复数据**: default compares the exact SUM for each full coordinate and writes `actual_duplicate_rows` / `reference_duplicate_rows` to `summary.json`, while `--reject-duplicates` blocks the entire acceptance report when a repeated coordinate exists. / 默认按坐标精确汇总但披露重复数量，严格模式会直接拒绝并不发布报告。

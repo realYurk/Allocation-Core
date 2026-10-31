@@ -295,10 +295,7 @@ func (a *Application) readCase(id string) (GenericRule, string, string, error) {
 	if e != nil {
 		return rule, "", "", e
 	}
-	// Canonicalize the case directory so that symlink/8.3-short-path expansion
-	// is consistent with EvalSymlinks below. On Windows, filepath.Abs may return
-	// a short (8.3) path while EvalSymlinks returns the long form; comparing the
-	// two with filepath.Rel would then falsely report a path escape.
+	// Normalize both ends of containment checks (Windows 8.3 and junctions).
 	if resolvedDir, e := filepath.EvalSymlinks(dir); e == nil {
 		dir = resolvedDir
 	}

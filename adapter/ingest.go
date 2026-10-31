@@ -5,7 +5,9 @@ package adapter
 import (
 	"allocationcore/internal/engine"
 	"context"
+	"crypto/sha256"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,6 +41,8 @@ type Report struct {
 	Fields     []string `json:"fields"`
 	Output     string   `json:"output"`
 	SourceKind string   `json:"source_kind,omitempty"`
+	SHA256     string   `json:"output_sha256"`
+	Bytes      int64    `json:"output_bytes"`
 	Note       string   `json:"note"`
 }
 
@@ -104,7 +108,8 @@ func ImportCSV(ctx context.Context, src Source, m Mapping, dst string) (report R
 	}
 	tmpPath := tmp.Name()
 	defer os.Remove(tmpPath)
-	w := csv.NewWriter(tmp)
+	checksum := sha256.New()
+	w := csv.NewWriter(io.MultiWriter(tmp, checksum))
 	fields := append(append([]string(nil), m.Dimensions...), m.ValueName)
 	if e = w.Write(fields); e != nil {
 		tmp.Close()
@@ -158,6 +163,11 @@ func ImportCSV(ctx context.Context, src Source, m Mapping, dst string) (report R
 		tmp.Close()
 		return report, e
 	}
+	info, e := tmp.Stat()
+	if e != nil {
+		tmp.Close()
+		return report, e
+	}
 	if e := tmp.Close(); e != nil {
 		return report, e
 	}
@@ -167,7 +177,7 @@ func ImportCSV(ctx context.Context, src Source, m Mapping, dst string) (report R
 	if e := os.Rename(tmpPath, dst); e != nil {
 		return report, e
 	}
-	return Report{Status: "PASS", Rows: count, Fields: fields, Output: dst, Note: "Validated source data only; financial allocation and reconciliation not performed"}, nil
+	return Report{Status: "PASS", Rows: count, Fields: fields, Output: dst, SHA256: hex.EncodeToString(checksum.Sum(nil)), Bytes: info.Size(), Note: "Validated source data only; financial allocation and reconciliation not performed"}, nil
 }
 
 // CSVConfig is a portable, no-credentials config. Other implementations may

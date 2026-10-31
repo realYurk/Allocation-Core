@@ -19,10 +19,11 @@ func (x *MultiApp) reconcile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Name      string `json:"name"`
-		Job       string `json:"job"`
-		Precision int    `json:"precision"`
-		Tolerance string `json:"tolerance"`
+		Name             string `json:"name"`
+		Job              string `json:"job"`
+		Precision        int    `json:"precision"`
+		Tolerance        string `json:"tolerance"`
+		RejectDuplicates bool   `json:"reject_duplicates"`
 	}
 	if e := multiRequest(w, r, &req, 2048); e != nil {
 		fail(w, 400, e)
@@ -74,7 +75,7 @@ func (x *MultiApp) reconcile(w http.ResponseWriter, r *http.Request) {
 	}
 	// A fresh report directory prevents overwriting historical evidence.
 	out := filepath.Join(x.parent.data, "multi-jobs", req.Job, "acceptance-"+time.Now().UTC().Format("20060102T150405.000000000"))
-	report, e := acceptance.Compare(r.Context(), actual, ref, out, acceptance.Options{Precision: req.Precision, Tolerance: req.Tolerance})
+	report, e := acceptance.Compare(r.Context(), actual, ref, out, acceptance.Options{Precision: req.Precision, Tolerance: req.Tolerance, RejectDuplicates: req.RejectDuplicates})
 	if e != nil {
 		fail(w, 422, e)
 		return

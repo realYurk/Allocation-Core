@@ -27,8 +27,9 @@ import (
 const shards = 32
 
 type Options struct {
-	Precision int
-	Tolerance string
+	Precision        int
+	Tolerance        string
+	RejectDuplicates bool // optional: prevent accidental duplicate source import
 }
 type Account struct {
 	Account   string `json:"account"`
@@ -46,24 +47,27 @@ type Difference struct {
 	Delta      string `json:"difference"`
 }
 type Report struct {
-	Status          string       `json:"status"`
-	Scope           string       `json:"scope"`
-	Dimensions      []string     `json:"dimensions"`
-	Precision       int          `json:"precision"`
-	Tolerance       string       `json:"tolerance"`
-	ActualRows      int64        `json:"actual_rows"`
-	ReferenceRows   int64        `json:"reference_rows"`
-	Matched         int64        `json:"matched"`
-	Different       int64        `json:"different"`
-	Missing         int64        `json:"missing"`
-	Extra           int64        `json:"extra"`
-	ActualTotal     string       `json:"actual_total"`
-	ReferenceTotal  string       `json:"reference_total"`
-	ActualSHA256    string       `json:"actual_sha256"`
-	ReferenceSHA256 string       `json:"reference_sha256"`
-	ElapsedMS       int64        `json:"elapsed_ms"`
-	Accounts        []Account    `json:"accounts"`
-	TopDifferences  []Difference `json:"top_differences"`
+	Status                 string       `json:"status"`
+	Scope                  string       `json:"scope"`
+	Dimensions             []string     `json:"dimensions"`
+	Precision              int          `json:"precision"`
+	Tolerance              string       `json:"tolerance"`
+	ActualRows             int64        `json:"actual_rows"`
+	ReferenceRows          int64        `json:"reference_rows"`
+	ActualDuplicateRows    int64        `json:"actual_duplicate_rows"`
+	ReferenceDuplicateRows int64        `json:"reference_duplicate_rows"`
+	DuplicatePolicy        string       `json:"duplicate_policy"`
+	Matched                int64        `json:"matched"`
+	Different              int64        `json:"different"`
+	Missing                int64        `json:"missing"`
+	Extra                  int64        `json:"extra"`
+	ActualTotal            string       `json:"actual_total"`
+	ReferenceTotal         string       `json:"reference_total"`
+	ActualSHA256           string       `json:"actual_sha256"`
+	ReferenceSHA256        string       `json:"reference_sha256"`
+	ElapsedMS              int64        `json:"elapsed_ms"`
+	Accounts               []Account    `json:"accounts"`
+	TopDifferences         []Difference `json:"top_differences"`
 }
 
 type fileInfo struct {
@@ -240,6 +244,10 @@ func pushTop(top []Difference, d Difference, precision int) []Difference {
 func Compare(ctx context.Context, actual, reference, out string, opt Options) (Report, error) {
 	start := time.Now()
 	r := Report{Status: "BLOCK", Scope: "EXACT_COORDINATES_ONLY; total conservation is not sufficient; missing and extra coordinates always fail", Precision: opt.Precision, Tolerance: opt.Tolerance, Accounts: []Account{}, TopDifferences: []Difference{}}
+	r.DuplicatePolicy = "AGGREGATE_WITH_COUNTS"
+	if opt.RejectDuplicates {
+		r.DuplicatePolicy = "REJECT"
+	}
 	if opt.Precision < 0 || opt.Precision > 6 {
 		return r, fmt.Errorf("precision must be 0..6")
 	}
@@ -344,8 +352,9 @@ func Compare(ctx context.Context, actual, reference, out string, opt Options) (R
 		}
 		rd := csv.NewReader(bufio.NewReader(f))
 		type sums struct {
-			actual, reference *big.Int
-			a, r              bool
+			actual, reference         *big.Int
+			a, r                      bool
+			actualRows, referenceRows int64
 		}
 		data := map[string]*sums{}
 		for {
@@ -377,9 +386,11 @@ func Compare(ctx context.Context, actual, reference, out string, opt Options) (R
 			if fields[0] == "A" {
 				s.actual.Add(s.actual, v)
 				s.a = true
+				s.actualRows++
 			} else if fields[0] == "R" {
 				s.reference.Add(s.reference, v)
 				s.r = true
+				s.referenceRows++
 			} else {
 				f.Close()
 				resultFile.Close()
@@ -394,6 +405,16 @@ func Compare(ctx context.Context, actual, reference, out string, opt Options) (R
 		sort.Strings(keys)
 		for _, k := range keys {
 			s := data[k]
+			if s.actualRows > 1 {
+				r.ActualDuplicateRows += s.actualRows - 1
+			}
+			if s.referenceRows > 1 {
+				r.ReferenceDuplicateRows += s.referenceRows - 1
+			}
+			if opt.RejectDuplicates && (s.actualRows > 1 || s.referenceRows > 1) {
+				resultFile.Close()
+				return r, fmt.Errorf("duplicate full coordinate rejected: actual=%d reference=%d key=%s", s.actualRows, s.referenceRows, k)
+			}
 			var coords []string
 			if er = json.Unmarshal([]byte(k), &coords); er != nil {
 				resultFile.Close()
