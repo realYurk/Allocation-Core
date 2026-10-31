@@ -68,6 +68,7 @@ func (a *Application) registerMulti(m *http.ServeMux) *MultiApp {
 	m.HandleFunc("/api/multi/projects", x.projects)
 	m.HandleFunc("/api/multi/create", x.create)
 	m.HandleFunc("/api/multi/onboard", x.createFromAmountsCSV)
+	m.HandleFunc("/api/multi/import-template", x.importTemplateFromDesigner)
 	m.HandleFunc("/api/multi/project", x.project)
 	m.HandleFunc("/api/multi/preflight", x.preflight)
 	m.HandleFunc("/api/multi/reconcile", x.reconcile)
