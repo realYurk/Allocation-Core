@@ -1,5 +1,11 @@
 # Allocation Core — Business Onboarding Update / 通用分摊引擎
 
+## 财务运行前体检 / Finance readiness checklist
+
+在 `/multi` 第 ④ 步点击“检查全部科目和因子”，工作台会显示可搜索的科目清单、原始金额记录数、Driver 字段正/零/负权重统计、中文问题和具体排查建议。可导出全部科目的输入诊断 CSV，页面只展示前 300 行以避免大项目浏览器卡顿。**检查只读取本地数据，不执行金额分摊、不改写任何来源或已发布结果。**
+
+Important boundary / 验证边界：**INPUT_OK/PASS 仅代表文件结构与输入格式检查通过，不代表 Driver 对期间/工厂/车型的目标匹配成功，也不代表财务计算或独立参考结果 MATCH。** 文件某个字段全为零或包含负值属于 `CHECK` 风险，不能误称已经证明某科目的分摊失败；必须运行实际 Core 后按完整坐标核对。关闭或切换项目时，旧诊断会失效。新增能力不引入用户资料上云、第二份引擎或新的 EXE。
+
 ## Finance-friendly percentage factors / 财务人员百分比因子配置
 
 In /multi → 科目规则 → 独立因子配置, enter 75% / 25% instead of fractional JSON values. Shares are checked exactly to 0.0001% precision and must sum to 100% for each active stage.
