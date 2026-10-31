@@ -21,6 +21,17 @@ This repository contains **no company data or proprietary allocation rules**. In
 
 **Boundaries:** This onboarding is for CSV input, not Excel `.xlsx`, automatic business-rule inference, a live MySQL connection, or a guarantee of correct financial allocations. Import PASS only verifies input format; business validation still requires real Drivers, eligibility checks, and independent reference reconciliation. For data larger than 256 MiB, use the local project folder. / 注意：此向导不自动识别企业分摊政策，不支持直接上传 XLSX，也不等于业务结果正确；超大文件可放入本地项目目录。
 
+## Business onboarding: reusable mapping profiles / 跨场景字段映射配置复用
+
+The unified /multi workspace can now save and reuse **amount** and **Driver** CSV column mappings across projects with matching dimensions, precision and required weight fields. Saved profiles contain only explicit source column names and the canonical schema: **no business values, source CSV data, credentials or project paths**. Profiles live under the private local data directory `mapping-profiles/`, outside Git and outside published results.
+
+- Select a compatible profile to restore field mappings before importing a new file; the real CSV header and every row are still checked.
+- Explicitly export a small JSON profile to move it to another machine; importing a profile never imports financial data.
+- Existing names cannot be overwritten. Broken, ambiguous or incompatible mappings fail closed.
+- Always run Inspect, actual Core allocation and independent coordinate-level reconciliation. A mapping profile is not a claim of financial correctness.
+
+金额与 Driver 的字段映射可跨项目/版本复用，同名拒绝覆盖；导出 JSON 只包含字段关系，可能含企业字段名，分享前请检查。正式分摊仍须完成数据体检、运行和独立对账。
+
 ## Unified visual business-rule workflow / 可视化规则直接进入多科目分摊
 
 No new editor, executable, or documentation tree is needed. / 不新增设计器、不新增 EXE、不扩张文档体系。
