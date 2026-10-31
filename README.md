@@ -1,4 +1,4 @@
-# Allocation Core Clean V10 / 通用分摊引擎
+# Allocation Core — Business Onboarding Update / 通用分摊引擎
 
 **One Go module · One Windows executable · One workspace.**
 **一个 Go 模块、一个 Windows 程序、一个业务工作台。**
@@ -6,6 +6,20 @@
 This repository contains **no company data or proprietary allocation rules**. Inputs, outputs, mappings and runtime records stay outside version control. / 本仓库不包含企业真实数据和私有规则；输入、输出、映射与运行状态默认不纳入 Git。
 
 > **MySQL 注意 / IMPORTANT**：本 ZIP 内附的离线 Windows EXE 保留全部已有功能，但**不包含官方 MySQL 驱动**。需要使用在线构建的 MySQL-enabled EXE（GitHub Actions）或 `go mod download && go build -tags mysql` 才能执行 `data mysql` / `mysql-bundle`。源码已实现，模拟事务测试通过；**目标企业 MySQL 实库联调仍待执行**。
+
+## Business onboarding: a visible product improvement / 新版：从金额 CSV 自动创建业务项目
+
+**This iteration intentionally stops chasing microbenchmarks.** It makes the existing multi-account engine easier for non-developers to use without modifying its financial formulas. / **这一轮停止追逐局部微基准**，优先完成业务人员能实际使用的数据接入流程。
+
+1. Run `AllocationCore.exe` and open **Workbench → 规则与执行 / Run**. / 双击程序，打开工作台的“规则与执行”。
+2. Create a synthetic template project once, or select a previously configured project as the template source. / 先建立样例模板项目，或选择已经配置过规则的项目。
+3. In **从自己的金额 CSV 创建项目 / Import wizard**, type a **new** project name and select the initial rule. The page shows the exact required CSV columns and offers a downloadable header. / 在“从自己的金额 CSV 创建项目”中输入**新项目名称**，选择初始规则，可直接下载必需 CSV 表头。
+4. Upload an amount CSV (**up to 256 MiB**, streamed, unlike the separate legacy 5 MiB JSON uploader). The engine verifies dimensions and fixed-point decimals, identifies distinct `account` values, and generates `assignments.csv` for every account. All records are saved in a NEW project; existing projects and published results are never replaced. / 上传金额 CSV，程序流式验证维度与金额、自动识别科目、为每个科目生成规则分派；仅创建新项目，不覆盖原项目或已发布结果。
+5. Review and adjust individual account rules, **replace the synthetic/copied Driver datasets with real data**, then run **检查全部科目和因子 / Inspect → 一键执行 → 参考结果逐坐标对账**. / 导入完成后，再逐科目配置规则、替换真实分摊因子，执行体检、分摊与逐坐标验收。
+
+**Required columns** depend on the chosen rule template, e.g. `period,department,sku,account,currency,amount`. Optional extra columns such as `row_id` are preserved. The CSV header may have an UTF-8 BOM; column order does not matter. / 必须字段由选择的规则决定，允许 UTF-8 BOM、附加列与不同列顺序。
+
+**Boundaries:** This onboarding is for CSV input, not Excel `.xlsx`, automatic business-rule inference, a live MySQL connection, or a guarantee of correct financial allocations. Import PASS only verifies input format; business validation still requires real Drivers, eligibility checks, and independent reference reconciliation. For data larger than 256 MiB, use the local project folder. / 注意：此向导不自动识别企业分摊政策，不支持直接上传 XLSX，也不等于业务结果正确；超大文件可放入本地项目目录。
 
 ## Clean V10: Skewed coordinate coalescing & verified CI readiness / V10 偏斜坐标合并及 CI 就绪校验
 

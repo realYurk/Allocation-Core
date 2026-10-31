@@ -1,3 +1,11 @@
+## Business onboarding acceptance / 业务接入验收（本轮新增）
+
+`go test ./internal/studio -run Onboarding -count=1 -v` checks: normal CSV import into a new isolated project; automatic two-account assignment; exact input total; original CSV byte identity and SHA-256; preflight PASS; original project unchanged; missing fields, bad decimals, empty coordinates and truncated CSV rejected without publishing; duplicate project names rejected; and a **105,000-row CSV over the legacy 5 MiB browser upload limit** imported successfully. / 新增测试覆盖自动识别科目、精确金额、原始字节不变、旧项目不被覆盖、错误输入整体拒绝，以及超过旧 5MB 限制的流式上传。
+
+A real localhost HTTP smoke test imported a synthetic 2-account CSV into a new project. `POST /api/multi/preflight` returned `PASS`, and `POST /api/multi/run` returned a completed `PASS` job with **2 accounts, 1 rule group, 4 output rows, 2000.00 → 2000.00**. These results use **synthetic Driver data** and do **not** establish independent business correctness. / 已在本地真实 HTTP 服务上完成导入、体检与分摊全链路联调；Driver 仍为合成样例，不能作为企业业务对账结论。
+
+This is a **usability-focused release**, not a claim of higher engine throughput. No financial formulas, precision, job evidence, or checkpoint formats were changed. / 本轮以业务易用性为目标，未宣称核心计算性能提升，也没有更改财务公式、审计与检查点格式。
+
 # Testing, Release and Security / 验收、发布与安全
 
 ## Clean checkout / 干净检出

@@ -4,7 +4,19 @@
 <header><nav><a href="/designer">← 返回规则设计器</a><a href="/">结果检查台</a><a href="/workspace#compare" target="_top">Cube Explorer · 分摊前后对比 / Comparison</a></nav><h1>多科目分摊 · 规则编排中心</h1><p>每个科目独立选择规则，多套分摊引擎编排并行，逐科目金额守恒，所有科目 PASS 才正式发布。</p></header>
 <main><div class="grid"><section>
 <div class="card"><h2>① 创建或打开分摊项目</h2><label>项目</label><select id="project"></select><div class="row" style="margin-top:10px"><input id="newname" placeholder="例如 demo_case_01"><button onclick="createProject()">建立样例副本</button></div><p>新项目自带 4 个科目和 3 类规则，可立即试运行。正式数据请在完成验收后再接入。</p></div>
-<div class="card"><h2>② 导入你的业务数据</h2><p>数据为 CSV，带 <code>account</code>（科目）、<code>amount</code>（金额）以及规则声明的维度。可直接选择小文件上传：</p><label>目标文件</label><select id="file"><option>amounts.csv</option><option>assignments.csv</option><option>overrides.csv</option><option>reference.csv</option></select><label>本机 CSV 文件</label><input type="file" id="csvfile" accept=".csv,text/csv"><button style="margin-top:12px" onclick="upload()">导入并替换</button><p>前端上传上限 5 MB。大量真实数据直接复制到下方项目数据目录，避免浏览器加载几 GB CSV。</p><code id="path">请选择项目</code></div>
+<div class="card" style="border-color:#b9d4f7;background:linear-gradient(140deg,#fff,#f6faff)">
+<h2>② 从自己的金额 CSV 创建项目 / Import wizard</h2>
+<p>无需手写 <code>assignments.csv</code>。选择已存在的规则项目作为模板，上传一份包含 <code>account</code>、<code>amount</code> 和业务维度的 CSV，就会自动识别所有科目并为它们分配初始规则。<b>始终创建新项目，绝不覆盖原项目。</b></p>
+<label>新项目名称 / New project</label><input id="onboardName" placeholder="例如 finance_import_01 / financial_project_01">
+<label>所有科目初始规则 / Default template</label><select id="onboardTemplate" onchange="showOnboardColumns()"></select>
+<div class="row" style="margin:8px 0"><button class="alt" onclick="downloadOnboardTemplate()" type="button">下载 CSV 表头模板 / Download header</button></div>
+<div id="onboardColumns" style="white-space:pre-wrap;word-break:break-word;background:#edf5ff;padding:10px;border-radius:9px;font-size:12px;color:#294d79" role="note">先选择一个模板项目，查看必需字段。</div>
+<label>金额文件 / Amount CSV（最大 256 MiB）</label><input id="onboardFile" type="file" accept=".csv,text/csv">
+<button id="onboardBtn" onclick="onboardFromCSV()" style="margin-top:12px">导入、识别科目并创建新项目</button>
+<pre id="onboardStatus" role="status" aria-live="polite" style="white-space:pre-wrap;word-break:break-word;font-size:12px;background:#f3f8ff;padding:10px;border-radius:8px">尚未导入</pre>
+<p><b>重要：</b>规则模板及 Driver 文件从选中的来源项目复制，可能仍是合成演示数据；导入后请配置真实 Driver、检查规则，再点击运行前体检。此导入只检查金额和维度格式，<b>不代表业务分摊结果正确</b>。大于 256 MiB 的数据请通过本地项目文件夹接入。</p>
+</div>
+<div class="card"><h2>其他文件更新 / Advanced CSV replacement</h2><p>少量更新某个已有项目的控制文件时使用；首次导入金额和自动识别科目请用上方向导。数据为 CSV，带 <code>account</code>（科目）、<code>amount</code>（金额）以及规则声明的维度。可直接选择小文件上传：</p><label>目标文件</label><select id="file"><option>amounts.csv</option><option>assignments.csv</option><option>overrides.csv</option><option>reference.csv</option></select><label>本机 CSV 文件</label><input type="file" id="csvfile" accept=".csv,text/csv"><button style="margin-top:12px" onclick="upload()">导入并替换</button><p>这里仍只支持 5 MB 的小文件覆盖；大金额文件请使用上方“创建新项目”流式向导。大规模 Driver 和参考结果可复制到下方项目目录，再执行体检。覆盖前请自行备份项目。</p><code id="path">请选择项目</code></div>
 <div class="card"><h2>Driver 索引缓存 / Driver cache</h2><p>项目级缓存复用可降低相同数据和相同生效规则的重复索引成本。首次运行仍需计算源 SHA-256；数据或规则变化会生成新索引。/ Reuses a validated index across runs. Source digest is still checked.</p><label><input id="persistCache" type="checkbox" style="width:auto"> 跨批次复用索引 / Reuse across runs</label> <label style="display:block;margin-top:12px"><input id="reuseWorkers" type="checkbox" style="width:auto"> 复用计算进程 / Reuse calculation workers</label> <button class="alt" onclick="saveCache()">保存缓存设置 / Save</button><small>仅在本机受信任的项目目录使用 / Trusted local projects only.</small></div><div class="card"><h2>④ 运行前数据体检 / Preflight</h2>
 <p>一次检查所有科目规则映射和实际金额 CSV，每个不同 Driver 文件仅扫描一次。不生成分摊结果，不能代替金额守恒及参考系统对账。</p>
 <button class="alt" id="inspectBtn" onclick="inspectProject()">检查全部科目和因子 / Inspect</button>
@@ -37,7 +49,41 @@ function message(t,ok=false){const v=document.getElementById('message');v.style.
 async function list(){try{const v=await api('/api/multi/projects');const el=document.getElementById('project');let old=el.value;el.innerHTML=v.projects.map(x=>`<option>${x}</option>`).join('');if(v.projects.includes(old))el.value=old;if(el.value)await openProject()}catch(e){message(e.message)}}
 async function saveCache(){if(!data||!active){message('请先选择项目 / Choose project');return}try{await api('/api/multi/cache',{name:active,scope:document.getElementById('persistCache').checked?'project':'run',base_sha256:data.project_sha256,reuse_workers:document.getElementById('reuseWorkers').checked});message('缓存设置已保存 / Cache policy saved',true);await openProject()}catch(e){message(e.message)}}
 async function createProject(){try{let name=document.getElementById('newname').value.trim();if(!name)name='demo_'+Date.now();await api('/api/multi/create',{name});await list();document.getElementById('project').value=name;await openProject();message('项目建立成功，现在可以选择各科目规则',true)}catch(e){message(e.message)}}
-async function openProject(){active=document.getElementById('project').value;document.getElementById('inspectResult').textContent='数据或规则可能已变化，请重新体检。';try{data=await api('/api/multi/project?name='+encodeURIComponent(active));chosen=Object.fromEntries(data.assignments.map(x=>[x.account,x.template]));document.getElementById('persistCache').checked=data.driver_cache_scope==='project';document.getElementById('reuseWorkers').checked=!!data.reuse_workers;document.getElementById('count').textContent=data.count;document.getElementById('path').textContent=data.manualDataDir;document.getElementById('bulkrule').innerHTML=data.templates.map(x=>`<option value="${x}">${x}</option>`).join('');renderTable()}catch(e){message(e.message)}}
+async function openProject(){active=document.getElementById('project').value;document.getElementById('inspectResult').textContent='数据或规则可能已变化，请重新体检。';try{data=await api('/api/multi/project?name='+encodeURIComponent(active));chosen=Object.fromEntries(data.assignments.map(x=>[x.account,x.template]));document.getElementById('persistCache').checked=data.driver_cache_scope==='project';document.getElementById('reuseWorkers').checked=!!data.reuse_workers;document.getElementById('count').textContent=data.count;document.getElementById('path').textContent=data.manualDataDir;document.getElementById('bulkrule').innerHTML=data.templates.map(x=>`<option value="${x}">${x}</option>`).join('');const templateSelect=document.getElementById('onboardTemplate');const previous=templateSelect.value;templateSelect.replaceChildren();for(const template of data.templates.filter(x=>data.template_columns?.[x])){const option=document.createElement('option');option.value=template;option.textContent=template;templateSelect.appendChild(option)}if([...templateSelect.options].some(x=>x.value===previous))templateSelect.value=previous;showOnboardColumns();renderTable()}catch(e){message(e.message)}}
+function showOnboardColumns(){
+ const box=document.getElementById('onboardColumns'),tpl=document.getElementById('onboardTemplate').value;
+ const fields=data?.template_columns?.[tpl]||[];
+ const precision=data?.template_precisions?.[tpl];
+ box.textContent=fields.length?`必需 CSV 字段（列顺序不限）：\n${fields.join(', ')}\n金额最多 ${precision} 位小数。可另加 row_id 等辅助列。`:'当前规则模板不可用于自动导入，请选择其他模板。';
+}
+function downloadOnboardTemplate(){
+ const tpl=document.getElementById('onboardTemplate').value, fields=data?.template_columns?.[tpl]||[];
+ if(!fields.length)return message('请先选择有效的规则模板');
+ const b=new Blob(['\ufeff'+[...fields,'row_id'].join(',')+'\r\n'],{type:'text/csv;charset=utf-8'});
+ const a=document.createElement('a'),url=URL.createObjectURL(b);
+ a.href=url;a.download='amounts_header_template.csv';document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
+async function onboardFromCSV(){
+ const btn=document.getElementById('onboardBtn'),status=document.getElementById('onboardStatus');
+ try{
+  if(!active||!data)throw new Error('请先创建或打开一个已有规则模板的项目');
+  const name=document.getElementById('onboardName').value.trim();
+  const template=document.getElementById('onboardTemplate').value;
+  const file=document.getElementById('onboardFile').files[0];
+  if(!/^[A-Za-z0-9_-]{1,48}$/.test(name)||name===active)throw new Error('请输入不同于原项目的新名称，只能用英文字母、数字、下划线或连字符');
+  if(!data.template_columns?.[template])throw new Error('请选择有效的规则模板');
+  if(!file||!file.name.toLowerCase().endsWith('.csv'))throw new Error('请选择 CSV 文件');
+  if(file.size>256*1024*1024)throw new Error('单次上传上限 256 MiB；更大的文件请放入本地项目文件夹');
+  const body=new FormData();body.append('name',name);body.append('source',active);body.append('template',template);body.append('csv',file,file.name);
+  btn.disabled=true;status.textContent='正在流式读取金额、检查维度和精度、识别不同科目...';
+  const response=await fetch('/api/multi/onboard',{method:'POST',body});
+  let result;try{result=await response.json()}catch{throw new Error('服务未返回合法 JSON')}
+  if(!response.ok)throw new Error(result.error||`HTTP ${response.status}`);
+  status.textContent=`创建成功：${result.project}\n不同科目 ${result.import.accounts} · 金额记录 ${result.import.amount_rows}\n输入金额 ${result.import.input_amount} · 文件 ${ (result.import.amounts_bytes/1048576).toFixed(2)} MiB\n\n下一步：选择各科目的规则 → 替换真实 Driver → 数据体检 → 执行 → 与参考结果逐坐标对账。`;
+  await list();document.getElementById('project').value=name;await openProject();
+  message('已自动建立科目规则分派；请检查真实 Driver 和业务规则再执行',true);
+ }catch(e){status.textContent='导入未完成，原项目未修改：'+e.message;message(e.message)}finally{btn.disabled=false}
+}
 function filtered(){if(!data)return [];let q=document.getElementById('search').value.toLowerCase();return data.assignments.filter(x=>x.account.toLowerCase().includes(q))}
 function renderTable(){const v=document.getElementById('rows');if(!data)return;let matches=filtered();v.replaceChildren();for(const item of matches.slice(0,250)){let tr=document.createElement('tr'),td=document.createElement('td'),pick=document.createElement('td'),select=document.createElement('select');td.textContent=item.account;for(const tpl of data.templates){const option=document.createElement('option');option.value=tpl;option.textContent=tpl;select.appendChild(option)}select.value=chosen[item.account];select.onchange=()=>{chosen[item.account]=select.value;document.getElementById('dirty').textContent='未保存更改'};pick.appendChild(select);let action=document.createElement('td'),btn=document.createElement('button');btn.className='alt';btn.textContent='配置因子';btn.onclick=()=>editFactors(item.account);action.appendChild(btn);tr.append(td,pick,action);v.appendChild(tr)}document.getElementById('hint').textContent=`显示 ${Math.min(matches.length,250)} / ${matches.length} 科目；当前批量操作覆盖全部筛选结果。`;}
 function bulkAll(){const rule=document.getElementById('bulkrule').value;for(const x of filtered())chosen[x.account]=rule;renderTable();document.getElementById('dirty').textContent='未保存更改'}

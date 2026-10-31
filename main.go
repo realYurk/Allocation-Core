@@ -116,7 +116,7 @@ func main() {
 		}
 		fmt.Printf("Synthetic example files generated: %d (local only)\n", n)
 	case "version", "--version":
-		fmt.Println("Allocation Core Clean / v10")
+		fmt.Println("Allocation Core Clean / Business Onboarding")
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command %q. Use 'serve', 'core', 'multi', 'rule', 'explorer', 'data', 'profile', 'review' or double-click the application.\n", os.Args[1])
 		os.Exit(2)

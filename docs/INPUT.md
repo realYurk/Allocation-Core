@@ -1,3 +1,21 @@
+## Browser wizard: onboard a new multi-account project / 网页创建多科目业务项目
+
+- Select a current project as the **template source** (only `project.json`, `templates/` and `drivers/` are copied; input amounts, assignments, overrides, history and caches are **not** copied). / 以现有项目为规则模板，只复制配置、规则与驱动数据，不复制旧金额、科目分派、覆盖配置或计算历史。
+- Select an initial template; the browser shows its mandatory dimensions and precision. Download the **CSV header template**, fill your data, and upload with a new project name. / 选择规则，下载字段模板，填好金额 CSV，用新项目名导入。
+- The server streams the CSV (limit **256 MiB**) and checks headers, nonempty dimensions, valid decimal amounts (precision from the rule), and distinct accounts. It writes `amounts.csv`, generates sorted `assignments.csv` and clears old override rows. / 自动检查字段、金额精度与业务维度，识别所有不同科目，生成 `assignments.csv`，不会继承演示的旧覆盖设置。
+- A failed import produces **no new project**; a duplicate project name is refused. The original template project is unchanged. / 失败时不发布新项目，同名项目拒绝覆盖，原项目保持不变。
+- The copied drivers may still be *synthetic examples*. Replace them with real data **before** treating any result as a business acceptance test. You can assign different rules to each account in the existing rules table after import. / 复制的 Driver 可能还是演示数据，必须替换并按科目调整规则，才能做业务验收。
+
+Example CSV:
+
+```csv
+period,department,sku,account,currency,amount,row_id
+2026-01,SharedPool,Unassigned,Account-A,CUR,1200.00,INPUT-001
+2026-01,SharedPool,Unassigned,Account-B,CUR,800.00,INPUT-002
+```
+
+The example uses **synthetic** names. Dimensions are governed by the selected template, not hard-coded in the importer. / 示例仅为合成数据，真实字段以所选规则模板为准。
+
 # Generic Input Contract / 通用数据接入规范
 
 ## 1. Five concepts / 五个核心概念

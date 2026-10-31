@@ -67,6 +67,7 @@ func (a *Application) registerMulti(m *http.ServeMux) *MultiApp {
 	})
 	m.HandleFunc("/api/multi/projects", x.projects)
 	m.HandleFunc("/api/multi/create", x.create)
+	m.HandleFunc("/api/multi/onboard", x.createFromAmountsCSV)
 	m.HandleFunc("/api/multi/project", x.project)
 	m.HandleFunc("/api/multi/preflight", x.preflight)
 	m.HandleFunc("/api/multi/reconcile", x.reconcile)
@@ -269,6 +270,15 @@ func (x *MultiApp) project(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sort.Strings(options)
+	templateColumns := map[string][]string{}
+	templatePrecisions := map[string]int{}
+	for _, name := range options {
+		precision, dimensions, err := readOnboardingTemplate(dir, name)
+		if err == nil {
+			templateColumns[name] = append(append([]string{}, dimensions...), "amount")
+			templatePrecisions[name] = precision
+		}
+	}
 	files := []map[string]any{}
 	for _, n := range []string{"amounts.csv", "assignments.csv", "overrides.csv"} {
 		if st, e := os.Stat(filepath.Join(dir, n)); e == nil {
@@ -292,7 +302,7 @@ func (x *MultiApp) project(w http.ResponseWriter, r *http.Request) {
 		sum := sha256.Sum256(cfgBytes)
 		cfgHash = hex.EncodeToString(sum[:])
 	}
-	jsonOut(w, 200, map[string]any{"reuse_workers": reuseWorkers, "driver_cache_scope": cfgScope, "project_sha256": cfgHash, "name": r.URL.Query().Get("name"), "assignments": assigned, "templates": options, "files": files, "count": len(assigned), "manualDataDir": dir})
+	jsonOut(w, 200, map[string]any{"reuse_workers": reuseWorkers, "driver_cache_scope": cfgScope, "project_sha256": cfgHash, "name": r.URL.Query().Get("name"), "assignments": assigned, "templates": options, "template_columns": templateColumns, "template_precisions": templatePrecisions, "files": files, "count": len(assigned), "manualDataDir": dir})
 }
 
 // cacheScope changes only generic execution settings, never financial rules.
@@ -543,7 +553,7 @@ func (x *MultiApp) run(w http.ResponseWriter, r *http.Request) {
 	st, e := os.Stat(x.program)
 	if e != nil || st.IsDir() {
 		x.mu.Unlock()
-		fail(w, 500, errors.New("缺少 allocation_multi 可执行程序，请使用完整发行包"))
+		fail(w, 500, errors.New("统一程序文件不可用，请从完整发行包启动 AllocationCore.exe"))
 		return
 	}
 	// Explicit bounded queue (including running jobs); never spawn an unbounded

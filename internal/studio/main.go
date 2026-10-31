@@ -167,7 +167,7 @@ func Run() {
 				http.Error(w, "cross-origin request rejected", 403)
 				return
 			}
-			if r.Header.Get("Content-Type") != "application/json" && !explorerUpload(r) {
+			if r.Header.Get("Content-Type") != "application/json" && !explorerUpload(r) && !(r.URL.Path == "/api/multi/onboard" && strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data;")) {
 				http.Error(w, "application/json required", 415)
 				return
 			}
