@@ -66,8 +66,9 @@ func InspectProject(ctx context.Context, projectDir string) (report PreflightRep
 		Scope: "Configuration, account coverage and input numeric checks ONLY; no driver eligibility, allocation accuracy or reference-system equivalence verified."}
 	var working *project
     var inputCounts map[string]int64
+    amountsComplete := false
     defer func() {
-        addBusinessDiagnostics(&report,working,inputCounts)
+        addBusinessDiagnostics(&report,working,inputCounts,amountsComplete)
         report.ElapsedMS = time.Since(begin).Milliseconds()
     }()
 	dir, err := filepath.Abs(projectDir)
@@ -128,8 +129,9 @@ func InspectProject(ctx context.Context, projectDir string) (report PreflightRep
 		}
 		row, e := rd.Read()
 		if e == io.EOF {
-			break
-		}
+            amountsComplete = true
+            break
+        }
 		if e != nil {
 			report.block("amount row %d: %v", report.TotalRows+2, e)
 			break
