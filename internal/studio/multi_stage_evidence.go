@@ -32,6 +32,9 @@ type stageEvidenceLine struct {
 	OutputRows      int64               `json:"output_rows"`
 	AllocatedAmount string              `json:"allocated_amount"`
 	SamplePools     []map[string]string `json:"sample_pools"`
+	// Bounded original ledger samples for explaining weights without reopening
+	// mutable Driver files. These are samples, never a complete target list.
+	SampleLedger []map[string]string `json:"sample_ledger,omitempty"`
 	// A zero count means "no ledger records for this filter", NOT an error.
 }
 
@@ -353,6 +356,13 @@ func summarizeStageLedger(r *http.Request, dir string, spec engine.Spec, account
 			return report, errors.New("ledger row count overflow")
 		}
 		line.OutputRows++
+		if len(line.SampleLedger) < 3 {
+			sample := map[string]string{}
+			for _, k := range []string{"pool", "target", "pool_amount", "share_amount", "driver_weight", "driver_denominator", "allocated_amount"} {
+				sample[k] = row[cols[k]]
+			}
+			line.SampleLedger = append(line.SampleLedger, sample)
+		}
 		report.TotalRows++
 		totals[ix].Add(totals[ix], big.NewInt(amount))
 		if len(line.SamplePools) < 3 {

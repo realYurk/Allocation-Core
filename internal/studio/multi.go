@@ -52,6 +52,7 @@ func (a *Application) registerMulti(m *http.ServeMux) *MultiApp {
 		panic(fmt.Errorf("multi job recovery: %w", err))
 	}
 	x.jobs = recovered
+	x.registerLab(m)
 	m.HandleFunc("/multi", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			w.WriteHeader(405)

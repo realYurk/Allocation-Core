@@ -105,6 +105,9 @@ func TestStageEvidenceActualPublishedLedgerAndHistoricImmutability(t *testing.T)
 		if l.OutputRows != 2 || len(l.SamplePools) != 1 {
 			t.Fatalf("bad per-pool evidence: %+v", l)
 		}
+		if len(l.SampleLedger) != 2 || l.SampleLedger[0]["driver_weight"] == "" || l.SampleLedger[0]["target"] == "" {
+			t.Fatal("missing original weight evidence", l)
+		}
 	}
 	if amounts["material"] != "450.00" || amounts["revenue"] != "150.00" {
 		t.Fatalf("ledger totals wrong: %v", amounts)
