@@ -44,7 +44,11 @@ func businessAdvice(problem string) (string, string) {
         return "已配置规则的科目没有金额明细", "检查金额来源的科目编码、期间筛选或删去不需要的科目分派。"
     case strings.Contains(p,"missing csv column"),strings.Contains(p,"missing dimension"),strings.Contains(p,"column count"),strings.Contains(p,"missing weight"):
         return "数据字段不符合当前规则", "打开金额或 Driver 字段映射，检查原始列名与必需字段，然后重新导入。"
-    case strings.Contains(p,"invalid decimal"),strings.Contains(p,"decimal scale"),strings.Contains(p,"invalid number"),strings.Contains(p,"overflow"):
+    case strings.Contains(p,"decimal scale"):
+        return "金额或权重的小数位超出允许精度", "金额使用所选规则精度（0至6位），Driver 权重最多6位。先确认原系统导出精度及经明确批准的转换政策，保留原件和差异证据；不能直接截断或默认四舍五入。"
+    case strings.Contains(p,"overflow"):
+        return "金额或权重超出整数容量", "核对原系统单位、精度及异常值。当前字段或累计值超出 Core 的固定精度整数容量，不能通过截断数值或修改原始金额绕过；需要重新审查数据契约。"
+    case strings.Contains(p,"invalid decimal"),strings.Contains(p,"invalid number"):
         return "金额或因子数字格式不合法", "查看报错行及字段；使用明确的小数格式，检查精度和极端数值。"
     case strings.Contains(p,"configuration changed"):
         return "检查期间配置被其他操作修改", "刷新项目重新体检，不要使用过期的规则或数据快照。"

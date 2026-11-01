@@ -88,7 +88,11 @@ func TestVisualDraftIsSchemaOnlyAndCanBeEdited(t *testing.T) {
 		t.Fatalf("draft metadata: %+v %t %v", meta, ok, err)
 	}
 	_, gotDir, kind, err := x.parent.readCase("user_financial_draft")
-	if err != nil || kind != "custom" || gotDir != directory {
+	// readCase resolves Windows 8.3 aliases and junctions. Verify the same
+	// filesystem object rather than assuming TEMP already uses its long name.
+	gotInfo, gotErr := os.Stat(gotDir)
+	wantInfo, wantErr := os.Stat(directory)
+	if err != nil || kind != "custom" || gotErr != nil || wantErr != nil || !os.SameFile(gotInfo, wantInfo) {
 		t.Fatalf("designer cannot open schema-only draft %q %q: %v", gotDir, kind, err)
 	}
 	for _, name := range []string{"amounts.csv", "units.csv"} {

@@ -34,9 +34,16 @@ type visualDraftMetadata struct {
 }
 
 type driverNeed struct {
-	Alias        string   `json:"alias"`
-	CurrentFile  string   `json:"current_file"`
-	WeightFields []string `json:"weight_fields"`
+	Alias               string      `json:"alias"`
+	CurrentFile         string      `json:"current_file"`
+	WeightFields        []string    `json:"weight_fields"`
+	RequiredDimensions  []string    `json:"required_dimensions"`
+	SourceDimensions    []string    `json:"source_dimensions"`
+	Uses                []driverUse `json:"uses"`
+	Status              string      `json:"status,omitempty"`
+	MissingColumns      []string    `json:"missing_columns"`
+	BroadcastDimensions []string    `json:"broadcast_dimensions"`
+	NextStep            string      `json:"next_step,omitempty"`
 }
 
 type driverRequirements struct {
@@ -108,7 +115,9 @@ func ruleDriverRequirements(spec engine.Spec) []driverNeed {
 			fields = append(fields, field)
 		}
 		sort.Strings(fields)
-		out = append(out, driverNeed{Alias: alias, CurrentFile: spec.Datasets.Drivers[alias], WeightFields: fields})
+		need := driverNeed{Alias: alias, CurrentFile: spec.Datasets.Drivers[alias], WeightFields: fields}
+		populateDriverContract(&need, spec)
+		out = append(out, need)
 	}
 	return out
 }
@@ -348,6 +357,7 @@ func (x *MultiApp) driverNeeds(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(405)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	dir, err := x.projectDir(r.URL.Query().Get("name"))
 	if err != nil {
 		fail(w, 404, err)
@@ -360,7 +370,16 @@ func (x *MultiApp) driverNeeds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sum := sha256.Sum256(raw)
-	jsonOut(w, 200, driverRequirements{Project: r.URL.Query().Get("name"), Template: template, SHA256: hex.EncodeToString(sum[:]), Dimensions: spec.Dimensions, Drivers: ruleDriverRequirements(spec)})
+	version := hex.EncodeToString(sum[:])
+	needs := ruleDriverRequirements(spec)
+	if r.URL.Query().Get("download") == "template" {
+		writeDriverHeaderTemplate(w, r, version, needs)
+		return
+	}
+	for i := range needs {
+		inspectDriverHeader(dir, &needs[i])
+	}
+	jsonOut(w, 200, driverRequirements{Project: r.URL.Query().Get("name"), Template: template, SHA256: version, Dimensions: spec.Dimensions, Drivers: needs})
 }
 
 func (x *MultiApp) importMappedDriver(w http.ResponseWriter, r *http.Request) {
@@ -461,6 +480,12 @@ func (x *MultiApp) importMappedDriver(w http.ResponseWriter, r *http.Request) {
 	for _, field := range selected.WeightFields {
 		if positions[field] == "" {
 			fail(w, 422, fmt.Errorf("missing weight-field mapping %s", field))
+			return
+		}
+	}
+	for _, dim := range selected.RequiredDimensions {
+		if positions[dim] == "" {
+			fail(w, 422, fmt.Errorf("缺少必需 Driver 维度映射 %s：目标成员或 Driver 过滤条件需要该字段，请补齐映射后重新导入", dim))
 			return
 		}
 	}

@@ -1,3 +1,11 @@
+## Driver 接入清单 / Driver onboarding checklist
+
+在 `/multi` 第④步选择规则与 Driver，可直接查看实际引用步骤、必需目标/过滤维度、权重字段、缺失文件/列和下一步，并下载**只有表头、不含任何权重**的 CSV 模板。导入器现在会在写文件前拒绝缺少必需目标或 Driver 过滤维度的映射，避免导入成功后才在计算时发现缺列。权重仍按 Core 六位定点契约校验，不能隐式舍入。
+
+来源匹配维度（如期间、科目）未提供时，Core 可能跨这些来源池复用权重，页面会要求核对其粒度。表头完整只表示结构准备；真实权重、来源池资格、实际计算和独立逐坐标对账仍须验证，不会自动生成企业 Driver 或补造业务定义。
+
+**English:** Multi step ④ now explains active Driver uses, required target/filter columns, missing files/headers and source-scope broadcast risks. Download a version-checked, header-only CSV template. Missing required dimension mappings are rejected before publishing an import. Schema readiness does not certify financial correctness; the existing engine and reconciliation remain authoritative.
+
 ## 发布准入与金额概览 / Release readiness and exact totals
 
 Studio 案例概览已改为**完整流式扫描**金额来源，使用与 Core 一致的固定精度整数解析，拒绝格式错误、精度超限及溢出；不会再将前 500 行的金额当作全量金额。案例详情仍然只展示**每份来源文件最多 500 行的预览**，需要完整数据应使用 Multi 工作台、真实计算及独立逐坐标对账。

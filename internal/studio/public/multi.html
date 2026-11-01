@@ -66,7 +66,8 @@
 <div class="card" id="flow-driver" style="border-color:#bad2f5"><h2>④ 导入自己的 Driver · 字段映射</h2>
 <p>支持 CSV 原始列名与标准维度/权重列名不同的情况。不改原文件，不猜测金额，不修改规则。导入后可在上面的“设计器规则导入”中选用新 Driver。</p>
 <label>依据哪个现有规则识别 Driver 字段</label><select id="driverSourceTemplate" onchange="loadDriverRequirements()"></select>
-<label>Driver 数据集</label><select id="driverAlias" onchange="renderDriverColumnMappings();refreshMappingProfileSelects()"></select>
+<label>Driver 数据集</label><select id="driverAlias" onchange="renderDriverColumnMappings();renderDriverContract();refreshMappingProfileSelects()"></select>
+<div id="driverRequirementCards" role="status" aria-live="polite" style="padding:12px;background:#f3f8ff;border-radius:8px;margin:10px 0">选择规则后，这里显示缺少什么数据、适用阶段和空表头模板。</div>
 <label>新建目标文件（永不覆盖已有文件）</label><input id="driverNewFile" placeholder="例如 sales_2026.csv" value="business_driver.csv">
 <label>原始 Driver CSV · 最大 256 MiB</label><input id="driverSourceFile" type="file" accept=".csv,text/csv" onchange="inspectDriverFile()">
 <div id="driverMappings" style="margin-top:10px;border:1px solid #e5edf8;border-radius:9px;padding:10px"></div>
@@ -166,6 +167,7 @@
 <pre id="batchOutput" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:230px;overflow:auto;background:#f2f7ff;padding:11px;border-radius:9px;font-size:12px">尚未查询正式版本</pre>
 <p>发布不会覆盖或删除旧版本；恢复会新建一个独立目录。历史清理预览不删除任何数据，实际清理需通过命令行明确加 <code>--apply</code>。</p></div>
 </section></div></main>
+<script src="/assets/driver_contract.js"></script>
 <script>
 let data=null,chosen={},active='',busyJob='',interval=null,factorContext=null,accountReport=[],designerPlan=null,designerContext='',designerPreviewRequest=0,ruleExplanation=null,ruleExplainRequest=0;
 let driverNeedsState=null,driverHeader=[],driverNeedsRequest=0;
@@ -212,6 +214,7 @@ async function loadDriverRequirements(){
  const id=++driverNeedsRequest,box=document.getElementById('driverImportStatus');
  const project=active,template=document.getElementById('driverSourceTemplate').value;
  driverNeedsState=null;driverHeader=[];
+ renderDriverContract();
  document.getElementById('driverSourceFile').value='';
  refreshMappingProfileSelects();
  document.getElementById('driverMappings').replaceChildren();
@@ -228,6 +231,7 @@ async function loadDriverRequirements(){
   }
   if([...picker.options].some(x=>x.value===old))picker.value=old;
   box.textContent='当前规则维度：'+req.dimensions.join('、')+'。选择 Driver 和源 CSV，系统会显示字段映射。';
+  renderDriverContract();
   refreshMappingProfileSelects();
  }catch(e){if(id===driverNeedsRequest)box.textContent='无法读取 Driver 契约：'+e.message}
 }
@@ -264,9 +268,10 @@ function renderDriverColumnMappings(){
  document.getElementById('driverUpload').disabled=!need||!driverHeader.length;
  if(!need||!driverHeader.length)return;
  const weight=new Set(need.weight_fields);
+ const mandatory=new Set(need.required_dimensions||[]);
  const fields=[...new Set([...req.dimensions,...need.weight_fields])];
  for(const key of fields){
-  const label=document.createElement('label');label.textContent=(weight.has(key)?'必填权重：':'可选维度：')+key;
+  const label=document.createElement('label');label.textContent=(weight.has(key)?'必填权重：':mandatory.has(key)?'必填目标/过滤维度：':'来源匹配维度（缺省可能跨来源复用）：')+key;
   const select=document.createElement('select');select.dataset.canonical=key;
   const empty=document.createElement('option');empty.value='';empty.textContent='— 不映射 —';select.appendChild(empty);
   for(const name of driverHeader){const op=document.createElement('option');op.value=name;op.textContent=name;select.appendChild(op)}
@@ -289,6 +294,7 @@ async function uploadMappedDriver(){
   }
   if(!req.dimensions.some(k=>mapping[k]))throw Error('请至少映射一个业务维度');
   for(const key of need.weight_fields)if(!mapping[key])throw Error('缺少权重字段映射：'+key);
+  for(const key of need.required_dimensions||[])if(!mapping[key])throw Error('缺少必需目标/过滤维度：'+key+'。补齐映射后再导入。');
   if(new Set(Object.values(mapping)).size!==Object.values(mapping).length)throw Error('不能把同一个源字段映射到多个目标字段');
   const body=new FormData();
   for(const [key,value] of [['name',active],['template',req.template],['alias',need.alias],['file',dest],['base_sha256',req.sha256],['mapping',JSON.stringify(mapping)]])body.append(key,value);
