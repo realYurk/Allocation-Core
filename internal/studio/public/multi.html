@@ -147,7 +147,7 @@
 <div class="row" style="margin:9px 0"><button id="referenceUploadBtn" class="alt" onclick="uploadBusinessReference()">上传并验证参考文件</button><small>替换已有文件时需确认其当前 SHA-256，冲突即拒绝覆盖。</small></div>
 <div id="referenceStatus" class="muted" style="white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f6fc;padding:11px;border-radius:9px" role="status" aria-live="polite">请选择项目以检查参考结果状态。</div>
 <div class="row"><label>金额小数位 / Precision<input id="refPrecision" type="number" min="0" max="6" value="2" style="width:85px"></label><label>允许差额 / Tolerance<input id="refTolerance" value="0" style="width:105px"></label><button class="alt" id="reconcileBtn" onclick="reconcileReference()">检查选中任务与参考结果 / Compare</button></div>
-<label style="margin-top:9px"><input type="checkbox" id="rejectDup" style="width:auto"> 严格拒绝重复的完整业务坐标 / Reject duplicate full coordinates</label>
+<label style="margin-top:9px"><input type="checkbox" id="rejectDup" style="width:auto"> 严格拒绝两侧重复业务坐标</label><label style="margin-top:9px"><input type="checkbox" id="rejectRefDup" style="width:auto"> 只拒绝参考文件的重复坐标（适合实际结果包含合法多因子明细）</label><p class="muted">未勾选时两侧重复坐标均汇总，可能掩盖重复导入；请按业务数据契约选择。</p>
 <pre id="reconcileResult" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:240px;overflow:auto" role="status" aria-live="polite">尚未检查参考结果 / Not compared</pre>
 <div class="row" style="margin-top:12px"><label style="flex:1">历史对账报告 / Saved acceptance<select id="acceptanceHistory" onchange="openAcceptanceReport()"></select></label><button class="alt" onclick="loadAcceptanceHistory()">刷新验收历史</button></div>
 <div id="acceptanceDashboard" style="display:none;background:#fff;border:1px solid #e2eaf6;border-radius:11px;padding:14px;margin-top:10px">
@@ -971,7 +971,7 @@ async function reconcileReference(){
  if(!project||!id){box.textContent='请先选择一个成功完成的项目任务。';return}
  btn.disabled=true;box.textContent='正在逐坐标对齐两份独立数据快照，并核对各科目...';
  try{
-  const response=await api('/api/multi/reconcile',{name:project,job:id,precision:Number(document.getElementById('refPrecision').value),tolerance:document.getElementById('refTolerance').value.trim(),reject_duplicates:document.getElementById('rejectDup').checked});
+  const response=await api('/api/multi/reconcile',{name:project,job:id,precision:Number(document.getElementById('refPrecision').value),tolerance:document.getElementById('refTolerance').value.trim(),reject_duplicates:document.getElementById('rejectDup').checked,reject_reference_duplicates:document.getElementById('rejectRefDup').checked});
   if(project!==active)return;
   const r=response.report;
   const lines=['验收结论：'+r.status,'一致 '+r.matched+' · 金额不符 '+r.different+' · 引擎缺少 '+r.missing+' · 引擎多余 '+r.extra,

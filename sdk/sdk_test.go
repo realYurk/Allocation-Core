@@ -113,3 +113,29 @@ func TestSDKComparisonCancellation(t *testing.T) {
 		t.Fatal("canceled report published")
 	}
 }
+
+func TestSDKReferenceDuplicatesPolicy(t *testing.T) {
+	d := t.TempDir()
+	a := filepath.Join(d, "actual.csv")
+	r := filepath.Join(d, "reference.csv")
+	if e := os.WriteFile(a, []byte("account,sku,amount\nE1,A,6.00\nE1,A,4.00\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(r, []byte("account,sku,amount\nE1,A,10.00\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	result, e := Compare(context.Background(), a, r, filepath.Join(d, "valid"), ReconciliationOptions{Precision: 2, RejectReferenceDuplicates: true})
+	if e != nil || result.Status != "MATCH" || result.ActualDuplicateRows != 1 {
+		t.Fatalf("%+v %v", result, e)
+	}
+	if e = os.WriteFile(r, []byte("account,sku,amount\nE1,A,5.00\nE1,A,5.00\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	_, e = Compare(context.Background(), a, r, filepath.Join(d, "invalid"), ReconciliationOptions{Precision: 2, RejectReferenceDuplicates: true})
+	if e == nil {
+		t.Fatal("duplicate reference accepted")
+	}
+	if _, e = os.Stat(filepath.Join(d, "invalid")); !os.IsNotExist(e) {
+		t.Fatal("invalid report published")
+	}
+}

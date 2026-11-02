@@ -27,9 +27,11 @@ import (
 const shards = 32
 
 type Options struct {
-	Precision        int
-	Tolerance        string
-	RejectDuplicates bool // optional: prevent accidental duplicate source import
+	Precision                 int
+	Tolerance                 string
+	RejectDuplicates          bool // optional: prevent accidental duplicate source import
+	RejectActualDuplicates    bool // reject duplicate full coordinates on actual side
+	RejectReferenceDuplicates bool // reject duplicate full coordinates on reference side
 }
 type Account struct {
 	Account   string `json:"account"`
@@ -247,6 +249,12 @@ func Compare(ctx context.Context, actual, reference, out string, opt Options) (R
 	r.DuplicatePolicy = "AGGREGATE_WITH_COUNTS"
 	if opt.RejectDuplicates {
 		r.DuplicatePolicy = "REJECT"
+	} else if opt.RejectActualDuplicates && opt.RejectReferenceDuplicates {
+		r.DuplicatePolicy = "REJECT"
+	} else if opt.RejectActualDuplicates {
+		r.DuplicatePolicy = "REJECT_ACTUAL"
+	} else if opt.RejectReferenceDuplicates {
+		r.DuplicatePolicy = "REJECT_REFERENCE"
 	}
 	if opt.Precision < 0 || opt.Precision > 6 {
 		return r, fmt.Errorf("precision must be 0..6")
@@ -411,7 +419,7 @@ func Compare(ctx context.Context, actual, reference, out string, opt Options) (R
 			if s.referenceRows > 1 {
 				r.ReferenceDuplicateRows += s.referenceRows - 1
 			}
-			if opt.RejectDuplicates && (s.actualRows > 1 || s.referenceRows > 1) {
+			if (opt.RejectDuplicates || opt.RejectActualDuplicates) && s.actualRows > 1 || (opt.RejectDuplicates || opt.RejectReferenceDuplicates) && s.referenceRows > 1 {
 				resultFile.Close()
 				return r, fmt.Errorf("duplicate full coordinate rejected: actual=%d reference=%d key=%s", s.actualRows, s.referenceRows, k)
 			}

@@ -535,6 +535,22 @@ func candidates(ref driverRef, st Stage, dims []string, pool map[string]string) 
 	return out, values, keys, nil
 }
 func routeRows(rows []Row, edges []route, inbox map[string][]Row) error {
+	// A sole full-share edge cannot change any amount. Transfer the original
+	// slice when the destination is empty and all rows are nonzero, preserving
+	// order and lineage while avoiding a second million-row backing array.
+	if len(rows) > 0 && len(edges) == 1 && edges[0].Share == unit && len(inbox[edges[0].To]) == 0 {
+		hasZero := false
+		for _, row := range rows {
+			if row.Amount == 0 {
+				hasZero = true
+				break
+			}
+		}
+		if !hasZero {
+			inbox[edges[0].To] = rows
+			return nil
+		}
+	}
 	shares := make([]int64, len(edges))
 	names := make([]string, len(edges))
 	for i, e := range edges {
