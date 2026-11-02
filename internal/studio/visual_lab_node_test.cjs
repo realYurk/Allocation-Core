@@ -70,4 +70,5 @@ test('exports retain decimals, quote coordinates and neutralize spreadsheet form
 test('offline assets, narrow layout rules, reduced motion and original entry points exist',()=>{
  assert(!/https?:\/\//.test(html));const css=fs.readFileSync(path.join(__dirname,'public/lab.css'),'utf8');assert(css.includes('prefers-reduced-motion:reduce'));assert(css.includes('max-width:760px'));assert(css.includes('overflow:auto'));
  for(const page of ['index.html','multi.html','designer.html'])assert(fs.readFileSync(path.join(__dirname,'public',page),'utf8').includes('href="/lab"'));
+ assert(html.includes('href="#history"'));assert(!html.includes('id="history" class="card" hidden'));
 });
