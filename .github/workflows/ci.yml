@@ -78,7 +78,7 @@ jobs:
       - name: Archive one-folder product
         shell: pwsh
         run: |
-          $include = @('AllocationCore.exe','启动可视化实验室.cmd','go.mod','go.sum','main.go','README.md','.gitignore','adapter','core','internal','examples','testdata','docs','input')
+          $include = @('AllocationCore.exe','启动可视化实验室.cmd','go.mod','go.sum','main.go','README.md','.gitignore','adapter','core','sdk','internal','examples','testdata','docs','input')
           New-Item -ItemType Directory -Force dist\Allocation-Core-Clean | Out-Null
           foreach ($item in $include) { Copy-Item -Recurse -Force $item dist\Allocation-Core-Clean\ }
           Get-ChildItem dist\Allocation-Core-Clean -Recurse -File | Where-Object { $_.Extension -in @('.csv','.xlsx','.xls','.db','.sqlite') } | Remove-Item -Force

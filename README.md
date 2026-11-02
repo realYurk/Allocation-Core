@@ -1,6 +1,6 @@
 ## Allocation Visual Lab / 交互式分摊可视化
 
-不需要界面的 Go 项目可以直接使用公开 `allocationcore/core` 源码接口调用同一 Core，详见 [组件接入说明](docs/组件接入说明.md)。Windows EXE 是可选交付形式，不替代源码组件。
+不需要界面的 Go 项目可使用 `allocationcore/sdk` 完成输入检查、分摊和独立对账，或使用原有 `allocationcore/core` 接口，详见 [组件接入说明](docs/组件接入说明.md)。Windows EXE 是可选交付形式，不替代源码组件。
 
 通过现有 Studio 启动流程打开 `/lab`，体验由原 Core 计算的合成实验、阶段依赖播放、分摊前后对比，以及历史任务、Ledger 和独立对账证据。真实结果只读已保存的 Core 输出；浏览器不分摊金额。使用说明、Windows 命令、修改文件清单、验证结论与限制见 [Visual Lab 文档](docs/VISUAL_LAB.md)。浏览器视觉与真实业务生产验收仍未完成，不能以合成演示代替生产验收。
 
