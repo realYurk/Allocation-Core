@@ -78,8 +78,12 @@ func inspectDriverHeader(dir string, need *driverNeed) {
 	need.NextStep = "从原系统导出真实权重，按必需字段映射后导入；可先下载空表头模板。"
 	folder := filepath.Join(dir, "drivers")
 	info, e := os.Lstat(folder)
+	if os.IsNotExist(e) {
+		return
+	}
 	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		need.Status = "INVALID_FILE"
+		need.NextStep = "Driver 目录无法安全读取，请检查目录权限及文件类型；不要替换为猜测的权重。"
 		return
 	}
 	file := filepath.Join(folder, need.CurrentFile)

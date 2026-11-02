@@ -21,6 +21,7 @@ function renderFailureDiagnosis(job){
   for(const k of Object.keys(d.pool).sort())lines.push('  '+k+' = '+(d.pool[k]==='__POOL__'?'汇总池（非业务成员）':d.pool[k]));
  }else{lines.push('定位范围：规则组（引擎没有报告可确认的完整分摊池坐标）');}
  put('pre',lines.join('\n'),'diagnosis-context');
+ if(d.original_error){put('h4','本次运行的原始错误');put('pre',d.original_error,'diagnosis-context')}
  put('h4','建议检查');
  const steps=document.createElement('ol');
  for(const step of d.next_steps||[]){const li=document.createElement('li');li.textContent=step;steps.appendChild(li)}

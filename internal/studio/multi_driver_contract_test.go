@@ -57,6 +57,14 @@ func TestDriverContractDistinguishesMissingDataAndSchemaReadiness(t *testing.T) 
 	}
 }
 
+func TestDriverContractMissingFolderNeedsRealExport(t *testing.T) {
+	need := driverNeed{CurrentFile: "weights.csv", Uses: []driverUse{{Stage: "S"}}}
+	inspectDriverHeader(t.TempDir(), &need)
+	if need.Status != "MISSING_FILE" || !strings.Contains(need.NextStep, "原系统") {
+		t.Fatalf("incorrect missing folder guidance: %+v", need)
+	}
+}
+
 func TestDriverHeaderDownloadIsEmptyVersionedAndReadOnly(t *testing.T) {
 	x, project, _, _ := designerBridgeFixture(t)
 	req := driverRequirementsForTest(t, x)
