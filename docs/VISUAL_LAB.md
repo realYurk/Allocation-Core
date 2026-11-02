@@ -4,6 +4,8 @@ Visual Lab 是 Studio 内的独立页面 `/lab`。修改集中在独立的 HTML�
 
 ## Windows 启动
 
+新电脑：把整个离线 ZIP 复制过去并解压，双击 `启动可视化实验室.cmd`。程序会自动打开浏览器；保持弹出的窗口运行，关闭窗口即可停止。无需安装 Python、Go 或 Node。默认使用当前 Windows 用户的本地 Studio 数据目录；只体验示例时选择「合成实验」。如需其他电脑的历史任务，需要自行安全迁移其 Studio 数据目录，本工具不会自动同步或上传。
+
 已有本分支编译的 `AllocationCore.exe` 时，不需要 Python、Node 或 Go：
 
 ```powershell

@@ -101,6 +101,7 @@ func Run() {
 	dataFlag := flag.String("data-dir", "", "persistent user data directory")
 	listen := flag.String("listen", "127.0.0.1:8866", "local-only HTTP listener")
 	noBrowser := flag.Bool("no-browser", false, "do not launch default browser")
+	labStart := flag.Bool("lab", false, "open Visual Lab on startup")
 	flag.Parse()
 	host, _, err := net.SplitHostPort(*listen)
 	if err != nil || (host != "127.0.0.1" && host != "localhost" && host != "::1") {
@@ -224,7 +225,11 @@ func Run() {
 					io.Copy(io.Discard, io.LimitReader(resp.Body, 1024))
 					resp.Body.Close()
 					if resp.StatusCode == 200 {
-						openBrowser(actual + "/workspace")
+						page := "/workspace"
+						if *labStart {
+							page = "/lab"
+						}
+						openBrowser(actual + page)
 						return
 					}
 				}

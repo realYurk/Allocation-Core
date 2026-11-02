@@ -109,7 +109,7 @@ func main() {
 	case "serve":
 		os.Args = append([]string{os.Args[0]}, os.Args[2:]...)
 		studio.Run()
-	case "-root", "-data-dir", "-listen", "-no-browser":
+	case "-root", "-data-dir", "-listen", "-no-browser", "-lab":
 		studio.Run()
 	case "demo":
 		root, err := os.Getwd()
