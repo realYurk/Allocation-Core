@@ -2,11 +2,72 @@ package acceptance
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestPartitionCoordinateLimitBlocksWithoutPublishing(t *testing.T) {
+	d := t.TempDir()
+	var csv strings.Builder
+	csv.WriteString("account,sku,amount\n")
+	// 33 distinct coordinates guarantee a collision among the 32 partitions.
+	for i := 0; i < 33; i++ {
+		fmt.Fprintf(&csv, "A,SKU-%02d,1.00\n", i)
+	}
+	input := write(t, d, "synthetic.csv", csv.String())
+	out := filepath.Join(d, "limited")
+	r, err := Compare(context.Background(), input, input, out, Options{Precision: 2, MaxPartitionCoordinates: 1})
+	if err == nil || !strings.Contains(err.Error(), "exceeds max partition coordinates") || r.Status != "BLOCK" {
+		t.Fatalf("coordinate limit did not block: %+v %v", r, err)
+	}
+	if _, err = os.Stat(out); !os.IsNotExist(err) {
+		t.Fatalf("partial report published: %v", err)
+	}
+	entries, err := os.ReadDir(d)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("temporary files remain: %v %v", entries, err)
+	}
+	r, err = Compare(context.Background(), input, input, filepath.Join(d, "unlimited"), Options{Precision: 2})
+	if err != nil || r.Status != "MATCH" || r.Matched != 33 {
+		t.Fatalf("default changed: %+v %v", r, err)
+	}
+	_, err = Compare(context.Background(), input, input, filepath.Join(d, "negative"), Options{Precision: 2, MaxPartitionCoordinates: -1})
+	if err == nil {
+		t.Fatal("negative limit accepted")
+	}
+}
+
+type cancelAtCheck struct {
+	context.Context
+	checks int
+	at     int
+}
+
+func (c *cancelAtCheck) Err() error {
+	c.checks++
+	if c.checks >= c.at {
+		return context.Canceled
+	}
+	return nil
+}
+
+func TestCancellationBeforePublicationReturnsBlock(t *testing.T) {
+	d := t.TempDir()
+	input := write(t, d, "empty.csv", "account,amount\n")
+	// Two scans, each partition's entry and EOF, then the final publication check.
+	ctx := &cancelAtCheck{Context: context.Background(), at: 2 + 2*shards + 1}
+	out := filepath.Join(d, "report")
+	r, err := Compare(ctx, input, input, out, Options{Precision: 2})
+	if err != context.Canceled || r.Status != "BLOCK" {
+		t.Fatalf("cancel must block: %+v %v", r, err)
+	}
+	if _, err = os.Stat(out); !os.IsNotExist(err) {
+		t.Fatalf("cancel published report: %v", err)
+	}
+}
 
 func write(t *testing.T, dir, name, content string) string {
 	t.Helper()

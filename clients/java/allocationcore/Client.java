@@ -41,6 +41,8 @@ public final class Client {
         public String tolerance = "0";
         public boolean rejectReferenceDuplicates = false;
         public boolean rejectActualDuplicates = false;
+        /** Zero disables the per-partition distinct-coordinate limit. */
+        public int maxPartitionCoordinates = 0;
     }
     private static String path(Path value) {
         if (value == null) throw new IllegalArgumentException("path required");
@@ -112,9 +114,11 @@ public final class Client {
         if(options==null)options=new CompareOptions();
         if(options.precision<0||options.precision>6)throw new IllegalArgumentException("precision must be 0..6");
         if(options.tolerance==null||options.tolerance.isEmpty())throw new IllegalArgumentException("tolerance is required");
+        if(options.maxPartitionCoordinates<0)throw new IllegalArgumentException("max partition coordinates must be nonnegative");
         List<String> args=new ArrayList<>();args.add("reconcile");args.add("--actual");args.add(path(actual));args.add("--reference");args.add(path(reference));args.add("--out");args.add(path(output));args.add("--precision");args.add(Integer.toString(options.precision));args.add("--tolerance");args.add(options.tolerance);
         if(options.rejectReferenceDuplicates)args.add("--reject-reference-duplicates");
         if(options.rejectActualDuplicates)args.add("--reject-actual-duplicates");
+        if(options.maxPartitionCoordinates>0){args.add("--max-partition-coordinates");args.add(Integer.toString(options.maxPartitionCoordinates));}
         return invoke(args,true); // DIFFERENCES returns JSON even though Core exits 3.
     }
 }

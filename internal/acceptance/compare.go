@@ -32,6 +32,7 @@ type Options struct {
 	RejectDuplicates          bool // optional: prevent accidental duplicate source import
 	RejectActualDuplicates    bool // reject duplicate full coordinates on actual side
 	RejectReferenceDuplicates bool // reject duplicate full coordinates on reference side
+	MaxPartitionCoordinates   int  // optional distinct-coordinate cap per partition; zero disables
 }
 type Account struct {
 	Account   string `json:"account"`
@@ -93,6 +94,11 @@ func validateHeaders(path string) (fileInfo, []string, error) {
 	if err != nil {
 		return o, nil, err
 	}
+	return parseHeaders(path, head)
+}
+
+func parseHeaders(path string, head []string) (fileInfo, []string, error) {
+	var o fileInfo
 	o.coords = make(map[string]int)
 	o.value = -1
 	countValues := 0
@@ -121,18 +127,7 @@ func validateHeaders(path string) (fileInfo, []string, error) {
 	return o, dims, nil
 }
 func scan(ctx context.Context, input string, side string, dimension []string, opt Options, files []*os.File, writers []*csv.Writer) (fileInfo, error) {
-	info, dims, err := validateHeaders(input)
-	if err != nil {
-		return info, err
-	}
-	if len(dims) != len(dimension) {
-		return info, fmt.Errorf("%s coordinate dimensions differ: got %v expected %v", filepath.Base(input), dims, dimension)
-	}
-	for _, d := range dimension {
-		if _, ok := info.coords[d]; !ok {
-			return info, fmt.Errorf("%s missing coordinate dimension %q", filepath.Base(input), d)
-		}
-	}
+	var info fileInfo
 	f, err := os.Open(input)
 	if err != nil {
 		return info, err
@@ -145,8 +140,19 @@ func scan(ctx context.Context, input string, side string, dimension []string, op
 	if err != nil {
 		return info, err
 	}
+	info, dims, err := parseHeaders(input, header)
+	if err != nil {
+		return info, err
+	}
+	if len(dims) != len(dimension) {
+		return info, fmt.Errorf("%s coordinate dimensions differ: got %v expected %v", filepath.Base(input), dims, dimension)
+	}
+	for _, d := range dimension {
+		if _, ok := info.coords[d]; !ok {
+			return info, fmt.Errorf("%s missing coordinate dimension %q", filepath.Base(input), d)
+		}
+	}
 	info.total = new(big.Int)
-	_ = header
 	n := int64(1)
 	for {
 		if err = ctx.Err(); err != nil {
@@ -243,9 +249,14 @@ func pushTop(top []Difference, d Difference, precision int) []Difference {
 // aggregates complete coordinate keys exactly using big.Int. Peak coordinate
 // memory scales with the largest partition, not with the full input table.
 // It publishes a new report directory only after a successful comparison.
-func Compare(ctx context.Context, actual, reference, out string, opt Options) (Report, error) {
+func Compare(ctx context.Context, actual, reference, out string, opt Options) (r Report, err error) {
 	start := time.Now()
-	r := Report{Status: "BLOCK", Scope: "EXACT_COORDINATES_ONLY; total conservation is not sufficient; missing and extra coordinates always fail", Precision: opt.Precision, Tolerance: opt.Tolerance, Accounts: []Account{}, TopDifferences: []Difference{}}
+	r = Report{Status: "BLOCK", Scope: "EXACT_COORDINATES_ONLY; total conservation is not sufficient; missing and extra coordinates always fail", Precision: opt.Precision, Tolerance: opt.Tolerance, Accounts: []Account{}, TopDifferences: []Difference{}}
+	defer func() {
+		if err != nil {
+			r.Status = "BLOCK"
+		}
+	}()
 	r.DuplicatePolicy = "AGGREGATE_WITH_COUNTS"
 	if opt.RejectDuplicates {
 		r.DuplicatePolicy = "REJECT"
@@ -258,6 +269,9 @@ func Compare(ctx context.Context, actual, reference, out string, opt Options) (R
 	}
 	if opt.Precision < 0 || opt.Precision > 6 {
 		return r, fmt.Errorf("precision must be 0..6")
+	}
+	if opt.MaxPartitionCoordinates < 0 {
+		return r, fmt.Errorf("max partition coordinates must be nonnegative")
 	}
 	if opt.Tolerance == "" {
 		opt.Tolerance = "0"
@@ -366,6 +380,11 @@ func Compare(ctx context.Context, actual, reference, out string, opt Options) (R
 		}
 		data := map[string]*sums{}
 		for {
+			if e = ctx.Err(); e != nil {
+				f.Close()
+				resultFile.Close()
+				return r, e
+			}
 			fields, er := rd.Read()
 			if errors.Is(er, io.EOF) {
 				break
@@ -388,6 +407,11 @@ func Compare(ctx context.Context, actual, reference, out string, opt Options) (R
 			}
 			s := data[fields[1]]
 			if s == nil {
+				if opt.MaxPartitionCoordinates > 0 && len(data) >= opt.MaxPartitionCoordinates {
+					f.Close()
+					resultFile.Close()
+					return r, fmt.Errorf("partition %d exceeds max partition coordinates %d; comparison blocked", part, opt.MaxPartitionCoordinates)
+				}
 				s = &sums{actual: new(big.Int), reference: new(big.Int)}
 				data[fields[1]] = s
 			}
@@ -412,6 +436,10 @@ func Compare(ctx context.Context, actual, reference, out string, opt Options) (R
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
+			if e = ctx.Err(); e != nil {
+				resultFile.Close()
+				return r, e
+			}
 			s := data[k]
 			if s.actualRows > 1 {
 				r.ActualDuplicateRows += s.actualRows - 1
@@ -498,6 +526,9 @@ func Compare(ctx context.Context, actual, reference, out string, opt Options) (R
 	// Partition files are private scratch only, never part of the published report.
 	for i := 0; i < shards; i++ {
 		_ = os.Remove(filepath.Join(scratch, fmt.Sprintf("part-%02d.csv", i)))
+	}
+	if e = ctx.Err(); e != nil {
+		return r, e
 	}
 	if e = os.Rename(scratch, out); e != nil {
 		return r, e

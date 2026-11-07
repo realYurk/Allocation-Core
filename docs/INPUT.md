@@ -44,6 +44,8 @@ The example uses **synthetic** names. Dimensions are governed by the selected te
 
 **逐坐标对账。** 默认会汇总两侧重复完整业务坐标并报告数量。Core 多因子输出可合法重复实际侧坐标；确认独立参考侧必须唯一时，命令行使用 `--reject-reference-duplicates`，或在 Studio 勾选“只拒绝参考文件的重复坐标”。`--reject-duplicates` 仍严格拒绝两侧重复；`--reject-actual-duplicates` 单独拒绝实际侧重复。不能仅凭是否重复判断业务正确性，需明确参考数据来源和粒度。
 
+对账表头与数据使用同一次打开的文件读取，但对账并不为两个输入建立事务快照；应先冻结实际结果和独立参考文件。CLI 可增加 `--max-partition-coordinates 100000` 设置单个分区最多允许的不同完整坐标数，超出即阻断且不发布报告；`0` 或省略则不限。Go SDK 使用 `MaxPartitionCoordinates`，Python/Java 客户端分别使用 `max_partition_coordinates` / `maxPartitionCoordinates`。这不是内存或磁盘字节上限：坐标长度、账户数、排序、其他分配及系统缓存仍消耗资源。数值仅为示例，应在目标环境测量后设置；Studio 当前未暴露此配置。
+
 ## 1. Five concepts / 五个核心概念
 
 **Dimensions / 维度** are labels used for grouping (period, site, product, account, currency, etc.). / 维度是分组标签；名称由接入方决定。

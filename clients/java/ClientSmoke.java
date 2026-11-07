@@ -24,6 +24,15 @@ public final class ClientSmoke {
         Path wrong=root.resolve("wrong-reference.csv");Files.write(wrong,ref.replace("100.00","101.00").getBytes(StandardCharsets.UTF_8));
         String different=c.compare(root.resolve("java-memory").resolve("results.csv"),wrong,root.resolve("java-different"),2,false);
         if(!different.contains("\"status\": \"DIFFERENCES\""))throw new AssertionError(different);
+        StringBuilder synthetic=new StringBuilder("account,sku,amount\n");
+        for(int i=0;i<33;i++)synthetic.append("A,SKU-").append(i).append(",1.00\n");
+        Path many=root.resolve("many.csv");Files.write(many,synthetic.toString().getBytes(StandardCharsets.UTF_8));
+        Client.CompareOptions limited=new Client.CompareOptions();limited.maxPartitionCoordinates=1;
+        Path limitedOut=root.resolve("limited");
+        try { c.compare(many,many,limitedOut,limited);throw new AssertionError("limit accepted"); }
+        catch(Client.CoreException expected) {
+            if(!expected.getMessage().contains("max partition coordinates")||Files.exists(limitedOut))throw expected;
+        }
         System.out.println("JAVA_CLIENT_PASS");
     }
 }

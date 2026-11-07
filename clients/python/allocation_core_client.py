@@ -88,13 +88,18 @@ class Client:
     def compare(self, actual: str | os.PathLike[str], reference: str | os.PathLike[str],
                 output: str | os.PathLike[str], *, precision: int,
                 tolerance: str = "0", reject_reference_duplicates: bool = False,
-                reject_actual_duplicates: bool = False) -> dict[str, Any]:
+                reject_actual_duplicates: bool = False,
+                max_partition_coordinates: int = 0) -> dict[str, Any]:
         if not 0 <= precision <= 6:
             raise ValueError("precision must be 0..6")
+        if max_partition_coordinates < 0:
+            raise ValueError("max_partition_coordinates must be nonnegative")
         args = ["reconcile", "--actual", str(Path(actual).resolve()), "--reference", str(Path(reference).resolve()),
                 "--out", str(Path(output).resolve()), "--precision", str(precision), "--tolerance", tolerance]
         if reject_reference_duplicates:
             args += ["--reject-reference-duplicates"]
         if reject_actual_duplicates:
             args += ["--reject-actual-duplicates"]
+        if max_partition_coordinates:
+            args += ["--max-partition-coordinates", str(max_partition_coordinates)]
         return self._call(args, allow_differences=True)

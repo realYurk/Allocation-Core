@@ -57,6 +57,16 @@ class SyntheticClientTest(unittest.TestCase):
             self.client.run(self.path / "rule.json", self.path / "invalid")
         self.assertFalse((self.path / "invalid").exists())
 
+    def test_reconciliation_coordinate_limit(self):
+        data = "account,sku,amount\n" + "".join(f"A,SKU-{i:02d},1.00\n" for i in range(33))
+        source = self.path / "many.csv"
+        source.write_text(data, encoding="utf-8")
+        out = self.path / "limited"
+        with self.assertRaises(CoreError) as caught:
+            self.client.compare(source, source, out, precision=2, max_partition_coordinates=1)
+        self.assertIn("max partition coordinates", str(caught.exception))
+        self.assertFalse(out.exists())
+
 
 class ClientValidationTest(unittest.TestCase):
     def test_timeout_and_disk_options(self):
