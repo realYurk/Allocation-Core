@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"math/big"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -40,13 +41,65 @@ type Summary struct {
 	DriverCacheHits   int               `json:"driver_cache_hits,omitempty"`
 	DriverCacheBuilds int               `json:"driver_cache_builds,omitempty"`
 	ReusedStages      int               `json:"reused_stages,omitempty"`
+	SourceCoverage    string            `json:"source_coverage"` // observation, not business acceptance
 }
 type StageSummary struct {
-	Stage      string `json:"stage"`
-	Input      string `json:"input"`
-	Output     string `json:"output"`
-	Pools      int    `json:"pools"`
-	OutputRows int    `json:"output_rows"`
+	Stage               string `json:"stage"`
+	Input               string `json:"input"`
+	Output              string `json:"output"`
+	Pools               int    `json:"pools"`
+	OutputRows          int    `json:"output_rows"`
+	SourceFilterChecked *bool  `json:"source_filter_checked,omitempty"`
+	UnmatchedRows       int    `json:"unmatched_rows,omitempty"`
+	UnmatchedNet        string `json:"unmatched_net,omitempty"`
+	UnmatchedGross      string `json:"unmatched_gross,omitempty"`
+}
+
+type unmatchedStats struct {
+	rows       int
+	net, gross big.Int
+}
+
+func (u *unmatchedStats) add(row Row) {
+	u.rows++
+	v := big.NewInt(row.Amount)
+	u.net.Add(&u.net, v)
+	u.gross.Add(&u.gross, new(big.Int).Abs(v))
+}
+func bigMoney(v *big.Int, p int) string {
+	negative := v.Sign() < 0
+	a := new(big.Int).Abs(v)
+	base := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(p)), nil)
+	whole, part := new(big.Int).QuoRem(a, base, new(big.Int))
+	s := whole.String()
+	if p > 0 {
+		s += fmt.Sprintf(".%0*s", p, part.String())
+	}
+	if negative {
+		return "-" + s
+	}
+	return s
+}
+func (u *unmatchedStats) annotate(s *StageSummary, p int) {
+	checked := true
+	s.SourceFilterChecked = &checked
+	s.UnmatchedRows = u.rows
+	if u.rows > 0 {
+		s.UnmatchedNet = bigMoney(&u.net, p)
+		s.UnmatchedGross = bigMoney(&u.gross, p)
+	}
+}
+func coverageStatus(stages []StageSummary) string {
+	status := "NO_UNMATCHED_OBSERVED"
+	for _, s := range stages {
+		if s.SourceFilterChecked == nil || !*s.SourceFilterChecked {
+			return "PARTIAL_LEGACY_CHECKPOINT"
+		}
+		if s.UnmatchedRows > 0 {
+			status = "UNMATCHED_PASSTHROUGH"
+		}
+	}
+	return status
 }
 
 // RunOptions controls bounded parallelism without changing the allocation rule schema.
@@ -94,6 +147,31 @@ func calculatePool(st Stage, dims, immutable []string, precision int, poolKey st
 			result.err = fail("stage %s rule %s pool %s has no eligible drivers", st.ID, alloc.ID, poolKey)
 			return result
 		}
+		if err := checkRequiredTargets(st.ID, alloc.ID, poolKey, targets, weights, alloc.RequiredTargetMembers, alloc.RequiredPositiveTargetMembers); err != nil {
+			result.err = err
+			return result
+		}
+		matchedPolicies := 0
+		for _, policy := range alloc.RequiredTargetsBySource {
+			matched := true
+			for dim, values := range policy.WhenSource {
+				if !has(values, pool[dim]) {
+					matched = false
+					break
+				}
+			}
+			if matched {
+				matchedPolicies++
+				if err := checkRequiredTargets(st.ID, alloc.ID, poolKey, targets, weights, policy.Members, policy.PositiveMembers); err != nil {
+					result.err = err
+					return result
+				}
+			}
+		}
+		if alloc.RequireSourceTargetPolicy && matchedPolicies == 0 {
+			result.err = fail("stage %s rule %s pool %s: no source-specific target policy matched", st.ID, alloc.ID, poolKey)
+			return result
+		}
 		values, err := Apportion(part, weights, ids, alloc.NegativePolicy == "ALLOW_SIGNED")
 		if err != nil {
 			result.err = fmt.Errorf("stage %s rule %s pool %s: %w", st.ID, alloc.ID, poolKey, err)
@@ -138,6 +216,37 @@ func calculatePool(st Stage, dims, immutable []string, precision int, poolKey st
 		result.err = fail("stage %s pool %s not conserved: %d vs %d", st.ID, poolKey, total, result.output)
 	}
 	return result
+}
+
+func checkRequiredTargets(stage, allocation, poolKey string, targets []map[string]string, weights []int64, members, positive map[string][]string) error {
+	if len(members) == 0 && len(positive) == 0 {
+		return nil
+	}
+	for policy, requirements := range []map[string][]string{members, positive} {
+		dims := make([]string, 0, len(requirements))
+		for dim := range requirements {
+			dims = append(dims, dim)
+		}
+		sort.Strings(dims)
+		for _, dim := range dims {
+			present := map[string]bool{}
+			for i, target := range targets {
+				if policy == 0 || weights[i] > 0 {
+					present[target[dim]] = true
+				}
+			}
+			for _, member := range requirements[dim] {
+				if !present[member] {
+					kind := "eligible driver"
+					if policy == 1 {
+						kind = "positive eligible driver"
+					}
+					return fail("stage %s rule %s pool %s: required target member %s=%s has no %s", stage, allocation, poolKey, dim, member, kind)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // parallelPools uses persistent workers for the whole stage instead of
@@ -651,6 +760,19 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 	if e := os.MkdirAll(filepath.Dir(outputDir), 0755); e != nil {
 		return summary, e
 	}
+	snapshot, e := snapshotInputs(&spec, plan, base, filepath.Dir(outputDir), nil)
+	if e != nil {
+		return summary, e
+	}
+	defer snapshot.close()
+	defer func() {
+		if runErr != nil {
+			runErr = snapshot.restoreError(runErr)
+		}
+	}()
+	for path, hash := range snapshot.hashes {
+		summary.DataSHA256[path] = hash
+	}
 	workingDir, e := os.MkdirTemp(filepath.Dir(outputDir), ".allocation-incomplete-")
 	if e != nil {
 		return summary, e
@@ -745,13 +867,6 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 			return summary, err
 		}
 		summary.InputAmount = Money(sum, spec.Precision)
-		if _, ok := summary.DataSHA256[path]; !ok {
-			if hash, er := fileSHA(path); er == nil {
-				summary.DataSHA256[path] = hash
-			} else {
-				return summary, er
-			}
-		}
 		for idx := range rows {
 			rows[idx].IDs = []string{sourceRowID(source, rows[idx].IDs[0], idx+1)}
 		}
@@ -776,6 +891,7 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 		after := int64(0)
 		outRows := 0
 		pools := 0
+		var unmatched unmatchedStats
 		emit := func(r Row) error {
 			var er error
 			after, er = checkedAdd(after, r.Amount)
@@ -838,6 +954,10 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 			groups := map[string]*bucket{}
 			for _, row := range inputs {
 				if !sourceFilter(row, checks) {
+					unmatched.add(row)
+					if st.SourceUnmatchedPolicy == "BLOCK" {
+						return summary, fail("stage %s source filter unmatched row %s; source_unmatched_policy=BLOCK", st.ID, key(row.Coord, spec.Dimensions))
+					}
 					if err := emit(row); err != nil {
 						return summary, err
 					}
@@ -885,13 +1005,6 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 						return summary, err
 					}
 					driverCache[cacheKey] = rows
-					if _, ok := summary.DataSHA256[path]; !ok {
-						if hash, er := fileSHA(path); er == nil {
-							summary.DataSHA256[path] = hash
-						} else {
-							return summary, er
-						}
-					}
 				}
 				idx, err := buildDriverIndex(rows, a, st, spec.Dimensions, spec.Hierarchies)
 				if err != nil {
@@ -942,7 +1055,9 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 		if before != after {
 			return summary, fail("stage %s total mismatch %d vs %d", st.ID, before, after)
 		}
-		summary.Stages = append(summary.Stages, StageSummary{Stage: st.ID, Input: Money(before, spec.Precision), Output: Money(after, spec.Precision), Pools: pools, OutputRows: outRows})
+		stageSummary := StageSummary{Stage: st.ID, Input: Money(before, spec.Precision), Output: Money(after, spec.Precision), Pools: pools, OutputRows: outRows}
+		unmatched.annotate(&stageSummary, spec.Precision)
+		summary.Stages = append(summary.Stages, stageSummary)
 		summary.OutputRows += outRows
 		if !leaf {
 			merged, err := mergeRows(buffered, spec.Dimensions)
@@ -965,6 +1080,7 @@ func RunWithOptions(configPath, outputDir string, options RunOptions) (summary S
 		return summary, fail("DAG final total %d != input total %d", grandTotal, inputAmount)
 	}
 	summary.OutputAmount = Money(grandTotal, spec.Precision)
+	summary.SourceCoverage = coverageStatus(summary.Stages)
 	summary.Status = "PASS"
 	if err := membership.finish(); err != nil {
 		return summary, err

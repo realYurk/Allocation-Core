@@ -40,6 +40,9 @@ func Compile(s Spec) (Planned, error) {
 	deps := map[string]int{}
 	edges := map[string][]string{}
 	for _, st := range s.Stages {
+		if st.SourceUnmatchedPolicy != "" && st.SourceUnmatchedPolicy != "PASS" && st.SourceUnmatchedPolicy != "BLOCK" {
+			return p, fail("stage %s invalid source_unmatched_policy", st.ID)
+		}
 		if st.ID == "" || st.ID == "$previous" || stages[st.ID].ID != "" {
 			return p, fail("duplicate/invalid stage ID %s", st.ID)
 		}
@@ -147,6 +150,54 @@ func Compile(s Spec) (Planned, error) {
 						return p, fail("allocation %s unknown driver filter %s", a.ID, k)
 					}
 				}
+				for _, requirements := range []map[string][]string{a.RequiredTargetMembers, a.RequiredPositiveTargetMembers} {
+					for dim, members := range requirements {
+						if !dims[dim] || len(members) == 0 {
+							return p, fail("allocation %s invalid required target dimension %s", a.ID, dim)
+						}
+						seen := map[string]bool{}
+						for _, member := range members {
+							if member == "" || seen[member] {
+								return p, fail("allocation %s invalid required target member for %s", a.ID, dim)
+							}
+							seen[member] = true
+						}
+					}
+				}
+				if a.RequireSourceTargetPolicy && len(a.RequiredTargetsBySource) == 0 {
+					return p, fail("allocation %s requires at least one contextual target policy", a.ID)
+				}
+				for _, policy := range a.RequiredTargetsBySource {
+					if len(policy.WhenSource) == 0 || (len(policy.Members) == 0 && len(policy.PositiveMembers) == 0) {
+						return p, fail("allocation %s contextual target policy needs source conditions and required members", a.ID)
+					}
+					for dim, values := range policy.WhenSource {
+						if !dims[dim] || st.Source.Grouping[dim] != "AS_IS" || len(values) == 0 {
+							return p, fail("allocation %s contextual source dimension %s must be AS_IS with explicit members", a.ID, dim)
+						}
+						seen := map[string]bool{}
+						for _, value := range values {
+							if value == "" || seen[value] {
+								return p, fail("allocation %s invalid contextual source member for %s", a.ID, dim)
+							}
+							seen[value] = true
+						}
+					}
+					for _, requirements := range []map[string][]string{policy.Members, policy.PositiveMembers} {
+						for dim, values := range requirements {
+							if !dims[dim] || len(values) == 0 {
+								return p, fail("allocation %s invalid contextual target dimension %s", a.ID, dim)
+							}
+							seen := map[string]bool{}
+							for _, value := range values {
+								if value == "" || seen[value] {
+									return p, fail("allocation %s invalid contextual target member for %s", a.ID, dim)
+								}
+								seen[value] = true
+							}
+						}
+					}
+				}
 			}
 			if active == 0 || shares != unit {
 				return p, fail("stage %s allocation shares must total exactly 1", st.ID)
@@ -189,6 +240,27 @@ func Compile(s Spec) (Planned, error) {
 	for source, total := range outgoingSum {
 		if total != unit {
 			return p, fail("source %s outgoing shares must total exactly 1 (actual %d/1000000)", source, total)
+		}
+	}
+	ignoredNames := make([]string, 0, len(s.IgnoredAmounts))
+	for source := range s.IgnoredAmounts {
+		ignoredNames = append(ignoredNames, source)
+	}
+	sort.Strings(ignoredNames)
+	for _, source := range ignoredNames {
+		reason := s.IgnoredAmounts[source]
+		if s.Datasets.Amounts[source] == "" || outgoingSum[source] != 0 || strings.TrimSpace(reason) == "" {
+			return p, fail("ignored amount source %s must exist, be unused and have a reason", source)
+		}
+	}
+	amountNames := make([]string, 0, len(s.Datasets.Amounts))
+	for source := range s.Datasets.Amounts {
+		amountNames = append(amountNames, source)
+	}
+	sort.Strings(amountNames)
+	for _, source := range amountNames {
+		if outgoingSum[source] == 0 && strings.TrimSpace(s.IgnoredAmounts[source]) == "" {
+			return p, fail("amount source %s is not connected to a stage; explicitly connect it or record a reason in ignored_amounts", source)
 		}
 	}
 	for k := range p.Outgoing {

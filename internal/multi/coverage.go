@@ -85,7 +85,7 @@ func coverageSupported(s engine.Spec) (engine.Stage,string,bool) {
  if !engine.Enabled(st.Enabled)||st.Operation=="MERGE"||st.Operation=="PASS" {return st,"直接金额来源的起始阶段不是启用的分摊阶段",false}
  if len(st.Inputs)!=1||(st.Inputs[0].Share!=""&&st.Inputs[0].Share!="1") {return st,"起始阶段含多个来源或部分来源份额",false}
  if len(s.Hierarchies)!=0||len(st.Source.Filters)!=0 {return st,"起始阶段含层级或来源筛选",false}
- for _,a:=range st.Allocations {if len(a.DriverFilters)!=0 {return st,"起始阶段含 Driver 筛选",false}}
+ for _,a:=range st.Allocations {if !engine.Enabled(a.Enabled){continue};if len(a.DriverFilters)!=0 {return st,"起始阶段含 Driver 筛选",false};if len(a.RequiredTargetMembers)>0||len(a.RequiredPositiveTargetMembers)>0||len(a.RequiredTargetsBySource)>0||a.RequireSourceTargetPolicy{return st,"含必需目标成员政策：当前覆盖检查不核验该政策，需由 Core 执行并对账",false}}
  return st,"",len(s.Stages)==1
 }
 

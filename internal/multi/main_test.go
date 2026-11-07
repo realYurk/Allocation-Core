@@ -71,6 +71,45 @@ func TestFourAccountEndToEnd(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestMultiReportsUnmatchedSourceWithoutClaimingBusinessCoverage(t *testing.T) {
+	project, bin := fixture(t)
+	path := filepath.Join(project, "templates", "material.json")
+	raw, e := os.ReadFile(path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var rule map[string]any
+	if e = json.Unmarshal(raw, &rule); e != nil {
+		t.Fatal(e)
+	}
+	stage := rule["stages"].([]any)[0].(map[string]any)
+	source := stage["source"].(map[string]any)
+	source["filters"] = map[string]any{"department": map[string]any{"include": []string{"not-matched"}}}
+	encoded, e := json.Marshal(rule)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = os.WriteFile(path, encoded, 0600); e != nil {
+		t.Fatal(e)
+	}
+	out := filepath.Join(t.TempDir(), "out")
+	result, e := Run(project, out, bin)
+	if e != nil || result.Status != "PASS" || result.SourceCoverage != "UNMATCHED_PASSTHROUGH" {
+		t.Fatalf("missing coverage warning: %+v %v", result, e)
+	}
+	marked := false
+	for _, g := range result.Engines {
+		for _, s := range g.CoverageStages {
+			if s.UnmatchedRows > 0 && s.UnmatchedGross != "" {
+				marked = true
+			}
+		}
+	}
+	if !marked {
+		t.Fatal("missing group stage coverage detail")
+	}
+}
 func TestUnassignedAccountFailClosed(t *testing.T) {
 	project, engine := fixture(t)
 	f := filepath.Join(project, "assignments.csv")

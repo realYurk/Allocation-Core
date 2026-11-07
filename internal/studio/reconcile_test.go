@@ -48,6 +48,31 @@ func TestWorkbenchReconciliationAndIsolation(t *testing.T) {
 	if v.Report.Status != "DIFFERENCES" || v.Report.Different != 2 {
 		t.Fatalf("%#v", v.Report)
 	}
+	if e := os.WriteFile(filepath.Join(dir, "results.csv"), []byte("account,period,sku,amount\nA,M1,P1,6.00\nA,M1,P1,4.00\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(filepath.Join(project, "reference.csv"), []byte("account,period,sku,amount\nA,M1,P1,10.00\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	call := func() *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", "/api/multi/reconcile", strings.NewReader(`{"name":"Example1","job":"`+id+`","precision":2,"reject_reference_duplicates":true}`))
+		x.reconcile(w, req)
+		return w
+	}
+	w = call()
+	if w.Code != http.StatusOK {
+		t.Fatalf("valid factor lines blocked: %s", w.Body.String())
+	}
+	if e := json.Unmarshal(w.Body.Bytes(), &v); e != nil || v.Report.Status != "MATCH" || v.Report.DuplicatePolicy != "REJECT_REFERENCE" {
+		t.Fatalf("wrong policy: %+v %v", v.Report, e)
+	}
+	if e := os.WriteFile(filepath.Join(project, "reference.csv"), []byte("account,period,sku,amount\nA,M1,P1,5.00\nA,M1,P1,5.00\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	if w = call(); w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("duplicate reference accepted: %s", w.Body.String())
+	}
 	req = httptest.NewRequest("POST", "/api/multi/reconcile", strings.NewReader(`{"name":"Other1","job":"`+id+`","precision":2}`))
 	w = httptest.NewRecorder()
 	x.reconcile(w, req)

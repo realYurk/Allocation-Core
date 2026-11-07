@@ -32,6 +32,39 @@ func TestExactComparisonAggregatesAndReorders(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestIndependentDuplicatePoliciesAndNoPartialPublication(t *testing.T) {
+	d := t.TempDir()
+	actual := write(t, d, "actual.csv", "account,sku,amount\nA,X,6.00\nA,X,4.00\n")
+	reference := write(t, d, "reference.csv", "account,sku,amount\nA,X,10.00\n")
+	result, e := Compare(context.Background(), actual, reference, filepath.Join(d, "reference-only"), Options{Precision: 2, RejectReferenceDuplicates: true})
+	if e != nil || result.Status != "MATCH" || result.DuplicatePolicy != "REJECT_REFERENCE" || result.ActualDuplicateRows != 1 || result.ReferenceDuplicateRows != 0 {
+		t.Fatalf("legitimate actual factors: %+v %v", result, e)
+	}
+	badReference := write(t, d, "bad-reference.csv", "account,sku,amount\nA,X,5.00\nA,X,5.00\n")
+	for _, tc := range []struct {
+		name              string
+		actual, reference string
+		options           Options
+	}{
+		{"reference", actual, badReference, Options{Precision: 2, RejectReferenceDuplicates: true}},
+		{"actual", actual, reference, Options{Precision: 2, RejectActualDuplicates: true}},
+		{"legacy", actual, reference, Options{Precision: 2, RejectDuplicates: true}},
+	} {
+		out := filepath.Join(d, tc.name)
+		_, e := Compare(context.Background(), tc.actual, tc.reference, out, tc.options)
+		if e == nil || !strings.Contains(e.Error(), "duplicate full coordinate") {
+			t.Fatalf("%s not rejected: %v", tc.name, e)
+		}
+		if _, e = os.Stat(out); !os.IsNotExist(e) {
+			t.Fatalf("%s partial output published", tc.name)
+		}
+	}
+	result, e = Compare(context.Background(), reference, badReference, filepath.Join(d, "actual-only"), Options{Precision: 2, RejectActualDuplicates: true})
+	if e != nil || result.Status != "MATCH" || result.DuplicatePolicy != "REJECT_ACTUAL" || result.ReferenceDuplicateRows != 1 {
+		t.Fatalf("actual-only: %+v %v", result, e)
+	}
+}
 func TestMismatchesNoOffsettingFalsePass(t *testing.T) {
 	d := t.TempDir()
 	a := write(t, d, "a.csv", "account,sku,amount\nA,P1,60.00\nA,P2,40.00\nA,P3,0.00\n")

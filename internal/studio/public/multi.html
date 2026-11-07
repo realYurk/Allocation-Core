@@ -147,7 +147,7 @@
 <div class="row" style="margin:9px 0"><button id="referenceUploadBtn" class="alt" onclick="uploadBusinessReference()">上传并验证参考文件</button><small>替换已有文件时需确认其当前 SHA-256，冲突即拒绝覆盖。</small></div>
 <div id="referenceStatus" class="muted" style="white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f6fc;padding:11px;border-radius:9px" role="status" aria-live="polite">请选择项目以检查参考结果状态。</div>
 <div class="row"><label>金额小数位 / Precision<input id="refPrecision" type="number" min="0" max="6" value="2" style="width:85px"></label><label>允许差额 / Tolerance<input id="refTolerance" value="0" style="width:105px"></label><button class="alt" id="reconcileBtn" onclick="reconcileReference()">检查选中任务与参考结果 / Compare</button></div>
-<label style="margin-top:9px"><input type="checkbox" id="rejectDup" style="width:auto"> 严格拒绝重复的完整业务坐标 / Reject duplicate full coordinates</label>
+<label style="margin-top:9px"><input type="checkbox" id="rejectDup" style="width:auto"> 严格拒绝两侧重复业务坐标</label><label style="margin-top:9px"><input type="checkbox" id="rejectRefDup" style="width:auto"> 只拒绝参考文件的重复坐标（实际结果可包含合法多因子明细）</label><p class="muted">未勾选时两侧重复坐标均汇总，可能掩盖重复导入；请按业务契约选择。</p>
 <pre id="reconcileResult" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:240px;overflow:auto" role="status" aria-live="polite">尚未检查参考结果 / Not compared</pre>
 <div class="row" style="margin-top:12px"><label style="flex:1">历史对账报告 / Saved acceptance<select id="acceptanceHistory" onchange="openAcceptanceReport()"></select></label><button class="alt" onclick="loadAcceptanceHistory()">刷新验收历史</button></div>
 <div id="acceptanceDashboard" style="display:none;background:#fff;border:1px solid #e2eaf6;border-radius:11px;padding:14px;margin-top:10px">
@@ -971,7 +971,7 @@ async function reconcileReference(){
  if(!project||!id){box.textContent='请先选择一个成功完成的项目任务。';return}
  btn.disabled=true;box.textContent='正在逐坐标对齐两份独立数据快照，并核对各科目...';
  try{
-  const response=await api('/api/multi/reconcile',{name:project,job:id,precision:Number(document.getElementById('refPrecision').value),tolerance:document.getElementById('refTolerance').value.trim(),reject_duplicates:document.getElementById('rejectDup').checked});
+  const response=await api('/api/multi/reconcile',{name:project,job:id,precision:Number(document.getElementById('refPrecision').value),tolerance:document.getElementById('refTolerance').value.trim(),reject_duplicates:document.getElementById('rejectDup').checked,reject_reference_duplicates:document.getElementById('rejectRefDup').checked});
   if(project!==active)return;
   const r=response.report;
   const lines=['验收结论：'+r.status,'一致 '+r.matched+' · 金额不符 '+r.different+' · 引擎缺少 '+r.missing+' · 引擎多余 '+r.extra,
@@ -989,13 +989,15 @@ async function poll(){try{const v=await api('/api/multi/jobs/'+busyJob);const j=
   [`任务结果：${j.status} / ${summary.status||'待核对'}`,
    `科目：${summary.accounts} ｜ 有效规则组：${summary.groups} ｜ 明细：${summary.result_rows}`,
    `分摊前：${summary.input_amount}  →  分摊后：${summary.output_amount}`,
+   `来源筛选观察：${summary.source_coverage||'UNVERIFIED'}（仅观察规则未命中透传，不证明业务范围完整）`,
+   ...(summary.engines||[]).flatMap(g=>(g.coverage_stages||[]).filter(s=>s.unmatched_rows>0).map(s=>`未命中透传 · 规则组 ${g.group_id} · 阶段 ${s.stage} · ${s.unmatched_rows} 行 · 净额 ${s.unmatched_net} · 绝对额 ${s.unmatched_gross}`)),
    `总耗时：${(summary.duration_ms/1000).toFixed(2)} 秒（包含快照、执行及结果发布）`,
    `Driver 缓存：有效复用 ${summary.driver_cache_hits||0} 次 · 新建索引 ${summary.driver_cache_builds||0} 次（仅磁盘索引模式统计）`,
    `以下列出前20个科目的检查结果：`,
    ...(summary.details||[]).slice(0,20).map(a=>`${a.account}：${a.input_amount} → ${a.output_amount} · ${a.status}`),
    (summary.details||[]).length>20?'其余科目请下载完整对账报告。':'',
    '注意：守恒通过不等于与其他系统逐坐标完全一致。'].join('\n'):
-  JSON.stringify(j,null,2);if(j.status==='PASS'||j.status==='FAILED'||j.status==='CANCELED'||j.status==='INTERRUPTED'){clearInterval(interval);document.getElementById('run').disabled=false;document.getElementById('cancel').disabled=true;if(j.status==='PASS'){message('全部科目 PASS，已生成完整输出和逐科目结果',true);await loadJobHistory();const a=document.getElementById('download');a.href='/api/multi/jobs/'+busyJob+'?download=results';a.style.display='inline-block'}else {message((j.status==='CANCELED'?'本次任务已取消。\n':j.status==='INTERRUPTED'?'该任务发生中断，不能自动续算。请重新运行。\n':'')+(j.error||'')+'\n'+(j.log||''));await loadJobHistory()}}}catch(e){clearInterval(interval);document.getElementById('run').disabled=false;document.getElementById('cancel').disabled=true;message(e.message)}}
+  JSON.stringify(j,null,2);if(j.status==='PASS'||j.status==='FAILED'||j.status==='CANCELED'||j.status==='INTERRUPTED'){clearInterval(interval);document.getElementById('run').disabled=false;document.getElementById('cancel').disabled=true;if(j.status==='PASS'){message(summary?.source_coverage==='UNMATCHED_PASSTHROUGH'?'计算完成，但有来源筛选未命中并被透传；请查看任务摘要并核对业务范围。':summary?.source_coverage==='NO_UNMATCHED_OBSERVED'?'计算完成，未观察到来源筛选透传；仍需独立对账。':'计算完成，但来源覆盖状态尚未验证；请检查任务摘要。',summary?.source_coverage==='NO_UNMATCHED_OBSERVED');await loadJobHistory();const a=document.getElementById('download');a.href='/api/multi/jobs/'+busyJob+'?download=results';a.style.display='inline-block'}else {message((j.status==='CANCELED'?'本次任务已取消。\n':j.status==='INTERRUPTED'?'该任务发生中断，不能自动续算。请重新运行。\n':'')+(j.error||'')+'\n'+(j.log||''));await loadJobHistory()}}}catch(e){clearInterval(interval);document.getElementById('run').disabled=false;document.getElementById('cancel').disabled=true;message(e.message)}}
 
 let lastBatchID='';
 function batchNames(){return {scenario:document.getElementById('batchScenario').value.trim(),version:document.getElementById('batchVersion').value.trim()}}

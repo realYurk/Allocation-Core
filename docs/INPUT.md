@@ -18,6 +18,30 @@ The example uses **synthetic** names. Dimensions are governed by the selected te
 
 # Generic Input Contract / 通用数据接入规范
 
+## 来源覆盖、目标资格与输入快照
+
+**规则显式覆盖金额来源。** `datasets.amounts` 里声明的每个数据集必须连接到阶段；确实不参与本次规则时，在规则顶层增加 `"ignored_amounts":{"dataset_alias":"业务批准的不参与原因"}`。忽略的数据集不会被读取、分摊或计入总额；不允许同时连接和忽略。升级后，旧规则中遗漏连接的来源会被阻断，必须核对后连接或明确记录原因。
+
+**来源未命中。** 在分摊阶段设置 `"source_unmatched_policy":"BLOCK"`，筛选不命中时阻断且不发布；设置 `"PASS"` 或省略时保留原有透传行为。执行摘要按阶段记录 `unmatched_rows`、`unmatched_net`、`unmatched_gross`（绝对金额合计，防止正负抵消），以及 `source_coverage`。`NO_UNMATCHED_OBSERVED` 仅说明启用分摊阶段没有观察到筛选透传，不证明来源或业务规则完整；历史检查点缺少记录时显示 `PARTIAL_LEGACY_CHECKPOINT`。计数以阶段输入行计算，中间行可能在多个阶段出现，不能跨阶段相加；零金额行在路由阶段本来就可能被跳过。
+
+**必需目标必须明确配置，不猜业务资格。** 在某个 allocation 上可设置 `"required_target_members":{"sku":["SKU-A","SKU-B"]}`，要求该非零金额池/因子的合格 Driver 目标中包含列出的每个字面成员。可另外设置 `"required_positive_target_members":{"sku":["SKU-A"]}`，要求至少一个合格目标坐标的合并权重为正。该检查按指定维度的成员分别执行，并非要求多个维度的所有笛卡尔组合；存在正权重也不保证小金额舍入后结果非零。使用层级时请显式提供所需叶成员。未配置时保留原有候选集合语义；某个目标缺失而其他目标仍可分摊，不能据此认定业务正确。
+
+当不同来源应覆盖不同目标时，可在该 allocation 中按来源配置，例如：
+
+```json
+"require_source_target_policy": true,
+"required_targets_by_source": [
+  {"when_source": {"family": ["系列甲"]}, "members": {"sku": ["A", "B"]}},
+  {"when_source": {"family": ["系列乙"]}, "positive_members": {"sku": ["C", "D"]}}
+]
+```
+
+`when_source` 使用来源中以 `AS_IS` 保留的维度和明确的字面成员；同一维度的多个成员是或的关系，不同维度之间是且的关系。每个非零金额池应用所有匹配的要求。`require_source_target_policy` 为 true 时，没有匹配要求的金额池会被阻断；省略或为 false 时允许未匹配，不能因此认定目标完整。成员与正权重要求的含义同上，不自动展开层级或推测权重。独立的 Driver 覆盖预检查尚不验证这些目标要求，会标记 `UNVERIFIED`；应通过 Core 执行并进行独立对账。新字段须使用支持它们的 Core 版本。
+
+**执行输入快照。** Core 在计算前把本次实际使用的金额和 Driver 文件逐一复制到输出目录同一父目录下的私有临时目录，复制时计算 SHA-256 并复核来源文件，运行只读取这些副本；摘要中的指纹对应捕获字节，保留原文件路径作为键。正常结束或错误退出会清理快照；进程强杀或断电可能留下临时目录，需要在确认无运行任务后由管理员处理。额外磁盘空间及一次复制/哈希开销必须纳入容量规划。逐文件快照不是跨文件数据库事务；如果多个文件需要同一时点一致性，调用方仍须提供已冻结的原系统导出或事务快照。需要保护输出父目录的访问权限。
+
+**逐坐标对账。** 默认会汇总两侧重复完整业务坐标并报告数量。Core 多因子输出可合法重复实际侧坐标；确认独立参考侧必须唯一时，命令行使用 `--reject-reference-duplicates`，或在 Studio 勾选“只拒绝参考文件的重复坐标”。`--reject-duplicates` 仍严格拒绝两侧重复；`--reject-actual-duplicates` 单独拒绝实际侧重复。不能仅凭是否重复判断业务正确性，需明确参考数据来源和粒度。
+
 ## 1. Five concepts / 五个核心概念
 
 **Dimensions / 维度** are labels used for grouping (period, site, product, account, currency, etc.). / 维度是分组标签；名称由接入方决定。

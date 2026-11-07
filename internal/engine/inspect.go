@@ -29,6 +29,7 @@ type InputCheck struct {
 	NegativeValues int64    `json:"negative_values,omitempty"`
 	WeightFields   []string `json:"weight_fields,omitempty"`
 	Error          string   `json:"error,omitempty"`
+	Note           string   `json:"note,omitempty"`
 }
 type InputReport struct {
 	Status     string       `json:"status"`
@@ -63,6 +64,10 @@ func InspectInputs(rulePath string, spec Spec) (report InputReport) {
 	}
 	sort.Strings(amounts)
 	for _, n := range amounts {
+		if reason := strings.TrimSpace(spec.IgnoredAmounts[n]); reason != "" {
+			report.Checks = append(report.Checks, InputCheck{Dataset: n, Kind: "AMOUNT_IGNORED", File: spec.Datasets.Amounts[n], Note: reason})
+			continue
+		}
 		c := inspectFile(base, n, "AMOUNT", spec.Datasets.Amounts[n], spec.Dimensions, nil, spec.Precision)
 		if c.Error != "" {
 			report.Status = "BLOCK"

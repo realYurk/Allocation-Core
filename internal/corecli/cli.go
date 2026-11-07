@@ -651,6 +651,9 @@ func Run() {
 				if c.Error != "" {
 					fmt.Printf(" ERROR: %s", c.Error)
 				}
+				if c.Note != "" {
+					fmt.Printf(" NOTE: %s", c.Note)
+				}
 				fmt.Println()
 			}
 			fmt.Println("NOTE: PASS does not verify eligible drivers, allocation math or reference system results.")

@@ -23,6 +23,15 @@ func TestCoverageMatchedReadOnly(t *testing.T) {
  after,e:=os.ReadFile(path);if e!=nil||string(after)!=string(before) {t.Fatal("inspection mutated source amounts")}
  if files,_:=os.ReadDir(dir);len(files)!=6 {t.Fatal("inspection wrote run outputs")}
 }
+func TestCoverageDoesNotClaimRequiredTargetPolicyWasChecked(t *testing.T){
+ dir:=preflightFixture(t);path:=filepath.Join(dir,"templates","material.json");raw,e:=os.ReadFile(path);if e!=nil{t.Fatal(e)}
+ var rule map[string]any;if e=json.Unmarshal(raw,&rule);e!=nil{t.Fatal(e)}
+ stage:=rule["stages"].([]any)[0].(map[string]any);allocation:=stage["allocations"].([]any)[0].(map[string]any)
+ allocation["required_target_members"]=map[string]any{"sku":[]string{"Item-A","Item-B"}}
+ b,e:=json.Marshal(rule);if e!=nil{t.Fatal(e)};if e=os.WriteFile(path,b,0600);e!=nil{t.Fatal(e)}
+ r:=InspectDriverCoverage(context.Background(),dir)
+ if coverageAccount(r,"Cost-A").Status!="UNVERIFIED"{t.Fatalf("required policy was not verified: %+v",r)}
+}
 func TestCoverageFindsMismatchedPeriodAndZeroDenominator(t *testing.T) {
  for _,tc:=range []struct{name,driver,why string}{
   {"wrong-period","period,department,sku,material\n2025-12,SharedPool,Item-A,8\n2025-12,SharedPool,Item-B,2\n","没有符合"},

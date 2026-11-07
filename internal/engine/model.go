@@ -12,6 +12,7 @@ import (
 )
 
 const Schema = "allocation-ir/2.0"
+
 // Existing rules without rounding_policy retain established result bytes.
 const RoundingLargestRemainderIdentity = "LARGEST_REMAINDER_IDENTITY"
 const maxDecimalTextBytes = 128
@@ -22,15 +23,17 @@ type Spec struct {
 	Schema         string                         `json:"schema"`
 	RoundingPolicy string                         `json:"rounding_policy,omitempty"`
 	Name           string                         `json:"name"`
-	Precision   int                            `json:"precision"`
-	Dimensions  []string                       `json:"dimensions"`
-	Immutable   []string                       `json:"immutable_dimensions"`
-	Hierarchies map[string]map[string][]string `json:"hierarchies"`
-	Datasets    struct {
+	Precision      int                            `json:"precision"`
+	Dimensions     []string                       `json:"dimensions"`
+	Immutable      []string                       `json:"immutable_dimensions"`
+	Hierarchies    map[string]map[string][]string `json:"hierarchies"`
+	Datasets       struct {
 		Amounts map[string]string `json:"amounts"`
 		Drivers map[string]string `json:"drivers"`
 	} `json:"datasets"`
-	Stages []Stage `json:"stages"`
+	// Explicitly ignored amount sources, with business reasons; no data is read.
+	IgnoredAmounts map[string]string `json:"ignored_amounts,omitempty"`
+	Stages         []Stage           `json:"stages"`
 }
 type Filter struct {
 	Include []string `json:"include"`
@@ -59,17 +62,30 @@ type Allocation struct {
 	DriverFilters  map[string]Filter `json:"driver_filters"`
 	NegativePolicy string            `json:"negative_driver_policy"`
 	// Signed driver values are a business exception, never inferred.
-	SignedDriverReason string `json:"signed_driver_reason,omitempty"`
+	SignedDriverReason            string              `json:"signed_driver_reason,omitempty"`
+	RequiredTargetMembers         map[string][]string `json:"required_target_members,omitempty"`
+	RequiredPositiveTargetMembers map[string][]string `json:"required_positive_target_members,omitempty"`
+	RequiredTargetsBySource       []TargetRequirement `json:"required_targets_by_source,omitempty"`
+	RequireSourceTargetPolicy     bool                `json:"require_source_target_policy,omitempty"`
+}
+
+// TargetRequirement applies conjunctive literal source-pool predicates.
+// Each list is an allowed set for one AS_IS source dimension.
+type TargetRequirement struct {
+	WhenSource      map[string][]string `json:"when_source"`
+	Members         map[string][]string `json:"members,omitempty"`
+	PositiveMembers map[string][]string `json:"positive_members,omitempty"`
 }
 type Stage struct {
-	Operation        string            `json:"operation"` // ALLOCATE(default), MERGE, PASS
-	ID               string            `json:"id"`
-	Inputs           []InputEdge       `json:"inputs"`
-	Source           Source            `json:"source"`
-	Target           map[string]Target `json:"target"`
-	ConservationKeys []string          `json:"conservation_keys"`
-	Allocations      []Allocation      `json:"allocations"`
-	Enabled          *bool             `json:"enabled"`
+	Operation             string            `json:"operation"` // ALLOCATE(default), MERGE, PASS
+	ID                    string            `json:"id"`
+	Inputs                []InputEdge       `json:"inputs"`
+	Source                Source            `json:"source"`
+	Target                map[string]Target `json:"target"`
+	ConservationKeys      []string          `json:"conservation_keys"`
+	Allocations           []Allocation      `json:"allocations"`
+	Enabled               *bool             `json:"enabled"`
+	SourceUnmatchedPolicy string            `json:"source_unmatched_policy,omitempty"` // PASS (legacy) or BLOCK
 }
 type Row struct {
 	Coord  map[string]string

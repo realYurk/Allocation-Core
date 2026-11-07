@@ -388,6 +388,23 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 			summary.DataSHA256[path] = hash
 		}
 	}
+	var expected map[string]string
+	if cp != nil {
+		expected = cp.identity.InputSHA256
+	}
+	snapshot, e := snapshotInputs(&spec, plan, base, filepath.Dir(final), expected)
+	if e != nil {
+		return summary, e
+	}
+	defer snapshot.close()
+	defer func() {
+		if err != nil {
+			err = snapshot.restoreError(err)
+		}
+	}()
+	for path, hash := range snapshot.hashes {
+		summary.DataSHA256[path] = hash
+	}
 	working, e := os.MkdirTemp(filepath.Dir(final), ".allocation-incomplete-")
 	if e != nil {
 		return summary, e
@@ -495,11 +512,6 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 		if e != nil {
 			return summary, fmt.Errorf("amount source %s: %w", source, e)
 		}
-		hash, er := fileSHA(path)
-		if er != nil {
-			return summary, er
-		}
-		summary.DataSHA256[path] = hash
 	}
 	summary.InputAmount = Money(originalTotal, spec.Precision)
 	driverCache := map[string][]DriverRow{}
@@ -570,8 +582,12 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 			if er != nil {
 				return summary, er
 			}
+			// A later validation or allocation failure must close the handle
+			// before removing the temporary directory, including on Windows.
+			defer stageOut.f.Close()
 		}
 		var before, after int64
+		var unmatched unmatchedStats
 		stageRows, stagePools := 0, 0
 		emit := func(row Row) error {
 			var e error
@@ -647,13 +663,6 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 				if idx.ix.disk != nil {
 					defer idx.ix.disk.close()
 				}
-				if _, ok := summary.DataSHA256[path]; !ok {
-					hash, ee := fileSHA(path)
-					if ee != nil {
-						return summary, ee
-					}
-					summary.DataSHA256[path] = hash
-				}
 				refs = append(refs, idx)
 				active = append(active, a)
 				share := a.Share
@@ -722,6 +731,10 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 						return e
 					}
 					if !sourceFilter(row, checks) {
+						unmatched.add(row)
+						if st.SourceUnmatchedPolicy == "BLOCK" {
+							return fail("stage %s source filter unmatched row %s; source_unmatched_policy=BLOCK", st.ID, key(row.Coord, spec.Dimensions))
+						}
 						return emit(row)
 					}
 					pool := make(map[string]string, len(spec.Dimensions))
@@ -842,6 +855,7 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 			return summary, fail("stage %s total mismatch %d vs %d", st.ID, before, after)
 		}
 		stageSummary := StageSummary{Stage: st.ID, Input: Money(before, spec.Precision), Output: Money(after, spec.Precision), Pools: stagePools, OutputRows: stageRows}
+		unmatched.annotate(&stageSummary, spec.Precision)
 		summary.Stages = append(summary.Stages, stageSummary)
 		summary.OutputRows += stageRows
 		if stageRecord != nil {
@@ -860,6 +874,7 @@ func RunDiskWithOptions(configPath, final string, options RunOptions) (summary S
 		return summary, e
 	}
 	summary.OutputAmount = Money(terminal, spec.Precision)
+	summary.SourceCoverage = coverageStatus(summary.Stages)
 	summary.Status = "PASS"
 	for _, s := range []*csvSink{membership, ledger, reconcile, results, lineage} {
 		if e = s.finish(); e != nil {

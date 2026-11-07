@@ -67,7 +67,10 @@ func initCheckpoint(ruleData []byte, spec Spec, configPath, dir, final string, r
 	identity := checkpointIdentity{Format: checkpointFormat, RuleSHA256: hex.EncodeToString(h[:]), InputSHA256: map[string]string{}}
 	paths := map[string]bool{}
 	base := filepath.Dir(configPath)
-	for _, p := range spec.Datasets.Amounts {
+	for name, p := range spec.Datasets.Amounts {
+		if strings.TrimSpace(spec.IgnoredAmounts[name]) != "" {
+			continue
+		}
 		q, e := Resolve(base, p)
 		if e != nil {
 			return nil, e

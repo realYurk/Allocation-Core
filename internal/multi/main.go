@@ -3,6 +3,7 @@
 package multi
 
 import (
+	"allocationcore/internal/engine"
 	"bufio"
 	"context"
 	"crypto/sha256"
@@ -78,17 +79,19 @@ type Rule struct {
 type Assignment struct{ Account, Template string }
 type Override struct{ Account, Stage, Allocation, DriverDataset, WeightField, Share string }
 type Group struct {
-	ID         string         `json:"group_id"`
-	Accounts   []string       `json:"accounts"`
-	Template   string         `json:"template"`
-	Count      int64          `json:"input_rows"`
-	Input      string         `json:"-"`
-	Rule       string         `json:"-"`
-	Output     string         `json:"-"`
-	Summary    map[string]any `json:"-"`
-	DurationMS int64          `json:"duration_ms"`
-	Status     string         `json:"status"`
-	Error      string         `json:"error,omitempty"`
+	ID             string                `json:"group_id"`
+	Accounts       []string              `json:"accounts"`
+	Template       string                `json:"template"`
+	Count          int64                 `json:"input_rows"`
+	Input          string                `json:"-"`
+	Rule           string                `json:"-"`
+	Output         string                `json:"-"`
+	Summary        map[string]any        `json:"-"`
+	DurationMS     int64                 `json:"duration_ms"`
+	Status         string                `json:"status"`
+	Error          string                `json:"error,omitempty"`
+	SourceCoverage string                `json:"source_coverage,omitempty"`
+	CoverageStages []engine.StageSummary `json:"coverage_stages,omitempty"`
 }
 type AccountResult struct {
 	Account  string `json:"account"`
@@ -111,6 +114,7 @@ type Result struct {
 	DriverCacheBuilds int             `json:"driver_cache_builds,omitempty"`
 	Details           []AccountResult `json:"details"`
 	Engines           []Group         `json:"engines"`
+	SourceCoverage    string          `json:"source_coverage"`
 }
 
 type project struct {
@@ -1015,7 +1019,7 @@ loop:
 	return nil
 }
 func (p *project) finish(start time.Time) (Result, error) {
-	r := Result{Status: "PASS", Started: start.UTC().Format(time.RFC3339), Accounts: len(p.assign), Groups: len(p.groups)}
+	r := Result{Status: "PASS", SourceCoverage: "NO_UNMATCHED_OBSERVED", Started: start.UTC().Format(time.RFC3339), Accounts: len(p.assign), Groups: len(p.groups)}
 	input, output := new(big.Int), new(big.Int)
 	actual := map[string]*big.Int{}
 	rows := map[string]int64{}
@@ -1043,6 +1047,19 @@ func (p *project) finish(start time.Time) (Result, error) {
 		}
 	}
 	for _, g := range p.groups {
+		coverage, ok := g.Summary["source_coverage"].(string)
+		if !ok || (coverage != "NO_UNMATCHED_OBSERVED" && coverage != "UNMATCHED_PASSTHROUGH") {
+			coverage = "UNVERIFIED"
+		}
+		g.SourceCoverage = coverage
+		if coverage == "UNVERIFIED" {
+			r.SourceCoverage = "UNVERIFIED"
+		} else if coverage == "UNMATCHED_PASSTHROUGH" && r.SourceCoverage != "UNVERIFIED" {
+			r.SourceCoverage = coverage
+		}
+		if data, e := json.Marshal(g.Summary["stages"]); e == nil {
+			_ = json.Unmarshal(data, &g.CoverageStages)
+		}
 		if n, ok := g.Summary["driver_cache_hits"].(float64); ok {
 			r.DriverCacheHits += int(n)
 		}
