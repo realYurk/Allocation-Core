@@ -74,6 +74,35 @@ func TestInputSnapshotFailureLeavesNoTemporaryDirectory(t *testing.T) {
 		t.Fatalf("temporary input snapshots leaked: %v %v", entries, e)
 	}
 }
+
+func TestInputSnapshotRejectsSourceChangedBeforeVerification(t *testing.T) {
+	rule, spec := coverageContractFixture(t)
+	plan, err := Compile(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := t.TempDir()
+	amount := filepath.Join(filepath.Dir(rule), "amounts.csv")
+	originalPath := spec.Datasets.Amounts["expenses"]
+	modified := false
+	_, err = snapshotInputsWithCopyHook(&spec, plan, filepath.Dir(rule), parent, nil, func(path string) error {
+		if path == amount {
+			modified = true
+			return os.WriteFile(path, []byte("changed while capturing synthetic input"), 0600)
+		}
+		return nil
+	})
+	if !modified || err == nil || !strings.Contains(err.Error(), "input changed while taking snapshot") || !strings.Contains(err.Error(), amount) {
+		t.Fatalf("changed input should fail closed: modified=%v error=%v", modified, err)
+	}
+	if spec.Datasets.Amounts["expenses"] != originalPath {
+		t.Fatal("failed snapshot modified rule dataset paths")
+	}
+	entries, readErr := os.ReadDir(parent)
+	if readErr != nil || len(entries) != 0 {
+		t.Fatalf("failed snapshot left temporary files: %v %v", entries, readErr)
+	}
+}
 func TestInputSnapshotCheckpointIdentityMismatchBlocks(t *testing.T) {
 	rule, spec := coverageContractFixture(t)
 	plan, e := Compile(spec)

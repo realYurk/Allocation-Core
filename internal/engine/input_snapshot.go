@@ -49,6 +49,12 @@ func (s *inputSnapshot) restoreError(err error) error {
 }
 
 func snapshotInputs(spec *Spec, plan Planned, base, parent string, expected map[string]string) (snap *inputSnapshot, err error) {
+	return snapshotInputsWithCopyHook(spec, plan, base, parent, expected, nil)
+}
+
+// The optional hook is used by deterministic fault tests after a file is
+// captured and before its source is rechecked. Production calls pass nil.
+func snapshotInputsWithCopyHook(spec *Spec, plan Planned, base, parent string, expected map[string]string, afterCopy func(string) error) (snap *inputSnapshot, err error) {
 	dir, e := os.MkdirTemp(parent, ".allocation-inputs-")
 	if e != nil {
 		return nil, e
@@ -145,6 +151,11 @@ func snapshotInputs(spec *Spec, plan Planned, base, parent string, expected map[
 				return nil, ce
 			}
 			hash := hex.EncodeToString(h.Sum(nil))
+			if afterCopy != nil {
+				if e = afterCopy(it.path); e != nil {
+					return nil, e
+				}
+			}
 			after, e := fileSHA(it.path)
 			if e != nil || hash != after {
 				return nil, fmt.Errorf("input changed while taking snapshot: %s", it.path)
