@@ -2,6 +2,8 @@
 
 生产适配的已验证范围与尚未关闭的验收门槛见 [生产就绪状态](docs/生产就绪状态.md)。
 
+业务和技术接手人员可先阅读图解版 [产品交接手册](docs/Allocation-Core产品交接手册.md)。
+
 Go 源码组件提供输入检查、分摊和对账接口；Java 和 Python 提供轻量进程客户端，复用同一 Core。可配置执行模式、Worker、检查点和对账策略。源码、示例及能力边界详见 [组件接入说明](docs/组件接入说明.md)。Java/Python 客户端需要对应平台的 Core 可执行文件；不是已完成的同进程原生 SDK。
 
 ## Driver 接入清单 / Driver onboarding checklist
