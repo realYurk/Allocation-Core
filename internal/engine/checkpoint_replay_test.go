@@ -3,11 +3,51 @@ package engine
 import (
 	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestResumeRejectsOlderCheckpointFormatWithoutPublishing(t *testing.T) {
+	tmp := t.TempDir()
+	rule := filepath.Join("..", "..", "examples", "manufacturing", "rule.json")
+	cp := filepath.Join(tmp, "checkpoint")
+	_, err := RunDiskWithOptions(rule, filepath.Join(tmp, "stopped"), RunOptions{DiskPartitions: 4, CheckpointDir: cp, TestStopAfterStage: 1})
+	if err == nil || !strings.Contains(err.Error(), "stopped after durable stage") {
+		t.Fatalf("expected controlled stop: %v", err)
+	}
+	manifest := filepath.Join(cp, "identity.json")
+	raw, err := os.ReadFile(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var identity checkpointIdentity
+	if err = json.Unmarshal(raw, &identity); err != nil {
+		t.Fatal(err)
+	}
+	identity.Format = "allocation-core/stage-checkpoint-v16/2"
+	raw, err = json.Marshal(identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(manifest, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(tmp, "no-publish")
+	_, err = RunDiskWithOptions(rule, out, RunOptions{DiskPartitions: 4, CheckpointDir: cp, Resume: true})
+	if err == nil || !strings.Contains(err.Error(), "checkpoint format incompatible") {
+		t.Fatalf("older checkpoint should be rejected: %v", err)
+	}
+	if _, err = os.Stat(out); !os.IsNotExist(err) {
+		t.Fatalf("output published or stat error: %v", err)
+	}
+	remaining, err := os.ReadFile(manifest)
+	if err != nil || !bytes.Equal(remaining, raw) {
+		t.Fatalf("original checkpoint modified: %v", err)
+	}
+}
 
 func TestCSVExcelBOMAndUnicode(t *testing.T) {
 	dir := t.TempDir()

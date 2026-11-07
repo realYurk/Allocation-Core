@@ -18,7 +18,10 @@ import (
 	"strings"
 )
 
-const checkpointFormat = "allocation-core/stage-checkpoint-v16/2"
+// Bump this compatibility identifier whenever changes to allocation semantics,
+// validation, or stage evidence could make replaying an older stage unsafe.
+// Checkpoints are resumable artifacts, not a long-term interchange format.
+const checkpointFormat = "allocation-core/stage-checkpoint-v16/3"
 
 type checkpointIdentity struct {
 	Format           string            `json:"format"`
@@ -110,7 +113,10 @@ func initCheckpoint(ruleData []byte, spec Spec, configPath, dir, final string, r
 		if e = json.Unmarshal(old, &previous); e != nil {
 			return nil, fail("invalid checkpoint identity: %v", e)
 		}
-		if previous.Format != identity.Format || previous.RuleSHA256 != identity.RuleSHA256 || previous.InputFingerprint != identity.InputFingerprint {
+		if previous.Format != identity.Format {
+			return nil, fail("checkpoint format incompatible with this Core version; use a NEW checkpoint directory")
+		}
+		if previous.RuleSHA256 != identity.RuleSHA256 || previous.InputFingerprint != identity.InputFingerprint {
 			return nil, fail("checkpoint fingerprint mismatch: rule or source/driver data changed; use a NEW checkpoint directory")
 		}
 	} else {
