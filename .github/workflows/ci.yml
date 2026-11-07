@@ -18,6 +18,11 @@ jobs:
         run: |
           go test ./... -count=1
           go vet ./...
+          ALLOCATION_TEST_EXE="$PWD/AllocationCore" python3 -m unittest discover -s clients/python -p test_client.py -v
+          mkdir -p output/sdk-classes output/sdk-java
+          javac --release 8 -encoding UTF-8 -d output/sdk-classes clients/java/allocationcore/Client.java clients/java/ClientSmoke.java
+          printf '%s\n' 'period,plant,brand,family,sku,account,currency,amount' '2026-01,工厂甲,品牌甲,系列甲,Item-A,Cost-A,CUR,100.00' '2026-01,工厂甲,品牌甲,系列甲,Item-B,Cost-A,CUR,300.00' '2026-01,工厂甲,品牌甲,系列乙,商品C,Cost-A,CUR,400.00' '2026-01,工厂甲,品牌甲,系列乙,商品D,Cost-A,CUR,400.00' > output/sdk-reference.csv
+          java -cp output/sdk-classes ClientSmoke "$PWD/AllocationCore" "$PWD/examples/manufacturing/rule.json" "$PWD/output/sdk-java" "$PWD/output/sdk-reference.csv"
           node --test internal/studio/factor_editor_node_test.cjs
           # All finance-facing standalone scripts must parse before shipping.
           node --check internal/studio/public/quickstart.js
@@ -78,7 +83,7 @@ jobs:
       - name: Archive one-folder product
         shell: pwsh
         run: |
-          $include = @('AllocationCore.exe','go.mod','go.sum','main.go','README.md','.gitignore','adapter','internal','examples','testdata','docs','input')
+          $include = @('AllocationCore.exe','go.mod','go.sum','main.go','README.md','.gitignore','adapter','core','sdk','clients','internal','examples','testdata','docs','input')
           New-Item -ItemType Directory -Force dist\Allocation-Core-Clean | Out-Null
           foreach ($item in $include) { Copy-Item -Recurse -Force $item dist\Allocation-Core-Clean\ }
           Get-ChildItem dist\Allocation-Core-Clean -Recurse -File | Where-Object { $_.Extension -in @('.csv','.xlsx','.xls','.db','.sqlite') } | Remove-Item -Force

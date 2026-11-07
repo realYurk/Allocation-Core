@@ -27,6 +27,9 @@ testdata/scale_1000/
 # Local test artifacts and user-specific run state
 AllocationCore
 AllocationCore.exe
+!clients/java/allocationcore/
+clients/java/allocationcore/*
+!clients/java/allocationcore/*.java
 **/driver-cache/
 **/run_summary.json
 # V4 local cache and independent business-acceptance evidence
