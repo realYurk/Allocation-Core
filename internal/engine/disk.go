@@ -340,6 +340,11 @@ func shouldStreamCoalesceSpool(path string, dims []string) (bool, error) {
 // Each intermediate output is aggregated by full coordinates before routing,
 // matching the single-core engine's DAG semantics even for fractional edges.
 func RunDiskWithOptions(configPath, final string, options RunOptions) (summary Summary, err error) {
+	defer func() {
+		if err != nil {
+			summary.Status = "BLOCK"
+		}
+	}()
 	if options.DiskPartitions < 2 || options.DiskPartitions > 64 {
 		return summary, fail("disk partitions must be 2..64")
 	}

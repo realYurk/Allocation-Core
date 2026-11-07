@@ -725,6 +725,11 @@ func Run(configPath, outputDir string) (Summary, error) {
 }
 
 func RunWithOptions(configPath, outputDir string, options RunOptions) (summary Summary, runErr error) {
+	defer func() {
+		if runErr != nil {
+			summary.Status = "BLOCK"
+		}
+	}()
 	if options.Workers < 0 || options.Workers > 128 {
 		return summary, fail("workers must be 0..128")
 	}
